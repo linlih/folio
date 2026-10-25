@@ -35,6 +35,8 @@ curl -fsSL https://raw.githubusercontent.com/linlih/folio/main/scripts/install-s
 
 The script installs everything under `/opt/folio-sync` (program, settings and token, data, logs rotated daily) as the systemd service `folio-sync`, sets up HTTPS with Caddy (when the machine has none, Caddy's official release is installed into `/opt/folio-sync`, checksum-verified and run as the service `folio-sync-caddy`, with no package manager needed; when it has one, the script asks before adding a site to your Caddyfile; `--https-port` picks another port than 443), and prints the server address and token to enter in **Settings → Sync** in the app. The server only ever sees encrypted data.
 
+Run on a terminal without options, it asks step by step for the domain, the public HTTPS port (443 by default; another port avoids most scanning) and the local port, then shows the plan and changes nothing until you agree. For unattended installs pass `--domain`, `--https-port`, `--port` and `--yes`.
+
 Manage it with the `folio-sync` command:
 
 ```

@@ -4,7 +4,10 @@
 #
 #   curl -fsSL https://raw.githubusercontent.com/linlih/folio/main/scripts/install-server.sh | sudo bash -s -- --domain sync.example.com
 #
-# Point the domain's DNS (A / AAAA record) at the machine first. Everything
+# Point the domain's DNS (A / AAAA record) at the machine first. Run without
+# options on a terminal, it asks for the domain, the public HTTPS port (443,
+# or another to avoid most scanning) and the local port, shows the plan and
+# changes nothing until you agree; re-runs offer the earlier answers. Everything
 # goes under /opt/folio-sync (bin, etc, data, logs); the systemd service and
 # the management command are both called folio-sync:
 #
@@ -14,6 +17,7 @@
 # keeps its token and data. Options:
 #
 #   --domain NAME     the address devices use (asked for when missing)
+#   (the three values below are asked for too, unless given or --yes)
 #   --email ADDR      for Let's Encrypt notices (only when Caddy is set up new)
 #   --port N          local port of the server (default 8787)
 #   --https-port N    public HTTPS port (default 443; certificates still use 80)
@@ -54,7 +58,7 @@ CADDY_SHA512_ARM64="3db36ba90c7a6e8dda40ee3dd71fa08844c76b5fb08f61b31e5e78d2ed38
 BEGIN_MARK="# >>> folio-sync (managed by install-server.sh)"
 END_MARK="# <<< folio-sync"
 
-domain=""; email=""; port=8787; https_port=443; version="latest"; binary=""; caddy=1; yes=0; uninstall=0; purge=0
+domain=""; email=""; port=""; https_port=""; version="latest"; binary=""; caddy=1; yes=0; uninstall=0; purge=0
 
 # ---- messages, in Chinese when the system speaks it ----
 case "${LC_ALL:-${LANG:-}}" in zh*) ZH=1 ;; *) ZH=0 ;; esac
@@ -87,15 +91,13 @@ while [[ $# -gt 0 ]]; do
     --yes|-y) yes=1; shift ;;
     --uninstall) uninstall=1; shift ;;
     --purge) purge=1; shift ;;
-    -h|--help) sed -n '2,35p' "$0" 2>/dev/null || true; exit 0 ;;
+    -h|--help) sed -n '2,40p' "$0" 2>/dev/null || true; exit 0 ;;
     *) die "不认识的参数：$1" "unknown option: $1" ;;
   esac
 done
 
 [[ $EUID -eq 0 ]] || die "请用 root 运行（在命令前加 sudo）。" "run as root (prefix the command with sudo)."
 command -v systemctl >/dev/null || die "需要 systemd。" "systemd is required."
-[[ "$port" =~ ^[0-9]+$ ]] || die "端口不对：$port" "not a port: $port"
-[[ "$https_port" =~ ^[0-9]+$ ]] || die "端口不对：$https_port" "not a port: $https_port"
 
 caddy_managed() { command -v caddy >/dev/null && [[ -f "$CADDYFILE" ]] && systemctl cat caddy 2>/dev/null | grep -q "$CADDYFILE"; }
 
@@ -147,15 +149,65 @@ if [[ $uninstall -eq 1 ]]; then
   exit 0
 fi
 
-# ---- the domain ----
-if [[ -z "$domain" && -f "$ENV_FILE" ]]; then domain="$(sed -n 's/^FOLIO_DOMAIN=//p' "$ENV_FILE")"; fi
-if [[ -z "$domain" && -r /dev/tty ]]; then
-  printf '%s ' "$(msg "同步服务用的域名（例如 sync.example.com）：" "Domain for the sync server (for example sync.example.com):")" > /dev/tty
-  read -r domain < /dev/tty || true
+# ---- domain and ports, asked step by step ----
+saved() { [[ -f "$ENV_FILE" ]] && sed -n "s/^$1=//p" "$ENV_FILE"; }
+# Defaults: what this machine was set up with before, else the usual ones.
+saved_domain="$(saved FOLIO_DOMAIN)"
+saved_https="$(saved FOLIO_HTTPS_PORT)"
+saved_port="$(saved FOLIO_SERVER_ADDR | sed 's/.*://')"
+interactive=0; [[ $yes -eq 0 && -r /dev/tty ]] && interactive=1
+
+# Asks on the terminal, showing the default; Enter keeps it.
+prompt() {
+  local reply=""
+  printf '%s%s ' "$(msg "$1" "$2")" "${3:+ [$3]}" > /dev/tty
+  read -r reply < /dev/tty || true
+  printf '%s' "${reply:-$3}"
+}
+if [[ $interactive -eq 1 ]]; then
+  printf '\n'
+  msg "Folio 同步服务安装：只需要一个域名、一个公网 HTTPS 端口和一个本机端口，回车使用括号里的值。" \
+      "Folio sync server setup: a domain, a public HTTPS port and a local port. Press Enter to keep the value in brackets."
 fi
+if [[ -z "$domain" ]]; then
+  if [[ $interactive -eq 1 ]]; then
+    printf '\n'
+    msg "  只填主机名，不带 https:// 和路径。它的 A / AAAA 记录要已经指向这台服务器。" \
+        "  The host name only, without https:// or a path. Its A / AAAA record must already point at this server."
+    domain="$(prompt "第 1/3 步 - 域名：" "Step 1/3 - Domain:" "$saved_domain")"
+  else
+    domain="$saved_domain"
+  fi
+fi
+if [[ -z "$https_port" ]]; then
+  if [[ $interactive -eq 1 ]]; then
+    printf '\n'
+    msg "  设备通过它连接（HTTPS 和 WebSocket）。换成 443 以外的端口可以避开大部分扫描，地址里会带上端口；记得在云服务商的安全组放行它。TCP 80 另外只用于申请和续期证书。" \
+        "  Devices connect on it (HTTPS and WebSocket). A port other than 443 avoids most scanning; the address then carries the port. Allow it in your provider's security group. TCP 80 is used only to get and renew the certificate."
+    https_port="$(prompt "第 2/3 步 - 公网 HTTPS 端口：" "Step 2/3 - Public HTTPS port:" "${saved_https:-443}")"
+  else
+    https_port="${saved_https:-443}"
+  fi
+fi
+if [[ -z "$port" ]]; then
+  if [[ $interactive -eq 1 ]]; then
+    printf '\n'
+    msg "  同步服务只在 127.0.0.1 上监听这个端口，由 Caddy 转发过去。不要对外开放。" \
+        "  The sync server listens on this port on 127.0.0.1 only; Caddy forwards to it. Never open it to the internet."
+    port="$(prompt "第 3/3 步 - 本机端口：" "Step 3/3 - Local port:" "${saved_port:-8787}")"
+  else
+    port="${saved_port:-8787}"
+  fi
+fi
+
 domain="${domain#https://}"; domain="${domain#http://}"; domain="${domain%%/*}"
 [[ "$domain" =~ ^[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?(\.[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?)+$ ]] \
   || die "需要一个域名（--domain sync.example.com）。" "a domain is needed (--domain sync.example.com)."
+for p in "$port" "$https_port"; do
+  [[ "$p" =~ ^[0-9]+$ && "$p" -ge 1 && "$p" -le 65535 ]] || die "端口不对：$p" "not a port: $p"
+done
+[[ "$https_port" != 80 && "$port" != 80 ]] || die "端口 80 留给证书申请，请换一个。" "port 80 is kept for certificates; choose another."
+[[ "$https_port" != "$port" ]] || die "公网 HTTPS 端口和本机端口不能相同。" "the public HTTPS port and the local port must differ."
 # The site address devices use: the domain, with the port when it is not 443.
 site="$domain"; [[ "$https_port" != 443 ]] && site="$domain:$https_port"
 url="https://$site"
@@ -228,10 +280,8 @@ if [[ $caddy -eq 1 ]]; then
     msg "  程序  $shared_exe" "  program  $shared_exe"
     msg "  配置  $shared_config" "  config   $shared_config"
     msg "  服务  ${shared_unit:-（不是 systemd 服务）}" "  service  ${shared_unit:-(not a systemd service)}"
-    ask "把 $site 的站点加到它的配置里？（先备份、检查通过才写入，原有站点不受影响）" \
-        "Add a site for $site to its configuration? (backed up and checked first; its other sites are untouched)" \
-      || die "没有改动。也可以用 --https-port 换一个端口，或用 --no-caddy 自己配置代理。" "Nothing changed. You can also pick another port with --https-port, or set up your proxy yourself with --no-caddy."
     caddy_mode=shared
+    plan_https="$(msg "把站点加到这个 Caddy 的配置 $shared_config（先备份、检查通过才写入，原有站点不受影响）" "add a site to that Caddy's $shared_config (backed up and checked first; its other sites are untouched)")"
   elif [[ -n "$holder" ]]; then
     name="$(proc_name "$holder")"
     if [[ "$holder_port" == 80 ]]; then
@@ -242,19 +292,33 @@ if [[ $caddy -eq 1 ]]; then
         "port $holder_port is used by $name (pid $holder). Choose another with --https-port (8443, say), or use --no-caddy and have your existing proxy forward to 127.0.0.1:$port."
   elif [[ -f "$CADDY_UNIT" ]]; then
     caddy_mode=bundled
+    plan_https="$(msg "Folio 自带的 Caddy（服务 $NAME-caddy），更新它的配置" "Folio's own Caddy (the service $NAME-caddy), its configuration updated")"
   elif command -v caddy >/dev/null && caddy_managed; then
     # The machine's own Caddy, installed but not running.
     shared_config="$CADDYFILE"; shared_unit=caddy.service; shared_exe="$(command -v caddy)"
-    ask "这台机器已经装了 Caddy。在 $CADDYFILE 里为 $site 添加站点？（原文件会备份）" "Caddy is already installed here. Add a site for $site to $CADDYFILE? (the file is backed up first)" \
-      && caddy_mode=shared
+    caddy_mode=shared
+    plan_https="$(msg "这台机器的 Caddy：把站点加到 $CADDYFILE（先备份）并启动它" "this machine's Caddy: add a site to $CADDYFILE (backed up first) and start it")"
   elif command -v caddy >/dev/null; then
-    warn "这台机器的 Caddy 不是用 $CADDYFILE 管理的，请把下面的站点加到你的配置里：" \
-         "This machine's Caddy is not run from $CADDYFILE; add this site to your configuration:"
-    block
-  elif ask "没有找到 Caddy。安装 Folio 自带的 Caddy（官方 $CADDY_VERSION）到 $HOME_DIR，作为服务 $NAME-caddy 运行，自动申请和续期 HTTPS 证书？" \
-           "No Caddy found. Install Caddy $CADDY_VERSION (the official release) into $HOME_DIR as the service $NAME-caddy, which gets and renews the HTTPS certificate?"; then
+    caddy_mode=foreign
+    plan_https="$(msg "不配置：这台机器的 Caddy 不是用 $CADDYFILE 管理的，装完后把打印的站点加进它的配置" "none: this machine's Caddy is not run from $CADDYFILE; add the printed site to its configuration afterwards")"
+  else
     caddy_mode=bundled
+    plan_https="$(msg "安装 Caddy $CADDY_VERSION（官方发布，校验 SHA-512）到 $HOME_DIR，作为服务 $NAME-caddy 运行，自动申请和续期证书" "install Caddy $CADDY_VERSION (official release, SHA-512 checked) into $HOME_DIR as the service $NAME-caddy, which gets and renews the certificate")"
   fi
+else
+  plan_https="$(msg "不配置（--no-caddy）：用你自己的代理把 $url 转发到 127.0.0.1:$port" "none (--no-caddy): have your own proxy forward $url to 127.0.0.1:$port")"
+fi
+
+# ---- the plan, before anything changes ----
+step "安装计划" "The plan"
+printf '  %-14s %s\n' "$(msg "服务器地址" "Server address")" "$url"
+printf '  %-14s %s\n' "$(msg "公网端口" "Public ports")" "$(msg "TCP $https_port（HTTPS），TCP 80（只用于证书）" "TCP $https_port (HTTPS), TCP 80 (certificates only)")"
+printf '  %-14s %s\n' "$(msg "本机端口" "Local port")" "$(msg "127.0.0.1:$port（不对外开放）" "127.0.0.1:$port (not open to the internet)")"
+printf '  %-14s %s\n' "HTTPS" "$plan_https"
+printf '  %-14s %s\n' "$(msg "安装位置" "Installed in")" "$(msg "$HOME_DIR（服务和命令都叫 $NAME）" "$HOME_DIR (the service and the command are both $NAME)")"
+msg "  云服务商的安全组需要放行 TCP 80 和 TCP $https_port。" "  Your provider's security group must allow TCP 80 and TCP $https_port."
+if [[ $interactive -eq 1 ]]; then
+  ask "按这个计划开始？" "Go ahead with this plan?" || { msg "没有做任何改动。" "Nothing was changed."; exit 0; }
 fi
 
 # ---- the binary ----
@@ -621,6 +685,10 @@ if [[ $caddy -eq 1 ]]; then
     shared)
       [[ -f "$CADDY_UNIT" ]] && retire_bundled_caddy
       setup_shared_caddy ;;
+    foreign)
+      warn "这台机器的 Caddy 不是用 $CADDYFILE 管理的，请把下面的站点加到你的配置里：" \
+           "This machine's Caddy is not run from $CADDYFILE; add this site to your configuration:"
+      block ;;
     *) msg "没有配置 HTTPS。用你自己的代理把 $url 转发到 127.0.0.1:$port。" "HTTPS is not set up. Have your own proxy forward $url to 127.0.0.1:$port." ;;
   esac
 

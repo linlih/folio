@@ -83,6 +83,27 @@ jobs:
           test "$(curl -fsSk https://folio-a.localhost:8443/health)" = ok
           sudo folio-sync info | grep -q "server:   https://folio-a.localhost:8443"
 
+      - name: Running again without the option keeps the chosen port
+        run: |
+          sudo ./scripts/install-server.sh --binary target/release/folio-server --yes
+          test "$(curl -fsSk https://folio-a.localhost:8443/health)" = ok
+          sudo folio-sync info | grep -q "server:   https://folio-a.localhost:8443"
+
+      - name: The guided setup (answers typed on a terminal)
+        run: |
+          # Domain, HTTPS port, local port (Enter: keep), plan (Enter: yes).
+          printf 'folio-w.localhost\n9444\n\n\n' | sudo script -qec "./scripts/install-server.sh --binary target/release/folio-server" /dev/null | tee /tmp/wizard
+          grep -q "Step 2/3 - Public HTTPS port: \[8443\]" /tmp/wizard
+          grep -q "The plan" /tmp/wizard
+          test "$(curl -fsSk https://folio-w.localhost:9444/health)" = ok
+          sudo folio-sync info | grep -q "server:   https://folio-w.localhost:9444"
+
+      - name: Declining the plan changes nothing
+        run: |
+          printf 'folio-x.localhost\n9555\n\nn\n' | sudo script -qec "./scripts/install-server.sh --binary target/release/folio-server" /dev/null | tee /tmp/declined
+          grep -q "Nothing was changed" /tmp/declined
+          sudo folio-sync info | grep -q "server:   https://folio-w.localhost:9444"
+
       - name: A taken port is named
         run: |
           python3 -m http.server 9443 --bind 0.0.0.0 > /dev/null 2>&1 &

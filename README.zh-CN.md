@@ -35,6 +35,8 @@ curl -fsSL https://raw.githubusercontent.com/linlih/folio/main/scripts/install-s
 
 脚本把所有文件装在 `/opt/folio-sync`（程序、设置和令牌、数据、按天轮转的日志），注册为 systemd 服务 `folio-sync`，用 Caddy 配好 HTTPS（机器上没有 Caddy 时，把 Caddy 官方发布的程序校验后装进 `/opt/folio-sync`，作为服务 `folio-sync-caddy` 运行，不需要包管理器；已经有 Caddy 时会先询问再往现有的 Caddyfile 里加站点；`--https-port` 可以换掉 443 端口），最后打印服务器地址和令牌，填到应用的“设置 → 同步”里即可。服务器上只有加密后的数据。
 
+在终端里不带参数运行时，会按步骤询问域名、公网 HTTPS 端口（默认 443；换成别的端口可以避开大部分扫描）和本机端口，列出安装计划，同意后才开始。无人值守安装用 `--domain`、`--https-port`、`--port` 和 `--yes`。
+
 用 `folio-sync` 命令管理：
 
 ```
