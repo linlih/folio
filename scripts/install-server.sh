@@ -451,7 +451,8 @@ setup_bundled_caddy() {
     [[ -n "$email" ]] && printf '{\n\temail %s\n}\n\n' "$email"
     printf '%s {\n\treverse_proxy 127.0.0.1:%s\n%s}\n' "$site" "$port" "$tls"
   } > "$tmp/Caddyfile"
-  XDG_DATA_HOME="$tmp" XDG_CONFIG_HOME="$tmp" "$CADDY_BIN" validate --config "$tmp/Caddyfile" --adapter caddyfile > "$tmp/validate.log" 2>&1 \
+  # Checked by parsing (adapt): validate would also set up certificates.
+  "$CADDY_BIN" adapt --config "$tmp/Caddyfile" --adapter caddyfile > "$tmp/validate.log" 2>&1 \
     || { cat "$tmp/validate.log" >&2; die "Caddy 配置没有通过检查。" "the Caddy configuration did not validate."; }
   install -m 0640 -o root -g "$CADDY_USER" "$tmp/Caddyfile" "$CADDY_DIR/Caddyfile"
 
