@@ -29,7 +29,12 @@ tracing-appender = "0.2"
 # Folder pickers and showing files in Finder / Explorer (export, backups).
 tauri-plugin-dialog = "2"
 tauri-plugin-opener = "2"
+# Reading the latest release on phones, where the updater plugin does not run.
+ureq = { version = "2", features = ["json"] }
 
 # System-wide quick capture shortcut (desktop only).
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-global-shortcut = "2"
+# Updates from GitHub Releases, and restarting into them (desktop only).
+tauri-plugin-updater = "2"
+tauri-plugin-process = "2"

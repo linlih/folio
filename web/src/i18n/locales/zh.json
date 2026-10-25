@@ -583,5 +583,27 @@
     "moveDown": "下移",
     "fold": "折叠 / 展开",
     "hideKeyboard": "收起键盘"
+  },
+  "update": {
+    "title": "Folio {{version}} 可以更新了",
+    "now": "立即更新",
+    "download": "下载新版本",
+    "later": "稍后",
+    "skip": "跳过此版本",
+    "downloading": "正在下载…",
+    "restarting": "正在重启…",
+    "failed": "更新失败：{{message}}",
+    "row": "更新",
+    "check": "检查更新",
+    "checking": "正在检查…",
+    "uptodate": "已是最新版本",
+    "available": "有新版本 {{version}}",
+    "unsupported": "这里不能自动更新（iOS 请从 App Store 更新）",
+    "error": "检查失败：{{message}}",
+    "hint": "从 GitHub Releases 获取新版本，下载后会校验签名。",
+    "auto": "自动检查更新",
+    "autoHint": "每天检查一次，有新版本时提示。",
+    "on": "开",
+    "off": "关"
   }
 }

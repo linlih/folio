@@ -1,6 +1,8 @@
 # Installers for desktop and phones. Run it from the Actions tab ("Run
-# workflow"), or push a tag like v0.1.0 to also make a draft release.
-# Builds are kept as artifacts of the run for 14 days.
+# workflow") to get them as artifacts of the run (kept 14 days), or push a
+# tag like v0.1.0 (scripts/release.sh) to publish a release: the installers,
+# the Android APK and latest.json, which installed apps check for updates
+# (design/ARCHITECTURE.md §7.3).
 name: Build apps
 
 on:
@@ -16,7 +18,34 @@ env:
   NODE_VERSION: 22
 
 jobs:
+  # A tag makes the release first, with the tag's message as its notes, so
+  # every build below adds its files to the same one.
+  release:
+    name: Release
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      notes: ${{ steps.notes.outputs.notes }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: notes
+        run: |
+          git fetch --force --tags
+          notes=$(git tag -l --format='%(contents)' "$GITHUB_REF_NAME")
+          { echo "notes<<END_OF_NOTES"; echo "$notes"; echo "END_OF_NOTES"; } >> "$GITHUB_OUTPUT"
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1 || gh release create "$GITHUB_REF_NAME" --title "Folio $GITHUB_REF_NAME" --notes-from-tag --verify-tag
+
   desktop:
+    needs: release
+    if: ${{ !cancelled() && (needs.release.result == 'success' || needs.release.result == 'skipped') }}
+    permissions:
+      contents: write
     strategy:
       fail-fast: false
       matrix:
@@ -57,15 +86,22 @@ jobs:
       - name: Fonts
         shell: bash
         run: ./scripts/fetch-fonts.sh
+      # Signs the update packages (the apps check that signature before
+      # installing) and, for a tag, adds them and latest.json to the release.
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           args: ${{ matrix.args }}
           tagName: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || '' }}
           releaseName: Folio ${{ github.ref_name }}
-          releaseDraft: true
-          prerelease: true
+          releaseBody: ${{ needs.release.outputs.notes }}
+          releaseDraft: false
+          prerelease: false
+          includeUpdaterJson: true
+          updaterJsonPreferNsis: true
       - uses: actions/upload-artifact@v4
         with:
           name: folio-${{ matrix.name }}
@@ -81,6 +117,10 @@ jobs:
 
   android:
     name: Android (APK)
+    needs: release
+    if: ${{ !cancelled() && (needs.release.result == 'success' || needs.release.result == 'skipped') }}
+    permissions:
+      contents: write
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -131,6 +171,13 @@ jobs:
           "$tools/apksigner" sign --ks "$RUNNER_TEMP/folio.p12" --ks-type PKCS12 --ks-pass env:KEYSTORE_PASSWORD \
             --ks-key-alias folio --out out/folio-android-arm64.apk "$RUNNER_TEMP/aligned.apk"
           "$tools/apksigner" verify out/folio-android-arm64.apk
+      # Under a fixed name, so releases/latest/download/folio-android-arm64.apk
+      # is always the newest (the Android app opens it to update).
+      - name: Add to the release
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$GITHUB_REF_NAME" out/folio-android-arm64.apk --clobber
       - uses: actions/upload-artifact@v4
         with:
           name: folio-Android

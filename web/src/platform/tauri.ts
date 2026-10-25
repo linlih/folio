@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { AppInfo, BackupInfo, Backlink, BlockText, CardRow, JournalDay, McpStatus, SearchHit, SyncStatus, TagInfo, TopicCount, CardText } from "../bindings/commands";
 import type { Backend, ExportResult } from "./backend";
-import type { LibraryLocation, PickedFolder } from "../bindings/commands";
+import type { LatestRelease, LibraryLocation, PickedFolder } from "../bindings/commands";
 
 export function tauriBackend(): Backend {
   return {
@@ -50,6 +50,8 @@ export function tauriBackend(): Backend {
     moveLibrary: (to) => invoke<string>("move_library", { to }),
     openLibrary: (path) => invoke<string>("open_library", { path }),
     revealLibrary: () => invoke<void>("reveal_library"),
+    latestRelease: () => invoke<LatestRelease>("latest_release"),
+    openReleaseDownload: (url) => invoke<void>("open_release_download", { url }),
     mcpStatus: () => invoke<McpStatus>("mcp_status"),
     setMcpEnabled: (enabled) => invoke<McpStatus>("set_mcp_enabled", { enabled }),
     regenerateMcpToken: () => invoke<McpStatus>("regenerate_mcp_token"),

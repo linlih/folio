@@ -70,6 +70,8 @@ struct AppInfo {
     frontend_peer: String,
     /// The peer id of the frontend's API replica.
     api_peer: String,
+    /// "macos", "windows", "linux", "android" or "ios": how updates arrive.
+    platform: &'static str,
 }
 
 #[tauri::command]
@@ -81,7 +83,53 @@ fn app_info(app: tauri::AppHandle, state: tauri::State<AppState>) -> CmdResult<A
         // As strings: a u64 does not fit a JavaScript number.
         frontend_peer: store.frontend_peer()?.to_string(),
         api_peer: store.api_peer()?.to_string(),
+        platform: std::env::consts::OS,
     })
+}
+
+/// Where releases are published; the desktop updater reads the same file
+/// (tauri.conf.json `plugins.updater`).
+const RELEASES: &str = "https://github.com/linlih/folio/releases/latest/download";
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct LatestRelease {
+    version: String,
+    notes: String,
+    date: Option<String>,
+    /// The Android package of that release.
+    apk: String,
+}
+
+/// The newest release, for phones (the updater plugin is desktop only):
+/// what latest.json says, read here because the page cannot fetch across
+/// origins.
+#[tauri::command]
+async fn latest_release() -> CmdResult<LatestRelease> {
+    let json: serde_json::Value = ureq::get(&format!("{RELEASES}/latest.json"))
+        .timeout(std::time::Duration::from_secs(20))
+        .call()
+        .map_err(|e| CommandError::Other(e.to_string()))?
+        .into_json()
+        .map_err(|e| CommandError::Other(e.to_string()))?;
+    let text = |k: &str| json.get(k).and_then(|v| v.as_str()).map(str::to_owned);
+    Ok(LatestRelease {
+        version: text("version").unwrap_or_default().trim_start_matches('v').to_owned(),
+        notes: text("notes").unwrap_or_default(),
+        date: text("pub_date"),
+        apk: format!("{RELEASES}/folio-android-arm64.apk"),
+    })
+}
+
+/// Opens a download from this project's releases in the system (the APK on
+/// Android installs from there). Only release links are opened.
+#[tauri::command]
+fn open_release_download(app: tauri::AppHandle, url: String) -> CmdResult<()> {
+    use tauri_plugin_opener::OpenerExt;
+    if !url.starts_with("https://github.com/linlih/folio/releases/") {
+        return Err(CommandError::Other("not a release link".into()));
+    }
+    app.opener().open_url(url, None::<&str>).map_err(|e| CommandError::Other(e.to_string()))
 }
 
 #[tauri::command]
@@ -740,12 +788,19 @@ pub fn run() {
             }
             #[cfg(desktop)]
             quick_capture_shortcut(app)?;
+            #[cfg(desktop)]
+            {
+                app.handle().plugin(tauri_plugin_updater::Builder::new().build())?;
+                app.handle().plugin(tauri_plugin_process::init())?;
+            }
             #[cfg(target_os = "macos")]
             app.set_menu(app_menu(app.handle())?)?;
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
             app_info,
+            latest_release,
+            open_release_download,
             list_cards,
             create_card,
             doc_snapshot,

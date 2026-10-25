@@ -19,6 +19,8 @@ import { TabBar } from "./TabBar";
 import { installLongPress } from "./longPress";
 import { KeyboardBar, PhoneNav, PhoneTopBar } from "./PhoneBars";
 import { usePhone, useTouch } from "./phone";
+import { UpdatePrompt } from "../update/UpdatePrompt";
+import { startUpdateChecks } from "../update/updates";
 import { TabDragLayer } from "./tabDrag";
 import { DetailsPanel } from "./DetailsPanel";
 import { useLayoutPersistence } from "./layout";
@@ -124,6 +126,8 @@ export function AppShell() {
   useLayoutPersistence();
   // Long press opens the right-click menus on a touch screen.
   useEffect(() => (touch ? installLongPress() : undefined), [touch]);
+  // A new version from GitHub Releases, checked quietly once a day.
+  useEffect(() => startUpdateChecks(), []);
   useMcpApprovals();
 
   useEffect(() => {
@@ -188,6 +192,7 @@ export function AppShell() {
       <SearchPalette />
       <ShellDialogs />
       <QuickCapture />
+      <UpdatePrompt />
       {notice && (
         <div className="notice" role="status" onClick={() => setNotice(null)}>
           {notice}

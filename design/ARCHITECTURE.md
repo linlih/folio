@@ -721,6 +721,14 @@ folio/
 
 ---
 
+### 7.3 构建与自动更新（2026-10-25）
+
+- **仓库**：`github.com/linlih/folio`（公开）。`CI` 每次推送跑全部测试；`Build apps` 手动运行或推送 `v*` 标签时构建 macOS（通用 `.dmg`）、Windows（`.msi` / `.exe`）、Linux（`.deb` / `.rpm` / `.AppImage`）、安卓 APK（arm64），iOS 暂时只检查能否编译。
+- **发布**：`./scripts/release.sh 0.2.0 -m "更新说明" --push`——改 `tauri.conf.json`、`Cargo.toml`、`web/package.json` 和两个锁文件里的版本号，提交，打带说明的标签并推送。标签触发构建：先建 Release（说明取自标签），各平台构建把安装包、更新包和 `latest.json` 加进去，安卓 APK 以固定文件名 `folio-android-arm64.apk` 上传。Release 直接发布（不是草稿），`releases/latest/download/…` 才能指向它。
+- **桌面自动更新**：`tauri-plugin-updater` 读 `releases/latest/download/latest.json`，下载后用 `tauri.conf.json` 里的公钥校验签名再安装，装完 `tauri-plugin-process` 重启。签名私钥在仓库 Secrets（`TAURI_SIGNING_PRIVATE_KEY` 及密码），本机备份在 `~/.folio-signing/`；**私钥丢失则已安装的应用再也无法自动更新**。Linux 只有 AppImage 能自更新。
+- **安卓**：更新插件不支持手机。应用通过 Rust 命令读同一个 `latest.json`（网页跨域读不了），有新版本就提示，“下载新版本”交给系统打开 APK；APK 都用仓库 Secrets 里同一把密钥签名，所以能覆盖安装。**iOS** 只能经 App Store / TestFlight 更新。
+- **界面**：启动 8 秒后、之后每小时看一次是否已过一天，满一天就静默检查；有新版本时右下角卡片显示版本和说明：立即更新（下载进度、重启前先保存）/ 稍后 / 跳过此版本（静默检查不再提示该版本，手动检查仍会提示）。设置 → 关于：检查更新、自动检查开关。失败的静默检查（离线）不提示。
+
 ## 8. 里程碑（单人 + AI 辅助的粗估）
 
 顺序原则：**先做到自己能每天用它记笔记（M2），边用边修**，再做同步、移动端，然后才是白板和插件（见 0.1 产品原则第 2 条）。

@@ -1,0 +1,29 @@
+/* The update card (update/UpdatePrompt.tsx), at the bottom right. */
+.update-prompt {
+  position: fixed;
+  z-index: 80;
+  right: 16px;
+  bottom: calc(16px + var(--safe-bottom));
+  width: min(340px, calc(100vw - 32px));
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--popup);
+  box-shadow: var(--shadow);
+  font-size: 13px;
+  color: var(--text);
+}
+.update-head { display: flex; align-items: center; gap: 8px; color: var(--accent); }
+.update-head strong { flex: 1; color: var(--text); font-weight: 600; }
+.update-notes { max-height: 160px; overflow-y: auto; white-space: pre-wrap; line-height: 1.55; color: var(--secondary); }
+.update-progress { height: 4px; border-radius: 2px; background: var(--hover); overflow: hidden; }
+.update-progress span { display: block; height: 100%; background: var(--accent); transition: width 0.2s; }
+.update-progress span.unknown { animation: update-pulse 1.2s ease-in-out infinite alternate; }
+@keyframes update-pulse { from { margin-left: 0; } to { margin-left: 70%; } }
+.update-error { margin: 0; color: #b5523f; overflow-wrap: anywhere; }
+.update-actions { display: flex; justify-content: flex-end; gap: 8px; }
+/* On a phone, above the bottom bar. */
+.shell.phone ~ .update-prompt, .shell.phone .update-prompt { bottom: calc(72px + var(--safe-bottom)); }

@@ -31,6 +31,16 @@ export interface AppInfo {
   frontendPeer: string;
   /** Peer id of the API replica (web/src/api). */
   apiPeer: string;
+  /** "macos", "windows", "linux", "android" or "ios" ("web" in a browser). */
+  platform: string;
+}
+
+/** The newest release as latest.json describes it (phones). */
+export interface LatestRelease {
+  version: string;
+  notes: string;
+  date: string | null;
+  apk: string;
 }
 
 export type DocKind = "workspace" | "card" | "board";

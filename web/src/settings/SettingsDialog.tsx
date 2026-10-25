@@ -29,6 +29,7 @@ import { keyLabel } from "../shell/shortcuts";
 import { useShell, type SettingsSection } from "../shell/tabs";
 import { SyncPanel } from "../sync/SyncPanel";
 import { LibraryLocationRow } from "./LibraryLocationRow";
+import { AUTO_SETTING, useUpdates } from "../update/updates";
 import "../shell/dialog.css";
 import "./settings.css";
 
@@ -207,6 +208,53 @@ function ExportRow() {
   );
 }
 
+/** Checking for a new version now, and whether to check by itself. */
+function UpdateRows() {
+  const { t } = useTranslation();
+  const { status, found, error, check } = useUpdates();
+  const [auto, setAuto] = useState(true);
+  useEffect(() => void backend.getLocalSetting<boolean>(AUTO_SETTING).then((v) => setAuto(v !== false), () => {}), []);
+  const said =
+    status === "checking" ? t("update.checking")
+    : status === "uptodate" ? t("update.uptodate")
+    : status === "available" && found ? t("update.available", { version: found.version })
+    : status === "unsupported" ? t("update.unsupported")
+    : status === "error" && error ? t("update.error", { message: error })
+    : t("update.hint");
+  return (
+    <>
+      <Row label={t("update.row")} hint={said}>
+        <button
+          className="button"
+          disabled={status === "checking" || status === "downloading"}
+          onClick={async () => {
+            await check();
+            // Found by asking: offered even if it was skipped before.
+            if (useUpdates.getState().found) useUpdates.setState({ prompt: true });
+          }}
+        >
+          {t("update.check")}
+        </button>
+      </Row>
+      {backend.kind === "tauri" && (
+        <Row label={t("update.auto")} hint={t("update.autoHint")}>
+          <Choice
+            value={auto ? "on" : "off"}
+            options={[
+              { value: "on", label: t("update.on") },
+              { value: "off", label: t("update.off") },
+            ]}
+            onChange={(v) => {
+              setAuto(v === "on");
+              void backend.setLocalSetting(AUTO_SETTING, v === "on");
+            }}
+          />
+        </Row>
+      )}
+    </>
+  );
+}
+
 function AboutPanel() {
   const { t } = useTranslation();
   const setNotice = useShell((s) => s.setNotice);
@@ -226,6 +274,7 @@ function AboutPanel() {
       <Row label={t("settings.version")}>
         <code className="settings-value">{info?.version ?? "…"}</code>
       </Row>
+      <UpdateRows />
       <Row label={t("settings.dataDir")}>
         <code className="settings-value" title={info?.dataDir}>
           {info?.dataDir ?? "…"}

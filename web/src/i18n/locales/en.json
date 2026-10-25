@@ -583,5 +583,27 @@
     "moveDown": "Move down",
     "fold": "Fold / unfold",
     "hideKeyboard": "Hide keyboard"
+  },
+  "update": {
+    "title": "Folio {{version}} is available",
+    "now": "Update now",
+    "download": "Download",
+    "later": "Later",
+    "skip": "Skip this version",
+    "downloading": "Downloading…",
+    "restarting": "Restarting…",
+    "failed": "Update failed: {{message}}",
+    "row": "Updates",
+    "check": "Check for updates",
+    "checking": "Checking…",
+    "uptodate": "You have the latest version",
+    "available": "Version {{version}} is available",
+    "unsupported": "Updates do not install here (on iOS, update from the App Store)",
+    "error": "Check failed: {{message}}",
+    "hint": "New versions come from GitHub Releases; their signature is checked after downloading.",
+    "auto": "Check automatically",
+    "autoHint": "Once a day; you are asked before anything installs.",
+    "on": "On",
+    "off": "Off"
   }
 }

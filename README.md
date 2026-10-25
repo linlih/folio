@@ -57,7 +57,8 @@ npm test
 ## 打包（GitHub Actions）
 
 - `CI`：每次推送到 `main` 跑全部测试。
-- `Build apps`：在 Actions 页面点 “Run workflow”，或推送 `v0.1.0` 这样的标签（同时生成草稿 Release）。产物在这次运行的 Artifacts 里，保留 14 天：
+- 发布新版本：`./scripts/release.sh 0.2.0 -m "更新说明" --push`。推送的标签会构建并发布 Release，已安装的桌面应用据此自动更新，安卓应用提示下载（见 `design/ARCHITECTURE.md` 7.3）。
+- `Build apps`：在 Actions 页面点 “Run workflow” 只构建不发布，产物在这次运行的 Artifacts 里，保留 14 天：
   - macOS（通用版 `.dmg`，未签名：首次打开需在“系统设置 → 隐私与安全性”里允许）、Windows（`.msi` / `.exe`）、Linux（`.deb` / `.rpm` / `.AppImage`）；
   - 安卓 `.apk`（arm64，用仓库 Secrets 里的 `ANDROID_KEYSTORE_B64` / `ANDROID_KEYSTORE_PASSWORD` 签名，密钥别名 `folio`）；
   - iOS 目前只检查能否编译；装到 iPhone 需要苹果开发者账号与签名（见 `design/ARCHITECTURE.md` 7.2）。

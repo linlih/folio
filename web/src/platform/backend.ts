@@ -1,5 +1,5 @@
 import type { BackupInfo, McpStatus, SyncStatus, TagInfo, TopicCount, CardText } from "../bindings/commands";
-import type { LibraryLocation, PickedFolder } from "../bindings/commands";
+import type { LatestRelease, LibraryLocation, PickedFolder } from "../bindings/commands";
 import type { AppInfo, Backlink, BlockText, CardRow, DocKind, JournalDay, SearchHit } from "../bindings/commands";
 
 /** Everything the UI may ask of the host. The Tauri app and web mode each
@@ -74,6 +74,10 @@ export interface Backend {
   moveLibrary(to: string): Promise<string>;
   openLibrary(path: string): Promise<string>;
   revealLibrary(): Promise<void>;
+  /** Updates on phones (desktop uses the updater plugin): the newest
+   *  release, and opening its download. */
+  latestRelease(): Promise<LatestRelease>;
+  openReleaseDownload(url: string): Promise<void>;
   /** The read-only MCP server for AI tools (§0.3); desktop only. */
   mcpStatus(): Promise<McpStatus | null>;
   setMcpEnabled(enabled: boolean): Promise<McpStatus>;

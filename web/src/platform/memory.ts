@@ -50,7 +50,7 @@ export function memoryBackend(now: () => number = Date.now): Backend {
 
   return {
     kind: "memory",
-    appInfo: async () => ({ version: "web", dataDir: "(memory)", frontendPeer: MEMORY_FRONTEND_PEER, apiPeer: MEMORY_API_PEER }),
+    appInfo: async () => ({ version: "web", dataDir: "(memory)", frontendPeer: MEMORY_FRONTEND_PEER, apiPeer: MEMORY_API_PEER, platform: "web" }),
     listCards: async (limit = 200) =>
       rows((m) => m.deletedAt === null && m.kind !== "journal")
         .sort((a, b) => b.updatedAt - a.updatedAt)
@@ -220,6 +220,10 @@ export function memoryBackend(now: () => number = Date.now): Backend {
       throw new Error("not available in the browser");
     },
     revealLibrary: async () => {},
+    latestRelease: async () => {
+      throw new Error("not available in the browser");
+    },
+    openReleaseDownload: async () => {},
     // No server in the browser.
     mcpStatus: async () => null,
     setMcpEnabled: async () => {

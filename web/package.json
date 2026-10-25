@@ -13,6 +13,8 @@
     "@base-ui/react": "1.9.0",
     "@floating-ui/dom": "1.7.4",
     "@tauri-apps/api": "2.12.4",
+    "@tauri-apps/plugin-process": "2.4.0",
+    "@tauri-apps/plugin-updater": "2.14.0",
     "@tiptap/core": "3.32.0",
     "@tiptap/extension-code-block-lowlight": "3.32.0",
     "@tiptap/extension-image": "3.32.0",
