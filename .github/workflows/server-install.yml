@@ -151,3 +151,66 @@ jobs:
         run: |
           sudo journalctl -u folio-sync -u caddy -n 80 --no-pager || true
           sudo cat /etc/caddy/Caddyfile || true
+
+  another-caddy:
+    name: Another program's Caddy (like a self-hosted Logseq sync)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: server-install
+      - run: cargo build --release -p folio-server
+
+      - name: First install, while the ports are free (bundles Caddy)
+        run: |
+          sudo ./scripts/install-server.sh --domain folio-a.localhost --binary target/release/folio-server --yes
+          systemctl is-active --quiet folio-sync-caddy
+
+      - name: Another program's Caddy takes ports 80 and 443
+        run: |
+          sudo systemctl stop folio-sync-caddy
+          sudo mkdir -p /opt/other/bin /opt/other/config /opt/other/data
+          curl -fsSL https://github.com/caddyserver/caddy/releases/download/v2.11.7/caddy_2.11.7_linux_amd64.tar.gz | sudo tar -xz -C /opt/other/bin caddy
+          printf 'other.localhost {\n\trespond "other site"\n}\n' | sudo tee /opt/other/config/Caddyfile > /dev/null
+          printf '%s\n' '[Service]' 'Environment=XDG_DATA_HOME=/opt/other/data' 'Environment=XDG_CONFIG_HOME=/opt/other/data' \
+            'ExecStart=/opt/other/bin/caddy run --environ --config /opt/other/config/Caddyfile' \
+            'ExecReload=/opt/other/bin/caddy reload --config /opt/other/config/Caddyfile --force' \
+            '[Install]' 'WantedBy=multi-user.target' | sudo tee /etc/systemd/system/other-caddy.service > /dev/null
+          sudo systemctl daemon-reload
+          sudo systemctl start other-caddy
+          sleep 2
+          test "$(curl -fsSk https://other.localhost)" = "other site"
+
+      - name: Running again joins that Caddy and retires our own
+        run: |
+          sudo ./scripts/install-server.sh --domain folio-a.localhost --binary target/release/folio-server --yes | tee /tmp/run
+          grep -q "already served by another Caddy" /tmp/run
+          cat /opt/other/config/Caddyfile
+          test "$(grep -c 'folio-sync (managed' /opt/other/config/Caddyfile)" = 1
+          test ! -e /etc/systemd/system/folio-sync-caddy.service
+          test ! -e /opt/folio-sync/bin/caddy
+          test "$(curl -fsSk https://folio-a.localhost/health)" = ok
+          test "$(curl -fsSk https://other.localhost)" = "other site"
+          sudo folio-sync info | grep -q "caddy:    /opt/other/config/Caddyfile (shared, service other-caddy.service)"
+          sudo folio-sync logs caddy | tail -3
+
+      - name: Running again changes nothing in that Caddy
+        run: |
+          sudo ./scripts/install-server.sh --domain folio-a.localhost --binary target/release/folio-server --yes
+          test "$(grep -c 'folio-sync (managed' /opt/other/config/Caddyfile)" = 1
+          test "$(curl -fsSk https://folio-a.localhost/health)" = ok
+
+      - name: Uninstall removes only our site from it
+        run: |
+          sudo folio-sync uninstall --yes
+          ! grep -q 'folio-sync (managed' /opt/other/config/Caddyfile
+          test "$(curl -fsSk https://other.localhost)" = "other site"
+          systemctl is-active --quiet other-caddy
+
+      - name: Logs
+        if: failure()
+        run: |
+          sudo journalctl -u folio-sync -u other-caddy -u folio-sync-caddy -n 80 --no-pager || true
+          sudo cat /opt/other/config/Caddyfile || true

@@ -48,6 +48,7 @@ CADDY_BIN="$HOME_DIR/bin/caddy"
 CADDY_USER="folio-caddy"
 CADDY_UNIT="/etc/systemd/system/$NAME-caddy.service"
 CADDY_VERSION="2.11.7"
+CADDY_ADMIN_PORT=2029
 CADDY_SHA512_AMD64="a7a433a1b133efc3c8d10eb0b99d52a24b5ef5c322dc77f5282182b1c0402139ab83f3a99f0c52409df77d20123fb0b523edad8a66d8f5e49136197bf61ef0e7"
 CADDY_SHA512_ARM64="3db36ba90c7a6e8dda40ee3dd71fa08844c76b5fb08f61b31e5e78d2ed38e71c51dc7baed875e50d1ca1279196e84302967237386ae87c91ae9f2aaceada682e"
 BEGIN_MARK="# >>> folio-sync (managed by install-server.sh)"
@@ -101,9 +102,21 @@ caddy_managed() { command -v caddy >/dev/null && [[ -f "$CADDYFILE" ]] && system
 # Removes our block (between the markers) from the Caddyfile on stdin.
 strip_block() { awk -v b="$BEGIN_MARK" -v e="$END_MARK" '$0==b{skip=1;next} $0==e{skip=0;next} !skip'; }
 
-reload_caddy() {
-  if systemctl is-active --quiet caddy; then systemctl reload caddy; else systemctl enable --now caddy; fi
+# Applies a changed Caddyfile to a Caddy we share (the machine's own, or one
+# another program installed, like a self-hosted Logseq sync): through its
+# systemd service when it has one, else through Caddy's admin endpoint.
+reload_shared() {
+  local config="$1" unit="$2" exe="$3"
+  if [[ -n "$unit" ]] && systemctl cat "$unit" >/dev/null 2>&1; then
+    if ! systemctl is-active --quiet "$unit"; then systemctl enable --now "$unit"; return; fi
+    systemctl reload "$unit" 2>/dev/null && return
+  fi
+  "$exe" reload --config "$config" --adapter caddyfile --force > /dev/null 2>&1 && return
+  [[ -n "$unit" ]] && systemctl restart "$unit"
 }
+
+# The Caddy we added our site to, as recorded at install.
+shared_setting() { [[ -f "$ENV_FILE" ]] && sed -n "s/^$1=//p" "$ENV_FILE"; }
 
 # ---- uninstall ----
 if [[ $uninstall -eq 1 ]]; then
@@ -112,12 +125,15 @@ if [[ $uninstall -eq 1 ]]; then
   rm -f "$UNIT" "$CADDY_UNIT" "$LOGROTATE" "/usr/local/bin/$NAME"
   rm -rf "$HOME_DIR/bin"
   systemctl daemon-reload
-  if caddy_managed && grep -qxF "$BEGIN_MARK" "$CADDYFILE"; then
-    if ask "从 Caddy 配置里删掉 folio-sync 的站点？" "Remove the folio-sync site from Caddy?"; then
-      cp "$CADDYFILE" "$CADDYFILE.bak-$(date +%Y%m%d%H%M%S)"
-      stripped="$(strip_block < "$CADDYFILE")"
-      printf '%s\n' "$stripped" > "$CADDYFILE"
-      reload_caddy
+  # Our site in a Caddy we share: as recorded, or in the machine's own.
+  s_config="$(shared_setting FOLIO_CADDYFILE)"; s_unit="$(shared_setting FOLIO_CADDY_UNIT)"; s_exe="$(shared_setting FOLIO_CADDY_BIN)"
+  if [[ -z "$s_config" ]] && caddy_managed; then s_config="$CADDYFILE"; s_unit=caddy.service; s_exe="$(command -v caddy)"; fi
+  if [[ -n "$s_config" && -f "$s_config" ]] && grep -qxF "$BEGIN_MARK" "$s_config"; then
+    if ask "从 $s_config 里删掉 folio-sync 的站点？" "Remove the folio-sync site from $s_config?"; then
+      cp "$s_config" "$s_config.bak-$(date +%Y%m%d%H%M%S)"
+      stripped="$(strip_block < "$s_config")"
+      printf '%s\n' "$stripped" > "$s_config"
+      reload_shared "$s_config" "$s_unit" "${s_exe:-caddy}"
     fi
   fi
   if [[ $purge -eq 1 ]]; then
@@ -159,36 +175,85 @@ if [[ $caddy -eq 1 && "$domain" != *.localhost ]]; then
 fi
 
 # ---- how HTTPS is served, decided before anything changes ----
-# Who has a port, as "name (pid)", or nothing when it is free.
-port_owner() {
-  command -v ss >/dev/null || return 0
-  ss -ltnpH "sport = :$1" 2>/dev/null | sed -n 's/.*users:(("\([^"]*\)",pid=\([0-9]*\).*/\1 (\2)/p' | head -1
+block() {
+  cat <<EOF
+$BEGIN_MARK
+$site {
+	reverse_proxy 127.0.0.1:$port
 }
-caddy_mode=none
+$END_MARK
+EOF
+}
+# Who listens on a port (its pid), and what it is.
+port_pid() { command -v ss >/dev/null || return 0; ss -ltnpH "sport = :$1" 2>/dev/null | sed -n 's/.*pid=\([0-9]*\).*/\1/p' | head -1; }
+proc_name() { cat "/proc/$1/comm" 2>/dev/null; }
+# A running Caddy's Caddyfile, from its command line (or its directory).
+caddy_config_of() {
+  local args=() i
+  mapfile -d '' args < "/proc/$1/cmdline"
+  for ((i = 0; i < ${#args[@]}; i++)); do
+    case "${args[i]}" in
+      --config) readlink -f "${args[i+1]}"; return ;;
+      --config=*) readlink -f "${args[i]#--config=}"; return ;;
+    esac
+  done
+  [[ -f "/proc/$1/cwd/Caddyfile" ]] && readlink -f "/proc/$1/cwd/Caddyfile"
+}
+caddy_adapter_of() { tr '\0' '\n' < "/proc/$1/cmdline" | awk 'p{print; exit} $0=="--adapter"{p=1}'; }
+unit_of() { sed -n 's#.*/\([^/]*\.service\)$#\1#p' "/proc/$1/cgroup" 2>/dev/null | head -1; }
+
+caddy_mode=none          # bundled: our own Caddy; shared: a Caddy already here
+shared_config=""; shared_unit=""; shared_exe=""
 if [[ $caddy -eq 1 ]]; then
-  if [[ -f "$CADDY_UNIT" ]]; then
+  ours="$(systemctl show -p MainPID --value "$NAME-caddy" 2>/dev/null || true)"
+  holder=""; holder_port=""
+  for p in "$https_port" 80; do
+    pid="$(port_pid "$p")"
+    if [[ -n "$pid" && "$pid" != "${ours:-0}" ]]; then holder="$pid"; holder_port="$p"; break; fi
+  done
+  if [[ -n "$holder" && "$(proc_name "$holder")" == caddy ]]; then
+    # Another Caddy serves these ports (the machine's own, or one another
+    # program installed): our site joins its configuration.
+    shared_exe="$(readlink -f "/proc/$holder/exe")"
+    shared_config="$(caddy_config_of "$holder")"
+    shared_unit="$(unit_of "$holder")"
+    adapter="$(caddy_adapter_of "$holder")"
+    if [[ -z "$shared_config" || "$shared_config" == *.json || ( -n "$adapter" && "$adapter" != caddyfile ) || ! -f "$shared_config" ]]; then
+      warn "端口 $holder_port 由另一个 Caddy（pid $holder）使用，但找不到它可以修改的 Caddyfile（可能跑在 Docker 里，或用 JSON 配置）。把下面的站点加到它的配置里，再用 --no-caddy 重新运行：" \
+           "Port $holder_port is served by another Caddy (pid $holder), but it has no Caddyfile to edit (Docker or a JSON configuration, perhaps). Add this site to its configuration, then run again with --no-caddy:"
+      block
+      exit 1
+    fi
+    msg "端口 $holder_port 已经由另一个 Caddy 使用：" "Port $holder_port is already served by another Caddy:"
+    msg "  程序  $shared_exe" "  program  $shared_exe"
+    msg "  配置  $shared_config" "  config   $shared_config"
+    msg "  服务  ${shared_unit:-（不是 systemd 服务）}" "  service  ${shared_unit:-(not a systemd service)}"
+    ask "把 $site 的站点加到它的配置里？（先备份、检查通过才写入，原有站点不受影响）" \
+        "Add a site for $site to its configuration? (backed up and checked first; its other sites are untouched)" \
+      || die "没有改动。也可以用 --https-port 换一个端口，或用 --no-caddy 自己配置代理。" "Nothing changed. You can also pick another port with --https-port, or set up your proxy yourself with --no-caddy."
+    caddy_mode=shared
+  elif [[ -n "$holder" ]]; then
+    name="$(proc_name "$holder")"
+    if [[ "$holder_port" == 80 ]]; then
+      die "端口 80 被 $name（pid $holder）占用。申请 HTTPS 证书需要它：先停掉它，或者用 --no-caddy 让现有的代理转发到 127.0.0.1:$port。" \
+          "port 80 is used by $name (pid $holder). Getting the HTTPS certificate needs it: stop that, or use --no-caddy and have your existing proxy forward to 127.0.0.1:$port."
+    fi
+    die "端口 $holder_port 被 $name（pid $holder）占用。用 --https-port 换一个（例如 8443），或者用 --no-caddy 让现有的代理转发到 127.0.0.1:$port。" \
+        "port $holder_port is used by $name (pid $holder). Choose another with --https-port (8443, say), or use --no-caddy and have your existing proxy forward to 127.0.0.1:$port."
+  elif [[ -f "$CADDY_UNIT" ]]; then
     caddy_mode=bundled
   elif command -v caddy >/dev/null && caddy_managed; then
-    caddy_mode=system
+    # The machine's own Caddy, installed but not running.
+    shared_config="$CADDYFILE"; shared_unit=caddy.service; shared_exe="$(command -v caddy)"
+    ask "这台机器已经装了 Caddy。在 $CADDYFILE 里为 $site 添加站点？（原文件会备份）" "Caddy is already installed here. Add a site for $site to $CADDYFILE? (the file is backed up first)" \
+      && caddy_mode=shared
   elif command -v caddy >/dev/null; then
-    caddy_mode=foreign
+    warn "这台机器的 Caddy 不是用 $CADDYFILE 管理的，请把下面的站点加到你的配置里：" \
+         "This machine's Caddy is not run from $CADDYFILE; add this site to your configuration:"
+    block
   elif ask "没有找到 Caddy。安装 Folio 自带的 Caddy（官方 $CADDY_VERSION）到 $HOME_DIR，作为服务 $NAME-caddy 运行，自动申请和续期 HTTPS 证书？" \
            "No Caddy found. Install Caddy $CADDY_VERSION (the official release) into $HOME_DIR as the service $NAME-caddy, which gets and renews the HTTPS certificate?"; then
     caddy_mode=bundled
-  fi
-  if [[ $caddy_mode == bundled ]]; then
-    # Certificates need port 80; devices come in on the HTTPS port. Our own
-    # Caddy may hold them already (a re-run).
-    for p in 80 "$https_port"; do
-      owner="$(port_owner "$p")"
-      [[ -z "$owner" || "$owner" == caddy* ]] && continue
-      if [[ "$p" == 80 ]]; then
-        die "端口 80 被 $owner 占用。申请 HTTPS 证书需要它：先停掉它，或者用 --no-caddy 让现有的代理转发到 127.0.0.1:$port。" \
-            "port 80 is used by $owner. Getting the HTTPS certificate needs it: stop that, or use --no-caddy and have your existing proxy forward to 127.0.0.1:$port."
-      fi
-      die "端口 $p 被 $owner 占用。用 --https-port 换一个（例如 8443），或者用 --no-caddy 让现有的代理转发到 127.0.0.1:$port。" \
-          "port $p is used by $owner. Choose another with --https-port (8443, say), or use --no-caddy and have your existing proxy forward to 127.0.0.1:$port."
-    done
   fi
 fi
 
@@ -247,6 +312,10 @@ FOLIO_SERVER_DB=$DATA/folio-sync.db
 FOLIO_DOMAIN=$domain
 FOLIO_HTTPS_PORT=$https_port
 FOLIO_PUBLIC_URL=$url
+# The Caddy serving HTTPS, when it is one we share (empty: our own or none).
+FOLIO_CADDYFILE=$([[ $caddy_mode == shared ]] && echo "$shared_config")
+FOLIO_CADDY_UNIT=$([[ $caddy_mode == shared ]] && echo "$shared_unit")
+FOLIO_CADDY_BIN=$([[ $caddy_mode == shared ]] && echo "$shared_exe")
 EOF
 )
 chown root:"$NAME" "$ENV_FILE"; chmod 0640 "$ENV_FILE"
@@ -354,7 +423,9 @@ case "$cmd" in
     shift
     which=folio-sync
     case "${1:-}" in caddy|proxy) which=caddy; shift ;; server) shift ;; esac
-    file="$LOGS/$which.log"; unit=folio-sync; [[ $which == caddy ]] && unit=folio-sync-caddy
+    file="$LOGS/$which.log"; unit=folio-sync
+    # Caddy: our own (its log file), or the one we share (its journal).
+    if [[ $which == caddy ]]; then unit="$(setting FOLIO_CADDY_UNIT 2>/dev/null || true)"; unit="${unit:-folio-sync-caddy}"; [[ $unit == folio-sync-caddy ]] || file=/nonexistent; fi
     if [[ -e "$file" ]] && [[ -s "$file" || "${1:-}" == -f ]]; then tail -n 100 "$@" "$file"; else journalctl -u "$unit" -n 100 --no-pager "$@"; fi ;;
   info|token)
     echo "version:  $(cat "$HOME_DIR/VERSION" 2>/dev/null || echo unknown)"
@@ -364,7 +435,8 @@ case "$cmd" in
     echo "data:     $(setting FOLIO_SERVER_DB)"
     echo "settings: $ENV_FILE"
     echo "logs:     $LOGS"
-    if [[ -f $HOME_DIR/caddy/Caddyfile ]]; then echo "caddy:    $HOME_DIR/caddy/Caddyfile (Caddy $(cat $HOME_DIR/caddy/version 2>/dev/null))"; fi ;;
+    if [[ -f $HOME_DIR/caddy/Caddyfile ]]; then echo "caddy:    $HOME_DIR/caddy/Caddyfile (Caddy $(cat $HOME_DIR/caddy/version 2>/dev/null))"; fi
+    if [[ -n "$(setting FOLIO_CADDYFILE)" ]]; then echo "caddy:    $(setting FOLIO_CADDYFILE) (shared, service $(setting FOLIO_CADDY_UNIT))"; fi ;;
   upgrade)
     shift
     port="$(sed -n 's/^FOLIO_SERVER_ADDR=.*://p' "$ENV_FILE")"
@@ -403,15 +475,6 @@ curl -fsS "http://127.0.0.1:$port/health" >/dev/null 2>&1 \
 msg "folio-sync 已运行（127.0.0.1:$port），安装在 $HOME_DIR。" "folio-sync is running (127.0.0.1:$port), installed in $HOME_DIR."
 
 # ---- Caddy (HTTPS) ----
-block() {
-  cat <<EOF
-$BEGIN_MARK
-$site {
-	reverse_proxy 127.0.0.1:$port
-}
-$END_MARK
-EOF
-}
 
 caddy_arch() { case "$arch" in x86_64) echo amd64 ;; aarch64) echo arm64 ;; esac; }
 
@@ -450,9 +513,11 @@ setup_bundled_caddy() {
   # (.localhost names get Caddy's own certificates either way).
   local tls=""
   if [[ "$https_port" != 443 && "$domain" != *.localhost ]]; then tls=$'\ttls {\n\t\tissuer acme {\n\t\t\tdisable_tlsalpn_challenge\n\t\t}\n\t}\n'; fi
+  # Its own admin address: another Caddy on this machine keeps 2019.
   {
-    [[ -n "$email" ]] && printf '{\n\temail %s\n}\n\n' "$email"
-    printf '%s {\n\treverse_proxy 127.0.0.1:%s\n%s}\n' "$site" "$port" "$tls"
+    printf '{\n\tadmin 127.0.0.1:%s\n' "$CADDY_ADMIN_PORT"
+    [[ -n "$email" ]] && printf '\temail %s\n' "$email"
+    printf '}\n\n%s {\n\treverse_proxy 127.0.0.1:%s\n%s}\n' "$site" "$port" "$tls"
   } > "$tmp/Caddyfile"
   # Checked by parsing (adapt): validate would also set up certificates.
   "$CADDY_BIN" adapt --config "$tmp/Caddyfile" --adapter caddyfile > "$tmp/validate.log" 2>&1 \
@@ -498,46 +563,51 @@ EOF
   msg "Caddy 已作为服务 $NAME-caddy 运行（配置：$CADDY_DIR/Caddyfile）。" "Caddy runs as the service $NAME-caddy (configuration: $CADDY_DIR/Caddyfile)."
 }
 
-# Adds or updates our site in the system's own Caddy (/etc/caddy/Caddyfile).
-setup_system_caddy() {
-  local current new do_write=0 backup
-  current="$(cat "$CADDYFILE")"
-  if grep -qxF "$BEGIN_MARK" "$CADDYFILE"; then
+# Adds or updates our site in a Caddy we share (found above).
+setup_shared_caddy() {
+  local current new do_write=1 backup
+  current="$(cat "$shared_config")"
+  if grep -qxF "$BEGIN_MARK" "$shared_config"; then
     new="$(printf '%s\n' "$current" | strip_block)"$'\n\n'"$(block)"
-    do_write=1
     if [[ "$(printf '%s\n' "$current" | awk -v b="$BEGIN_MARK" '$0==b{getline; print $1; exit}')" != "$site" ]]; then
-      ask "把 Caddy 里 folio-sync 的站点改为 $site？" "Change the folio-sync site in Caddy to $site?" || do_write=0
+      ask "把 $shared_config 里 folio-sync 的站点改为 $site？" "Change the folio-sync site in $shared_config to $site?" || do_write=0
     fi
-  elif grep -Eq "(^|[[:space:],])(https?://)?${domain//./\\.}([[:space:],:{]|$)" "$CADDYFILE"; then
-    warn "$CADDYFILE 里已经有 $domain 的站点，没有改动。请确认它代理到 127.0.0.1:$port：" \
-         "$CADDYFILE already has a site for $domain; left as it is. Make sure it proxies to 127.0.0.1:$port:"
+  elif grep -Eq "(^|[[:space:],])(https?://)?${domain//./\\.}(:[0-9]+)?([[:space:],{]|$)" "$shared_config"; then
+    warn "$shared_config 里已经有 $domain 的站点，没有改动。请确认它代理到 127.0.0.1:$port：" \
+         "$shared_config already has a site for $domain; left as it is. Make sure it proxies to 127.0.0.1:$port:"
     block
     proxy_ready=1
     return 0
-  elif ask "这台机器已经装了 Caddy。在 $CADDYFILE 里为 $site 添加站点？（原文件会备份）" "Caddy is already installed here. Add a site for $site to $CADDYFILE? (the file is backed up first)"; then
-    new="$current"$'\n\n'"$(block)"
-    do_write=1
   else
-    msg "没有改动 Caddy。需要时把这段加进去：" "Caddy left alone. When you want it, add:"
-    block
+    new="$current"$'\n\n'"$(block)"
   fi
   [[ $do_write -eq 1 ]] || return 0
-  backup="$CADDYFILE.bak-$(date +%Y%m%d%H%M%S)"
-  cp "$CADDYFILE" "$backup"
-  printf '%s\n' "$new" > "$CADDYFILE.new"
-  if caddy validate --config "$CADDYFILE.new" --adapter caddyfile > "$tmp/validate.log" 2>&1; then
-    # Written over in place: the file keeps its owner and mode (Caddy runs
-    # as its own user and must still read it).
-    cat "$CADDYFILE.new" > "$CADDYFILE"; rm -f "$CADDYFILE.new"
-    caddy fmt --overwrite "$CADDYFILE" 2>/dev/null || true
-    if systemctl is-active --quiet caddy; then systemctl reload caddy; else systemctl enable --now caddy; fi
-    proxy_ready=1
-    msg "已更新 $CADDYFILE（备份：$backup）。" "Updated $CADDYFILE (backup: $backup)."
-  else
-    rm -f "$CADDYFILE.new"
+  backup="$shared_config.bak-$(date +%Y%m%d%H%M%S)"
+  cp "$shared_config" "$backup"
+  printf '%s\n' "$new" > "$tmp/Caddyfile.shared"
+  # Checked by parsing (adapt): validate would also set up certificates.
+  if ! "$shared_exe" adapt --config "$tmp/Caddyfile.shared" --adapter caddyfile > "$tmp/validate.log" 2>&1; then
     cat "$tmp/validate.log" >&2
-    die "新的 Caddy 配置没有通过检查，原文件没有改动。" "the new Caddy configuration did not validate; the file is unchanged."
+    die "加上站点后的 Caddy 配置没有通过检查，原文件没有改动。" "the Caddy configuration with our site did not validate; the file is unchanged."
   fi
+  # Written over in place: the file keeps its owner and mode (Caddy runs
+  # as its own user and must still read it).
+  cat "$tmp/Caddyfile.shared" > "$shared_config"
+  "$shared_exe" fmt --overwrite "$shared_config" 2>/dev/null || true
+  reload_shared "$shared_config" "$shared_unit" "$shared_exe"
+  proxy_ready=1
+  msg "已把站点加到 $shared_config（备份：$backup）。" "Added the site to $shared_config (backup: $backup)."
+}
+
+# Our own Caddy, from a run when it had the ports to itself: it gives way to
+# the Caddy that serves them now.
+retire_bundled_caddy() {
+  msg "停用并移除 Folio 自带的 Caddy（$NAME-caddy）。" "Stopping and removing Folio's own Caddy ($NAME-caddy)."
+  systemctl disable --now "$NAME-caddy" 2>/dev/null || true
+  rm -f "$CADDY_UNIT" "$CADDY_BIN"
+  rm -rf "$CADDY_DIR"
+  userdel "$CADDY_USER" 2>/dev/null || true
+  systemctl daemon-reload
 }
 
 proxy_ready=0
@@ -545,11 +615,9 @@ if [[ $caddy -eq 1 ]]; then
   step "配置 HTTPS（Caddy）" "Setting up HTTPS (Caddy)"
   case "$caddy_mode" in
     bundled) setup_bundled_caddy; proxy_ready=1 ;;
-    system) setup_system_caddy ;;
-    foreign)
-      warn "这台机器的 Caddy 不是用 $CADDYFILE 管理的（比如跑在 Docker 里），请把下面的站点加到你的配置里：" \
-           "This machine's Caddy is not run from $CADDYFILE (Docker, perhaps); add this site to your configuration:"
-      block ;;
+    shared)
+      [[ -f "$CADDY_UNIT" ]] && retire_bundled_caddy
+      setup_shared_caddy ;;
     *) msg "没有配置 HTTPS。用你自己的代理把 $url 转发到 127.0.0.1:$port。" "HTTPS is not set up. Have your own proxy forward $url to 127.0.0.1:$port." ;;
   esac
 
