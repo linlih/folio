@@ -1,6 +1,6 @@
-# Runs scripts/install-server.sh on a fresh Ubuntu machine: installing
-# Caddy, upgrading in place, sharing a Caddyfile with another site, and
-# uninstalling. `.localhost` names get certificates from Caddy's own CA.
+# Runs scripts/install-server.sh on fresh Ubuntu machines: with the Caddy it
+# bundles (no Caddy on the machine) and with the machine's own Caddy.
+# `.localhost` names get certificates from Caddy's own CA.
 name: Server install
 
 on:
@@ -13,7 +13,8 @@ on:
       - .github/workflows/server-install.yml
 
 jobs:
-  install:
+  bundled-caddy:
+    name: Bundled Caddy
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -22,8 +23,9 @@ jobs:
         with:
           key: server-install
       - run: cargo build --release -p folio-server
+      - run: "! command -v caddy"
 
-      - name: Fresh install (installs Caddy)
+      - name: Fresh install (bundles Caddy)
         run: sudo ./scripts/install-server.sh --domain folio-a.localhost --binary target/release/folio-server --yes
 
       - name: The server answers through Caddy, WebSocket too
@@ -42,64 +44,110 @@ jobs:
 
       - name: Everything is under /opt/folio-sync, managed by folio-sync
         run: |
-          ls -lR /opt/folio-sync | head -40
+          sudo ls -lR /opt/folio-sync | grep -v '^$' | head -60
           test -x /opt/folio-sync/bin/folio-server
+          test -x /opt/folio-sync/bin/caddy
           test -x /opt/folio-sync/bin/install-server.sh
           test "$(readlink /usr/local/bin/folio-sync)" = /opt/folio-sync/bin/folio-sync
           sudo test -s /opt/folio-sync/data/folio-sync.db
           sudo grep -q "folio-server listening" /opt/folio-sync/logs/folio-sync.log
+          sudo test -e /opt/folio-sync/logs/caddy.log
           test -f /etc/logrotate.d/folio-sync && sudo logrotate -d /etc/logrotate.d/folio-sync
           test "$(stat -c '%U %a' /opt/folio-sync/etc/folio-sync.env)" = "root 640"
-          folio-sync status | tee /tmp/status
-          grep -q "health: ok" /tmp/status
+          systemctl is-active --quiet folio-sync-caddy
+          sudo folio-sync status | tee /tmp/status
+          grep -q "server health: ok" /tmp/status
+          grep -q "https health: ok" /tmp/status
           sudo folio-sync info | grep -q "server:   https://folio-a.localhost"
           sudo folio-sync restart
-          sleep 1
-          folio-sync status | grep -q "health: ok"
+          sleep 2
+          sudo folio-sync status | grep -q "https health: ok"
           sudo folio-sync stop
           ! systemctl is-active --quiet folio-sync
+          ! systemctl is-active --quiet folio-sync-caddy
           sudo folio-sync start
-          sleep 1
-          folio-sync status | grep -q "health: ok"
-          sudo folio-sync logs | tail -5
+          sleep 2
+          sudo folio-sync status | grep -q "https health: ok"
+          sudo folio-sync logs | tail -3
+          sudo folio-sync logs caddy | tail -3
 
-      - name: Running again upgrades and keeps the token
+      - name: Running again keeps the token and the downloaded Caddy
         run: |
-          sudo ./scripts/install-server.sh --domain folio-a.localhost --binary target/release/folio-server --yes
+          sudo ./scripts/install-server.sh --domain folio-a.localhost --binary target/release/folio-server --yes | tee /tmp/again
+          grep -q "Caddy 2.11.7 is installed" /tmp/again
           test "$(sudo sed -n 's/^FOLIO_SERVER_TOKEN=//p' /opt/folio-sync/etc/folio-sync.env)" = "$(cat /tmp/token-before)"
-          test "$(grep -c 'folio-sync (managed' /etc/caddy/Caddyfile)" = 1
 
-      - name: A Caddyfile with another site keeps it
+      - name: Another HTTPS port
         run: |
-          printf '\nother.localhost {\n\trespond "other site"\n}\n' | sudo tee -a /etc/caddy/Caddyfile > /dev/null
-          sudo systemctl reload caddy
-          sudo ./scripts/install-server.sh --domain folio-b.localhost --binary target/release/folio-server --yes
-          cat /etc/caddy/Caddyfile
-          test "$(curl -fsSk https://folio-b.localhost/health)" = ok
-          test "$(curl -fsSk https://other.localhost)" = "other site"
-          ! grep -q folio-a.localhost /etc/caddy/Caddyfile
+          sudo ./scripts/install-server.sh --domain folio-a.localhost --https-port 8443 --binary target/release/folio-server --yes
+          test "$(curl -fsSk https://folio-a.localhost:8443/health)" = ok
+          sudo folio-sync info | grep -q "server:   https://folio-a.localhost:8443"
 
-      - name: Uninstall (by the command) keeps the data and the other site
+      - name: A taken port is named
+        run: |
+          python3 -m http.server 9443 --bind 0.0.0.0 > /dev/null 2>&1 &
+          sleep 1
+          ! sudo ./scripts/install-server.sh --domain folio-a.localhost --https-port 9443 --binary target/release/folio-server --yes 2> /tmp/err
+          cat /tmp/err
+          grep -q "port 9443 is used by python3" /tmp/err
+          kill %1
+
+      - name: Uninstall keeps the data; purge removes everything
         run: |
           sudo folio-sync uninstall --yes
           ! systemctl is-active --quiet folio-sync
+          ! systemctl is-active --quiet folio-sync-caddy
           test ! -e /usr/local/bin/folio-sync
           test ! -e /opt/folio-sync/bin
           sudo test -e /opt/folio-sync/data/folio-sync.db
-          ! grep -q 'folio-sync (managed' /etc/caddy/Caddyfile
-          test "$(curl -fsSk https://other.localhost)" = "other site"
-
-      - name: Purge removes everything
-        run: |
-          sudo ./scripts/install-server.sh --domain folio-c.localhost --binary target/release/folio-server --yes
+          sudo ./scripts/install-server.sh --domain folio-a.localhost --binary target/release/folio-server --yes
           sudo folio-sync uninstall --purge --yes
           test ! -e /opt/folio-sync
           ! id folio-sync
+          ! id folio-caddy
 
       - name: Logs
         if: failure()
         run: |
-          sudo tail -n 50 /opt/folio-sync/logs/folio-sync.log || true
-          sudo journalctl -u folio-sync -n 50 --no-pager || true
-          sudo journalctl -u caddy -n 50 --no-pager || true
+          sudo tail -n 50 /opt/folio-sync/logs/folio-sync.log /opt/folio-sync/logs/caddy.log || true
+          sudo journalctl -u folio-sync -u folio-sync-caddy -n 80 --no-pager || true
+
+  system-caddy:
+    name: The machine's own Caddy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: server-install
+      - run: cargo build --release -p folio-server
+      - name: Caddy from its apt repository
+        run: |
+          sudo apt-get install -y -qq debian-keyring debian-archive-keyring apt-transport-https curl gnupg > /dev/null
+          curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+          curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | sudo tee /etc/apt/sources.list.d/caddy-stable.list > /dev/null
+          sudo apt-get update -qq && sudo apt-get install -y -qq caddy > /dev/null
+          printf 'other.localhost {\n\trespond "other site"\n}\n' | sudo tee /etc/caddy/Caddyfile > /dev/null
+          sudo systemctl reload caddy
+
+      - name: Install adds a site to the existing Caddyfile
+        run: |
+          sudo ./scripts/install-server.sh --domain folio-b.localhost --binary target/release/folio-server --yes
+          cat /etc/caddy/Caddyfile
+          test "$(grep -c 'folio-sync (managed' /etc/caddy/Caddyfile)" = 1
+          test ! -e /etc/systemd/system/folio-sync-caddy.service
+          test "$(curl -fsSk https://folio-b.localhost/health)" = ok
+          test "$(curl -fsSk https://other.localhost)" = "other site"
+
+      - name: Uninstall removes only our site
+        run: |
+          sudo folio-sync uninstall --yes
+          ! grep -q 'folio-sync (managed' /etc/caddy/Caddyfile
+          test "$(curl -fsSk https://other.localhost)" = "other site"
+
+      - name: Logs
+        if: failure()
+        run: |
+          sudo journalctl -u folio-sync -u caddy -n 80 --no-pager || true
           sudo cat /etc/caddy/Caddyfile || true
