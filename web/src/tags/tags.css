@@ -1,0 +1,4 @@
+/* Tag pages and tag pills. */
+.tag-title { display: flex; align-items: center; gap: 4px; }
+.tag-title svg { color: var(--muted); width: 0.8em; height: 0.8em; }
+.tag-blocks { border-top: 0; padding-top: 0; margin-top: 0; }

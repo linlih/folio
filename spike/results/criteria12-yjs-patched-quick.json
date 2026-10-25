@@ -1,0 +1,31 @@
+{
+ "editor": {
+  "engine": "yjs",
+  "suite": "editor",
+  "runs": 15,
+  "steps": 900,
+  "problems": 0,
+  "byKind": {},
+  "byOp": {},
+  "mergeDuplicateBids": 0,
+  "silentDrops": 0,
+  "dropSamples": [],
+  "seconds": 5,
+  "firstProblems": []
+ },
+ "convergence": {
+  "engine": "yjs",
+  "suite": "convergence",
+  "runs": 10,
+  "steps": 3000,
+  "problems": 0,
+  "byKind": {},
+  "byOp": {},
+  "mergeDuplicateBids": 0,
+  "silentDrops": 0,
+  "dropSamples": [],
+  "seconds": 14,
+  "firstProblems": []
+ },
+ "allProblems": []
+}

@@ -1,0 +1,29 @@
+{
+ "engine": "loro",
+ "days": 10,
+ "ops": 5500,
+ "updates": 5459,
+ "finalChars": 1383,
+ "updateLogBytes": 487927,
+ "snapshotBytes": 49070,
+ "compactBytes": 9296,
+ "bytesPerFinalChar": {
+  "snapshot": 35.48,
+  "compact": 6.72
+ },
+ "editSeconds": 1.2,
+ "openFromSnapshot": {
+  "n": 5,
+  "p50": 8.848,
+  "p95": 10.848,
+  "max": 10.848,
+  "mean": 8.52
+ },
+ "openFromCompact": {
+  "n": 5,
+  "p50": 6.933,
+  "p95": 8.011,
+  "max": 8.011,
+  "mean": 6.983
+ }
+}

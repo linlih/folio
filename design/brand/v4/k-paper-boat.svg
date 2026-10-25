@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024"><defs><linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4f86bd"/><stop offset="1" stop-color="#22497a"/></linearGradient><filter id="sh" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur in="SourceAlpha" stdDeviation="20"/><feOffset dy="20"/><feComponentTransfer><feFuncA type="linear" slope="0.3"/></feComponentTransfer><feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
+<rect width="1024" height="1024" fill="url(#bg)"/>
+<g filter="url(#sh)">
+<polygon points="512,220 512,620 300,620" fill="#ffffff"/>
+<polygon points="512,260 512,620 690,620" fill="#e6ddcf"/>
+<polygon points="180,580 844,580 740,740 284,740" fill="#f6f0e6"/>
+<polygon points="180,580 512,580 512,740 284,740" fill="#ffffff"/>
+</g>
+<g fill="none" stroke="#9cc0e6" stroke-width="22" stroke-linecap="round" stroke-opacity="0.8">
+<path d="M150 820 Q230 780 310 820 T470 820 T630 820 T790 820 T890 810"/></g>
+</svg>

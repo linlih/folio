@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024"><defs>
+<linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2d4f80"/><stop offset="1" stop-color="#111f3d"/></linearGradient>
+<radialGradient id="moon" cx="0.45" cy="0.4" r="0.6"><stop offset="0" stop-color="#fffaf0"/><stop offset="1" stop-color="#f3dfb4"/></radialGradient>
+<linearGradient id="card" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2a4c7d"/><stop offset="1" stop-color="#16294a"/></linearGradient>
+<filter id="glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="30" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+<filter id="sh" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur in="SourceAlpha" stdDeviation="20"/><feOffset dy="20"/><feComponentTransfer><feFuncA type="linear" slope="0.45"/></feComponentTransfer><feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
+<rect width="1024" height="1024" fill="url(#bg)"/>
+<g fill="#fff" fill-opacity="0.6"><circle cx="200" cy="220" r="7"/><circle cx="300" cy="150" r="4"/><circle cx="170" cy="420" r="5"/><circle cx="860" cy="820" r="5"/></g>
+<circle cx="600" cy="420" r="250" fill="url(#moon)" filter="url(#glow)"/>
+<g filter="url(#sh)" transform="rotate(-8 420 640)">
+<rect x="200" y="460" width="440" height="340" rx="48" fill="url(#card)" stroke="#8cb4de" stroke-opacity="0.55" stroke-width="5"/>
+<rect x="268" y="552" width="200" height="22" rx="11" fill="#f3dfb4"/>
+<rect x="268" y="620" width="300" height="14" rx="7" fill="#8cb4de" fill-opacity="0.6"/>
+<rect x="268" y="672" width="230" height="14" rx="7" fill="#8cb4de" fill-opacity="0.6"/>
+</g>
+</svg>

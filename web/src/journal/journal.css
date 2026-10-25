@@ -1,0 +1,36 @@
+/* The first day's date sits where other pages' titles do (the page's own
+   top padding); every date is a page title in size (Logseq). */
+.journal-day { padding: 0 0 28px; border-bottom: 1px solid var(--border); }
+.journal-day + .journal-day { padding-top: 32px; }
+.journal-date {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 0 0 12px;
+  font: var(--page-title-weight) var(--page-title-size) / var(--page-title-leading) var(--font-body);
+  color: var(--text);
+}
+.journal-day:not(.today) .journal-date { color: var(--secondary); }
+.journal-today { font: 500 11px var(--font-ui); color: var(--accent); }
+/* A day's "⋯" menu: on hover, or while open. */
+.journal-day-menu { align-self: center; width: 24px; height: 24px; opacity: 0; transition: opacity 0.12s; }
+.journal-date:hover .journal-day-menu, .journal-day-menu[data-popup-open], .journal-day-menu:focus-visible { opacity: 1; }
+
+/* The writing area of a day with an editor; today's is tall, like a fresh
+   page, and clicking its empty part writes at the end (Logseq). */
+.journal-body { cursor: text; min-height: 2em; }
+.journal-day.today .journal-body { min-height: max(240px, 45vh); }
+
+.journal-static { cursor: text; min-height: 1.6em; border-radius: var(--radius); }
+.journal-static:hover { background: color-mix(in srgb, var(--ink) 2.5%, transparent); }
+.journal-line { position: relative; }
+.journal-line::before {
+  content: "•";
+  position: absolute;
+  margin-left: -0.9em;
+  color: var(--muted);
+}
+.journal-empty { margin: 0; color: var(--muted); font-size: 14px; }
+.journal-more { height: 1px; }
+/* A far-away day: only its height, so scrolling stays put (§5.2a). */
+.journal-day.placeholder { box-sizing: border-box; }

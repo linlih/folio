@@ -1,0 +1,39 @@
+{
+ "editor": {
+  "engine": "yjs",
+  "suite": "editor",
+  "runs": 50,
+  "steps": 3000,
+  "problems": 0,
+  "byKind": {},
+  "byOp": {},
+  "mergeDuplicateBids": 0,
+  "silentDrops": 1,
+  "silentDropChars": 0,
+  "dropSamples": [
+   "0 chars: yjs deleted unrenderable taskList"
+  ],
+  "seconds": 17.4,
+  "firstProblems": []
+ },
+ "convergence": {
+  "engine": "yjs",
+  "suite": "convergence",
+  "runs": 200,
+  "steps": 100000,
+  "problems": 0,
+  "byKind": {},
+  "byOp": {},
+  "mergeDuplicateBids": 0,
+  "silentDrops": 22,
+  "silentDropChars": 62,
+  "dropSamples": [
+   "0 chars: yjs deleted unrenderable taskList",
+   "0 chars: yjs deleted unrenderable bulletList",
+   "0 chars: yjs deleted unrenderable bulletList"
+  ],
+  "seconds": 535.5,
+  "firstProblems": []
+ },
+ "allProblems": []
+}

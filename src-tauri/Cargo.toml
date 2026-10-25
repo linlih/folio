@@ -1,0 +1,35 @@
+[package]
+name = "folio"
+description = "Tauri 2 shell: IPC commands, windows, logging and diagnostics. Thin by design (§3.1)."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lib]
+name = "folio_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+folio-core.workspace = true
+folio-store.workspace = true
+folio-io = { path = "../crates/folio-io" }
+folio-mcp = { path = "../crates/folio-mcp" }
+folio-sync = { path = "../crates/folio-sync" }
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing-appender = "0.2"
+# Folder pickers and showing files in Finder / Explorer (export, backups).
+tauri-plugin-dialog = "2"
+tauri-plugin-opener = "2"
+
+# System-wide quick capture shortcut (desktop only).
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+tauri-plugin-global-shortcut = "2"

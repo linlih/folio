@@ -1,0 +1,115 @@
+/* Phones (§0.2): one column, a bar at the top, the four entries at the
+   bottom, nothing that needs hover. Media queries match shell/phone.ts. */
+
+/* ---- the phone shell ---- */
+.shell.phone { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto; }
+.shell.phone > .sidebar { display: none; }
+.shell.phone > .main { grid-row: 1; grid-column: 1; }
+.shell.phone .web-mode { display: none; }
+
+.phone-top { display: flex; align-items: center; gap: 4px; flex: none; min-height: 44px; padding: 0 6px; border-bottom: 1px solid transparent; transition: border-color 0.15s; }
+.pane.scrolled > .phone-top { border-bottom-color: var(--border); }
+.phone-top .icon-button { width: 40px; height: 40px; }
+.phone-top > .icon-button:last-child { margin-left: auto; }
+.phone-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; font-weight: 500; color: var(--text); }
+
+.phone-nav {
+  grid-row: 2;
+  grid-column: 1;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  padding: 4px 6px var(--safe-bottom);
+  border-top: 1px solid var(--border);
+  background: var(--paper);
+}
+.phone-nav-item { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-height: 50px; color: var(--muted); font-size: 11px; }
+.phone-nav-item[aria-current="page"] { color: var(--accent); }
+.phone-capture {
+  position: fixed;
+  z-index: 40;
+  right: 16px;
+  bottom: calc(70px + var(--safe-bottom));
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: white;
+  box-shadow: 0 4px 14px rgb(0 0 0 / 0.18);
+}
+/* While typing, the keyboard and its bar take the bottom. */
+body.phone-typing .phone-nav, body.phone-typing .phone-capture { display: none; }
+
+/* Keys the phone keyboard lacks, on top of it. */
+.keyboard-bar {
+  position: fixed;
+  z-index: 60;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 44px;
+  padding: 0 6px;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+}
+.keyboard-bar .icon-button { width: 44px; height: 40px; color: var(--secondary); }
+.keyboard-bar-gap { flex: 1; }
+
+@media (max-width: 720px) {
+  /* Room at the end of a page for the capture button. */
+  :root .page { padding-bottom: 96px; }
+  :root .page-header h1 { white-space: nowrap; }
+
+  /* Card library: the header wraps instead of squeezing its words; the
+     search takes a line, the filters the next. */
+  :root .library .page-header { flex-wrap: wrap; row-gap: 8px; }
+  :root .library .page-header h1 { font-size: 28px; }
+  :root .library-header-actions { flex-wrap: wrap; justify-content: flex-end; }
+  :root .library-header-actions .button { white-space: nowrap; }
+  :root .library-toolbar { flex-wrap: wrap; }
+  :root .library-toolbar .library-search { flex: 1 1 100%; }
+  :root .library-selection { flex-wrap: wrap; height: auto; }
+
+  /* Settings: the whole screen, sections as a row to swipe along. */
+  :root .dialog.settings { top: 0; left: 0; transform: none; inset: 0; width: 100%; max-width: none; height: 100%; max-height: none; border-radius: 0; flex-direction: column; padding-top: var(--safe-top); padding-bottom: var(--safe-bottom); }
+  :root .dialog.settings .settings-nav { flex-direction: row; width: auto; overflow-x: auto; gap: 4px; padding: 8px 12px; border-right: 0; border-bottom: 1px solid var(--border); }
+  :root .dialog.settings .settings-heading { display: none; }
+  :root .dialog.settings .settings-nav .nav-item { flex: none; width: auto; }
+  :root .dialog.settings .settings-body { padding: 12px 16px; min-height: 0; }
+  :root .settings-row { flex-wrap: wrap; gap: 8px; }
+  :root .settings-row-label { flex-basis: 100%; }
+  :root .settings-row-control { max-width: 100%; flex-wrap: wrap; }
+
+  /* Whiteboard: zoom at the top right, the tools alone at the bottom. */
+  :root .board-zoom { top: 10px; bottom: auto; right: 10px; }
+  :root .board-zoom .board-sep, :root .board-minimap-toggle { display: none; }
+  :root .board-toolbar { max-width: calc(100% - 20px); overflow-x: auto; }
+}
+
+/* ---- touch screens: no hover, fingers ---- */
+@media (hover: none) and (pointer: coarse) {
+  html { -webkit-tap-highlight-color: transparent; }
+  /* The system's long-press menu would cover the app's own (shell/longPress.ts). */
+  :root .sidebar, :root .tabbar, :root .phone-top, :root .phone-nav, :root .library, :root .board, :root .page-header { -webkit-touch-callout: none; }
+
+  /* What a mouse finds by hovering is simply there. */
+  :root .card-menu, :root .journal-day-menu, :root .ol-chevron, :root .library-check, :root .backlink-link, :root .topic-chip-remove, :root .topic-add,
+  :root .board-tile-menu, :root .nav-row-menu, :root .card-trash, :root .code-language, :root .board-card-open, :root .board-fold { opacity: 1; }
+  :root .card-menu, :root .journal-day-menu { width: 36px; height: 36px; }
+  :root .board-tile-menu, :root .nav-row-menu { width: 32px; height: 32px; }
+
+  /* Keyboard shortcuts beside menu items mean nothing to a finger (the
+     list of shortcuts itself stays, for a keyboard attached to a tablet). */
+  :root kbd:not(.shortcut-row kbd) { display: none; }
+
+  /* iOS zooms the page into a field whose text is under 16px. */
+  :root :is(input, select, textarea) { font-size: 16px !important; }
+
+  /* Fingers need bigger targets. */
+  :root .board-zoom .icon-button, :root .board-tool { min-width: 40px; min-height: 40px; }
+  :root .library-views .icon-button { width: 36px; height: 36px; }
+  :root .segmented button { padding: 6px 12px; }
+}

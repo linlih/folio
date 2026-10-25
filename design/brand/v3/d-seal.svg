@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fdfaf5"/><stop offset="1" stop-color="#ece4d7"/></linearGradient>
+    <linearGradient id="seal" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#df5a40"/><stop offset="1" stop-color="#a8301f"/></linearGradient>
+    <filter id="sh" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur in="SourceAlpha" stdDeviation="20"/><feOffset dy="20"/><feComponentTransfer><feFuncA type="linear" slope="0.25"/></feComponentTransfer><feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  </defs>
+  <rect width="1024" height="1024" fill="url(#bg)"/>
+  <g filter="url(#sh)" transform="rotate(-5 512 512)">
+    <rect x="200" y="200" width="624" height="624" rx="96" fill="url(#seal)"/>
+    <rect x="200" y="200" width="624" height="624" rx="96" fill="none" stroke="#fff" stroke-opacity="0.25" stroke-width="5"/>
+    <g fill="none" stroke="#fdf6ee" stroke-width="60" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M312 312 H712"/>
+      <path d="M532 312 L488 392"/>
+      <path d="M352 680 V452 Q352 420 384 420 H640 Q672 420 672 452 V680"/>
+      <path d="M512 492 V612 Q512 680 412 752"/>
+      <path d="M580 660 L656 748"/>
+    </g>
+  </g>
+</svg>

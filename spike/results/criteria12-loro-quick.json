@@ -1,0 +1,31 @@
+{
+ "editor": {
+  "engine": "loro",
+  "suite": "editor",
+  "runs": 15,
+  "steps": 900,
+  "problems": 0,
+  "byKind": {},
+  "byOp": {},
+  "mergeDuplicateBids": 0,
+  "silentDrops": 0,
+  "dropSamples": [],
+  "seconds": 3.2,
+  "firstProblems": []
+ },
+ "convergence": {
+  "engine": "loro",
+  "suite": "convergence",
+  "runs": 10,
+  "steps": 3000,
+  "problems": 0,
+  "byKind": {},
+  "byOp": {},
+  "mergeDuplicateBids": 0,
+  "silentDrops": 0,
+  "dropSamples": [],
+  "seconds": 8.3,
+  "firstProblems": []
+ },
+ "allProblems": []
+}

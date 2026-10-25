@@ -1,0 +1,629 @@
+{
+ "editor": {
+  "engine": "yjs",
+  "suite": "editor",
+  "runs": 50,
+  "steps": 3000,
+  "problems": 60,
+  "byKind": {
+   "exception": 1,
+   "replicas-diverged": 42,
+   "crdt-editor-mismatch": 17
+  },
+  "byOp": {
+   "moveBlock": 7,
+   "deleteRange": 4,
+   "sink": 2,
+   "codeBlock": 2,
+   "heading": 4,
+   "pasteSlice": 7,
+   "splitBlock": 5,
+   "type": 18,
+   "undo": 5,
+   "joinBackward": 4,
+   "redo": 1,
+   "lift": 1
+  },
+  "mergeDuplicateBids": 0,
+  "silentDrops": 1,
+  "silentDropChars": 0,
+  "dropSamples": [
+   "0 chars: yjs deleted unrenderable taskList"
+  ],
+  "seconds": 17.3,
+  "firstProblems": [
+   {
+    "seed": 13,
+    "step": 18,
+    "op": "moveBlock",
+    "kind": "exception",
+    "detail": "TypeError: Cannot read properties of null (reading 'nodeSize')\n    at new NodeSelection (file:///<repo>/spike/web/node_modules/prosemirror-state/dist/index.js:342:57)\n    at NodeSelection.create (file:///<repo>/spike/web/node_modules/prosemirror-state/dist/index.js:375:16)\n    at restoreRelativeSelection (file:///<repo>/spike/web/node_modules/y-prosemirror"
+   },
+   {
+    "seed": 13,
+    "step": 18,
+    "op": "moveBlock",
+    "kind": "replicas-diverged",
+    "detail": "@34: …{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f57fbeb-a05b3465b550db9ee4b3\"},\"content\":[{\"type… vs …{\"type\":\"doc\",\"content\":[{\"type\":\"image\",\"attrs\":{\"bid\":\"01a15f57fc31-a0a60db49f89402827c9\",\"src\":\"data:image/gif;…"
+   },
+   {
+    "seed": 13,
+    "step": 18,
+    "op": "moveBlock",
+    "kind": "crdt-editor-mismatch",
+    "detail": "replica 0: @34: …{\"type\":\"doc\",\"content\":[{\"type\":\"image\",\"attrs\":{\"bid\":\"01a15f57fc31-a0a60db49f89402827c9\",\"src\":\"data:image/gif;… vs …{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f57fbeb-a05b3465b550db9ee4b3\"},\"content\":[{\"type…"
+   },
+   {
+    "seed": 13,
+    "step": 19,
+    "op": "deleteRange",
+    "kind": "replicas-diverged",
+    "detail": "@34: …{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f57fbeb-a05b3465b550db9ee4b3\"},\"content\":[{\"type… vs …{\"type\":\"doc\",\"content\":[{\"type\":\"image\",\"attrs\":{\"bid\":\"01a15f57fc31-a0a60db49f89402827c9\",\"src\":\"data:image/gif;…"
+   }
+  ]
+ },
+ "convergence": {
+  "engine": "yjs",
+  "suite": "convergence",
+  "runs": 200,
+  "steps": 100000,
+  "problems": 12,
+  "byKind": {
+   "exception": 6,
+   "not-converged": 3,
+   "crdt-editor-mismatch": 3
+  },
+  "byOp": {
+   "undo": 3,
+   "splitBlock": 1,
+   "sync": 6,
+   "moveBlock": 1,
+   "deleteRange": 1
+  },
+  "mergeDuplicateBids": 0,
+  "silentDrops": 18,
+  "silentDropChars": 57,
+  "dropSamples": [
+   "0 chars: yjs deleted unrenderable taskList",
+   "0 chars: yjs deleted unrenderable taskList",
+   "0 chars: yjs deleted unrenderable taskList"
+  ],
+  "seconds": 535,
+  "firstProblems": [
+   {
+    "seed": 1035,
+    "step": 149,
+    "op": "undo",
+    "kind": "exception",
+    "detail": "TypeError: Cannot read properties of null (reading 'nodeSize')\n    at new NodeSelection (file:///<repo>/spike/web/node_modules/prosemirror-state/dist/index.js:342:57)\n    at NodeSelection.create (file:///<repo>/spike/web/node_modules/prosemirror-state/dist/index.js:375:16)\n    at restoreRelativeSelection (file:///<repo>/spike/web/node_modules/y-prosemirror"
+   },
+   {
+    "seed": 1053,
+    "step": 258,
+    "op": "splitBlock",
+    "kind": "exception",
+    "detail": "TypeError: Cannot read properties of null (reading 'nodeSize')\n    at new NodeSelection (file:///<repo>/spike/web/node_modules/prosemirror-state/dist/index.js:342:57)\n    at NodeSelection.create (file:///<repo>/spike/web/node_modules/prosemirror-state/dist/index.js:375:16)\n    at restoreRelativeSelection (file:///<repo>/spike/web/node_modules/y-prosemirror"
+   },
+   {
+    "seed": 1053,
+    "step": 500,
+    "op": "sync",
+    "kind": "not-converged",
+    "detail": "@34: …{\"type\":\"doc\",\"content\":[{\"type\":\"taskList\",\"content\":[{\"type\":\"taskItem\",\"attrs\":{\"bid\":\"01a15f59aae5-4bc85f3626e… vs …{\"type\":\"doc\",\"content\":[{\"type\":\"heading\",\"attrs\":{\"bid\":\"01a15f59a33c-bbfb993566bd15aee190\",\"level\":2},\"content\"…"
+   },
+   {
+    "seed": 1053,
+    "step": 500,
+    "op": "sync",
+    "kind": "crdt-editor-mismatch",
+    "detail": "replica 2: @34: …{\"type\":\"doc\",\"content\":[{\"type\":\"taskList\",\"content\":[{\"type\":\"taskItem\",\"attrs\":{\"bid\":\"01a15f59aae5-4bc85f3626e… vs …{\"type\":\"doc\",\"content\":[{\"type\":\"heading\",\"attrs\":{\"bid\":\"01a15f59a33c-bbfb993566bd15aee190\",\"level\":2},\"content\"…"
+   }
+  ]
+ },
+ "allProblems": [
+  {
+   "seed": 13,
+   "step": 18,
+   "op": "moveBlock",
+   "kind": "exception",
+   "detail": "TypeError: Cannot read properties of null (reading 'nodeSize')\n    at new NodeSelection (file:///<repo>/spike/web/node_modules/prosemirror-state/dist/index.js:342:57)\n    at NodeSelection.create (file:///<repo>/spike/web/node_modules/prosemirror-state/dist/index.js:375:16)\n    at restoreRelativeSelection (file:///<repo>/spike/web/node_modules/y-prosemirror"
+  },
+  {
+   "seed": 13,
+   "step": 18,
+   "op": "moveBlock",
+   "kind": "replicas-diverged",
+   "detail": "@34: …{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f57fbeb-a05b3465b550db9ee4b3\"},\"content\":[{\"type… vs …{\"type\":\"doc\",\"content\":[{\"type\":\"image\",\"attrs\":{\"bid\":\"01a15f57fc31-a0a60db49f89402827c9\",\"src\":\"data:image/gif;…"
+  },
+  {
+   "seed": 13,
+   "step": 18,
+   "op": "moveBlock",
+   "kind": "crdt-editor-mismatch",
+   "detail": "replica 0: @34: …{\"type\":\"doc\",\"content\":[{\"type\":\"image\",\"attrs\":{\"bid\":\"01a15f57fc31-a0a60db49f89402827c9\",\"src\":\"data:image/gif;… vs …{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f57fbeb-a05b3465b550db9ee4b3\"},\"content\":[{\"type…"
+  },
+  {
+   "seed": 13,
+   "step": 19,
+   "op": "deleteRange",
+   "kind": "replicas-diverged",
+   "detail": "@34: …{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f57fbeb-a05b3465b550db9ee4b3\"},\"content\":[{\"type… vs …{\"type\":\"doc\",\"content\":[{\"type\":\"image\",\"attrs\":{\"bid\":\"01a15f57fc31-a0a60db49f89402827c9\",\"src\":\"data:image/gif;…"
+  },
+  {
+   "seed": 13,
+   "step": 19,
+   "op": "deleteRange",
+   "kind": "crdt-editor-mismatch",
+   "detail": "replica 1: @34: …{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f57fbeb-a05b3465b550db9ee4b3\"},\"content\":[{\"type… vs …{\"type\":\"doc\",\"content\":[{\"type\":\"image\",\"attrs\":{\"bid\":\"01a15f57fc31-a0a60db49f89402827c9\",\"src\":\"data:image/gif;…"
+  },
+  {
+   "seed": 13,
+   "step": 20,
+   "op": "deleteRange",
+   "kind": "replicas-diverged",
+   "detail": "@34: …{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f57fbeb-a05b3465b550db9ee4b3\"},\"content\":[{\"type… vs …{\"type\":\"doc\",\"content\":[{\"type\":\"image\",\"attrs\":{\"bid\":\"01a15f57fc31-a0a60db49f89402827c9\",\"src\":\"data:image/gif;…"
+  },
+  {
+   "seed": 13,
+   "step": 20,
+   "op": "deleteRange",
+   "kind": "crdt-editor-mismatch",
+   "detail": "replica 1: @302: …eb-a05b3465b550db9ee4b3\"},\"content\":[{\"type\":\"text\",\"text\":\"粘贴一段\"}]},{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f57fc2e-0c05563daf056c27acf4\"}… vs …eb-a05b3465b550db9ee4b3\"},\"content\":[{\"type\":\"text\",\"text\":\"卡片note第\"}]},{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f57fc2e-0c05563daf056c27acf…"
+  },
+  {
+   "seed": 13,
+   "step": 21,
+   "op": "sink",
+   "kind": "replicas-diverged",
+   "detail": "@34: …{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f57fbeb-a05b3465b550db9ee4b3\"},\"content\":[{\"type… vs …{\"type\":\"doc\",\"content\":[{\"type\":\"image\",\"attrs\":{\"bid\":\"01a15f57fc31-a0a60db49f89402827c9\",\"src\":\"data:image/gif;…"
+  },
+  {
+   "seed": 13,
+   "step": 21,
+   "op": "sink",
+   "kind": "crdt-editor-mismatch",
+   "detail": "replica 1: @302: …eb-a05b3465b550db9ee4b3\"},\"content\":[{\"type\":\"text\",\"text\":\"粘贴一段\"}]},{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f57fc2e-0c05563daf056c27acf4\"}… vs …eb-a05b3465b550db9ee4b3\"},\"content\":[{\"type\":\"text\",\"text\":\"卡片note第\"}]},{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f57fc2e-0c05563daf056c27acf…"
+  },
+  {
+   "seed": 13,
+   "step": 22,
+   "op": "codeBlock",
+   "kind": "replicas-diverged",
+   "detail": "@34: …{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f57fbeb-a05b3465b550db9ee4b3\"},\"content\":[{\"type… vs …{\"type\":\"doc\",\"content\":[{\"type\":\"image\",\"attrs\":{\"bid\":\"01a15f57fc31-a0a60db49f89402827c9\",\"src\":\"data:image/gif;…"
+  },
+  {
+   "seed": 13,
+   "step": 22,
+   "op": "codeBlock",
+   "kind": "crdt-editor-mismatch",
+   "detail": "replica 1: @302: …eb-a05b3465b550db9ee4b3\"},\"content\":[{\"type\":\"text\",\"text\":\"粘贴一段\"}]},{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f57fc2e-0c05563daf056c27acf4\"}… vs …eb-a05b3465b550db9ee4b3\"},\"content\":[{\"type\":\"text\",\"text\":\"卡片note第\"}]},{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f57fc2e-0c05563daf056c27acf…"
+  },
+  {
+   "seed": 13,
+   "step": 23,
+   "op": "heading",
+   "kind": "replicas-diverged",
+   "detail": "@34: …{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f57fbeb-a05b3465b550db9ee4b3\"},\"content\":[{\"type… vs …{\"type\":\"doc\",\"content\":[{\"type\":\"image\",\"attrs\":{\"bid\":\"01a15f57fc31-a0a60db49f89402827c9\",\"src\":\"data:image/gif;…"
+  },
+  {
+   "seed": 13,
+   "step": 23,
+   "op": "heading",
+   "kind": "crdt-editor-mismatch",
+   "detail": "replica 1: @302: …eb-a05b3465b550db9ee4b3\"},\"content\":[{\"type\":\"text\",\"text\":\"粘贴一段\"}]},{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f57fc2e-0c05563daf056c27acf4\"}… vs …eb-a05b3465b550db9ee4b3\"},\"content\":[{\"type\":\"text\",\"text\":\"卡片note第\"}]},{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f57fc2e-0c05563daf056c27acf…"
+  },
+  {
+   "seed": 13,
+   "step": 24,
+   "op": "pasteSlice",
+   "kind": "replicas-diverged",
+   "detail": "@34: …{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f57fbeb-a05b3465b550db9ee4b3\"},\"content\":[{\"type… vs …{\"type\":\"doc\",\"content\":[{\"type\":\"image\",\"attrs\":{\"bid\":\"01a15f57fc31-a0a60db49f89402827c9\",\"src\":\"data:image/gif;…"
+  },
+  {
+   "seed": 13,
+   "step": 24,
+   "op": "pasteSlice",
+   "kind": "crdt-editor-mismatch",
+   "detail": "replica 1: @241: …height\":null}},{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f57fc61-1dacaf409545de6fb1b9\"},\"content\":[{\"type\":\"text\",\"text\":\"inline paste\"}]},{\"… vs …height\":null}},{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f57fbeb-a05b3465b550db9ee4b3\"},\"content\":[{\"type\":\"text\",\"text\":\"卡片note第\"}]},{\"type\"…"
+  },
+  {
+   "seed": 13,
+   "step": 25,
+   "op": "splitBlock",
+   "kind": "replicas-diverged",
+   "detail": "@34: …{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f57fbeb-a05b3465b550db9ee4b3\"},\"content\":[{\"type… vs …{\"type\":\"doc\",\"content\":[{\"type\":\"image\",\"attrs\":{\"bid\":\"01a15f57fc31-a0a60db49f89402827c9\",\"src\":\"data:image/gif;…"
+  },
+  {
+   "seed": 13,
+   "step": 26,
+   "op": "type",
+   "kind": "replicas-diverged",
+   "detail": "@34: …{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f57fbeb-a05b3465b550db9ee4b3\"},\"content\":[{\"type… vs …{\"type\":\"doc\",\"content\":[{\"type\":\"image\",\"attrs\":{\"bid\":\"01a15f57fc31-a0a60db49f89402827c9\",\"src\":\"data:image/gif;…"
+  },
+  {
+   "seed": 13,
+   "step": 27,
+   "op": "splitBlock",
+   "kind": "replicas-diverged",
+   "detail": "@34: …{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f57fbeb-a05b3465b550db9ee4b3\"},\"content\":[{\"type… vs …{\"type\":\"doc\",\"content\":[{\"type\":\"image\",\"attrs\":{\"bid\":\"01a15f57fc31-a0a60db49f89402827c9\",\"src\":\"data:image/gif;…"
+  },
+  {
+   "seed": 13,
+   "step": 27,
+   "op": "splitBlock",
+   "kind": "crdt-editor-mismatch",
+   "detail": "replica 1: @477: …\":\"粘贴一段白板\"}]},{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f57fc71-9e5ae2e0194187a2cfe8\"}},{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f57fc2e-4a51… vs …\":\"粘贴一段白板\"}]},{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f57fc2e-4a51ad3e444e64893331\"},\"content\":[{\"type\":\"text\",\"text\":\"白板第二段\"}]},{\"type\":\"p…"
+  },
+  {
+   "seed": 13,
+   "step": 28,
+   "op": "heading",
+   "kind": "replicas-diverged",
+   "detail": "@34: …{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f57fbeb-a05b3465b550db9ee4b3\"},\"content\":[{\"type… vs …{\"type\":\"doc\",\"content\":[{\"type\":\"image\",\"attrs\":{\"bid\":\"01a15f57fc31-a0a60db49f89402827c9\",\"src\":\"data:image/gif;…"
+  },
+  {
+   "seed": 13,
+   "step": 28,
+   "op": "heading",
+   "kind": "crdt-editor-mismatch",
+   "detail": "replica 1: @440: …cf4\"},\"content\":[{\"type\":\"text\",\"text\":\"粘贴一段白板\"}]},{\"type\":\"heading\",\"attrs\":{\"bid\":\"01a15f57fc71-9e5ae2e0194187a2cfe8\",\"level\":1}},{\"type\":… vs …cf4\"},\"content\":[{\"type\":\"text\",\"text\":\"粘贴一段白板\"}]},{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f57fc2e-4a51ad3e444e64893331\"},\"content\":[{\"type…"
+  },
+  {
+   "seed": 13,
+   "step": 29,
+   "op": "undo",
+   "kind": "replicas-diverged",
+   "detail": "@34: …{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f57fbeb-a05b3465b550db9ee4b3\"},\"content\":[{\"type… vs …{\"type\":\"doc\",\"content\":[{\"type\":\"image\",\"attrs\":{\"bid\":\"01a15f57fc31-a0a60db49f89402827c9\",\"src\":\"data:image/gif;…"
+  },
+  {
+   "seed": 13,
+   "step": 29,
+   "op": "undo",
+   "kind": "crdt-editor-mismatch",
+   "detail": "replica 1: @440: …cf4\"},\"content\":[{\"type\":\"text\",\"text\":\"粘贴一段白板\"}]},{\"type\":\"heading\",\"attrs\":{\"bid\":\"01a15f57fc71-9e5ae2e0194187a2cfe8\",\"level\":1}},{\"type\":… vs …cf4\"},\"content\":[{\"type\":\"text\",\"text\":\"粘贴一段白板\"}]},{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f57fc2e-4a51ad3e444e64893331\"},\"content\":[{\"type…"
+  },
+  {
+   "seed": 13,
+   "step": 30,
+   "op": "type",
+   "kind": "replicas-diverged",
+   "detail": "@34: …{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f57fbeb-a05b3465b550db9ee4b3\"},\"content\":[{\"type… vs …{\"type\":\"doc\",\"content\":[{\"type\":\"image\",\"attrs\":{\"bid\":\"01a15f57fc31-a0a60db49f89402827c9\",\"src\":\"data:image/gif;…"
+  },
+  {
+   "seed": 13,
+   "step": 31,
+   "op": "joinBackward",
+   "kind": "replicas-diverged",
+   "detail": "@34: …{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f57fbeb-a05b3465b550db9ee4b3\"},\"content\":[{\"type… vs …{\"type\":\"doc\",\"content\":[{\"type\":\"image\",\"attrs\":{\"bid\":\"01a15f57fc31-a0a60db49f89402827c9\",\"src\":\"data:image/gif;…"
+  },
+  {
+   "seed": 13,
+   "step": 31,
+   "op": "joinBackward",
+   "kind": "crdt-editor-mismatch",
+   "detail": "replica 1: @823: …e4b3~1\"},\"content\":[{\"type\":\"text\",\"text\":\"一卡片\"}]},{\"type\":\"bulletList\",\"content\":[{\"type\":\"listItem\",\"attrs\":{\"bid\":\"01a15f57fc26-654f71c53… vs …e4b3~1\"},\"content\":[{\"type\":\"text\",\"text\":\"一卡片\"}]},{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f57fbfd-2074f4eb0cae70bb9de0\"}},{\"type\":\"bulletL…"
+  },
+  {
+   "seed": 13,
+   "step": 32,
+   "op": "pasteSlice",
+   "kind": "replicas-diverged",
+   "detail": "@34: …{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f57fbeb-a05b3465b550db9ee4b3\"},\"content\":[{\"type… vs …{\"type\":\"doc\",\"content\":[{\"type\":\"image\",\"attrs\":{\"bid\":\"01a15f57fc31-a0a60db49f89402827c9\",\"src\":\"data:image/gif;…"
+  },
+  {
+   "seed": 13,
+   "step": 33,
+   "op": "joinBackward",
+   "kind": "replicas-diverged",
+   "detail": "@34: …{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f57fbeb-a05b3465b550db9ee4b3\"},\"content\":[{\"type… vs …{\"type\":\"doc\",\"content\":[{\"type\":\"image\",\"attrs\":{\"bid\":\"01a15f57fc31-a0a60db49f89402827c9\",\"src\":\"data:image/gif;…"
+  },
+  {
+   "seed": 13,
+   "step": 34,
+   "op": "type",
+   "kind": "replicas-diverged",
+   "detail": "@34: …{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f57fbeb-a05b3465b550db9ee4b3\"},\"content\":[{\"type… vs …{\"type\":\"doc\",\"content\":[{\"type\":\"image\",\"attrs\":{\"bid\":\"01a15f57fc31-a0a60db49f89402827c9\",\"src\":\"data:image/gif;…"
+  },
+  {
+   "seed": 13,
+   "step": 35,
+   "op": "splitBlock",
+   "kind": "replicas-diverged",
+   "detail": "@34: …{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f57fbeb-a05b3465b550db9ee4b3\"},\"content\":[{\"type… vs …{\"type\":\"doc\",\"content\":[{\"type\":\"image\",\"attrs\":{\"bid\":\"01a15f57fc31-a0a60db49f89402827c9\",\"src\":\"data:image/gif;…"
+  },
+  {
+   "seed": 13,
+   "step": 35,
+   "op": "splitBlock",
+   "kind": "crdt-editor-mismatch",
+   "detail": "replica 1: @365: …helloote第\"}]},{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f57fc61-1dacaf409545de6fb1b9~1\"},\"content\":[{\"type\":\"text\",\"text\":\"nline paste\"}]},{\"… vs …helloote第\"}]},{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f57fc2e-0c05563daf056c27acf4\"},\"content\":[{\"type\":\"text\",\"text\":\"粘贴一段白板\"}]},{\"type\":\"…"
+  },
+  {
+   "seed": 13,
+   "step": 36,
+   "op": "type",
+   "kind": "replicas-diverged",
+   "detail": "@34: …{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f57fbeb-a05b3465b550db9ee4b3\"},\"content\":[{\"type… vs …{\"type\":\"doc\",\"content\":[{\"type\":\"image\",\"attrs\":{\"bid\":\"01a15f57fc31-a0a60db49f89402827c9\",\"src\":\"data:image/gif;…"
+  },
+  {
+   "seed": 13,
+   "step": 36,
+   "op": "type",
+   "kind": "crdt-editor-mismatch",
+   "detail": "replica 1: @365: …helloote第\"}]},{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f57fc61-1dacaf409545de6fb1b9~1\"},\"content\":[{\"type\":\"text\",\"text\":\"nline paste\"}]},{\"… vs …helloote第\"}]},{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f57fc2e-0c05563daf056c27acf4\"},\"content\":[{\"type\":\"text\",\"text\":\"粘贴一段白板\"}]},{\"type\":\"…"
+  },
+  {
+   "seed": 13,
+   "step": 37,
+   "op": "undo",
+   "kind": "replicas-diverged",
+   "detail": "@34: …{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f57fbeb-a05b3465b550db9ee4b3\"},\"content\":[{\"type… vs …{\"type\":\"doc\",\"content\":[{\"type\":\"image\",\"attrs\":{\"bid\":\"01a15f57fc31-a0a60db49f89402827c9\",\"src\":\"data:image/gif;…"
+  },
+  {
+   "seed": 13,
+   "step": 37,
+   "op": "undo",
+   "kind": "crdt-editor-mismatch",
+   "detail": "replica 1: @365: …helloote第\"}]},{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f57fc61-1dacaf409545de6fb1b9~1\"},\"content\":[{\"type\":\"text\",\"text\":\"nline paste\"}]},{\"… vs …helloote第\"}]},{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f57fc2e-0c05563daf056c27acf4\"},\"content\":[{\"type\":\"text\",\"text\":\"粘贴一段白板\"}]},{\"type\":\"…"
+  },
+  {
+   "seed": 13,
+   "step": 38,
+   "op": "moveBlock",
+   "kind": "replicas-diverged",
+   "detail": "@34: …{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f57fbeb-a05b3465b550db9ee4b3\"},\"content\":[{\"type… vs …{\"type\":\"doc\",\"content\":[{\"type\":\"image\",\"attrs\":{\"bid\":\"01a15f57fc31-a0a60db49f89402827c9\",\"src\":\"data:image/gif;…"
+  },
+  {
+   "seed": 13,
+   "step": 38,
+   "op": "moveBlock",
+   "kind": "crdt-editor-mismatch",
+   "detail": "replica 1: @696: …ragraph\",\"attrs\":{\"bid\":\"01a15f57fc09-ac762f8031ae4c5fe89e\"},\"content\":[{\"type\":\"text\",\"text\":\"，\"}]},{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a… vs …ragraph\",\"attrs\":{\"bid\":\"01a15f57fc09-ac762f8031ae4c5fe89e\"}},{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f57fbeb-a05b3465b550db9ee4b3~1\"},\"con…"
+  },
+  {
+   "seed": 13,
+   "step": 39,
+   "op": "moveBlock",
+   "kind": "replicas-diverged",
+   "detail": "@34: …{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f57fbeb-a05b3465b550db9ee4b3\"},\"content\":[{\"type… vs …{\"type\":\"doc\",\"content\":[{\"type\":\"image\",\"attrs\":{\"bid\":\"01a15f57fc31-a0a60db49f89402827c9\",\"src\":\"data:image/gif;…"
+  },
+  {
+   "seed": 13,
+   "step": 40,
+   "op": "type",
+   "kind": "replicas-diverged",
+   "detail": "@34: …{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f57fbeb-a05b3465b550db9ee4b3\"},\"content\":[{\"type… vs …{\"type\":\"doc\",\"content\":[{\"type\":\"image\",\"attrs\":{\"bid\":\"01a15f57fc31-a0a60db49f89402827c9\",\"src\":\"data:image/gif;…"
+  },
+  {
+   "seed": 13,
+   "step": 41,
+   "op": "redo",
+   "kind": "replicas-diverged",
+   "detail": "@34: …{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f57fbeb-a05b3465b550db9ee4b3\"},\"content\":[{\"type… vs …{\"type\":\"doc\",\"content\":[{\"type\":\"image\",\"attrs\":{\"bid\":\"01a15f57fc31-a0a60db49f89402827c9\",\"src\":\"data:image/gif;…"
+  },
+  {
+   "seed": 13,
+   "step": 42,
+   "op": "type",
+   "kind": "replicas-diverged",
+   "detail": "@34: …{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f57fbeb-a05b3465b550db9ee4b3\"},\"content\":[{\"type… vs …{\"type\":\"doc\",\"content\":[{\"type\":\"image\",\"attrs\":{\"bid\":\"01a15f57fc31-a0a60db49f89402827c9\",\"src\":\"data:image/gif;…"
+  },
+  {
+   "seed": 13,
+   "step": 43,
+   "op": "moveBlock",
+   "kind": "replicas-diverged",
+   "detail": "@34: …{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f57fbeb-a05b3465b550db9ee4b3\"},\"content\":[{\"type… vs …{\"type\":\"doc\",\"content\":[{\"type\":\"image\",\"attrs\":{\"bid\":\"01a15f57fc31-a0a60db49f89402827c9\",\"src\":\"data:image/gif;…"
+  },
+  {
+   "seed": 13,
+   "step": 44,
+   "op": "undo",
+   "kind": "replicas-diverged",
+   "detail": "@34: …{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f57fbeb-a05b3465b550db9ee4b3\"},\"content\":[{\"type… vs …{\"type\":\"doc\",\"content\":[{\"type\":\"image\",\"attrs\":{\"bid\":\"01a15f57fc31-a0a60db49f89402827c9\",\"src\":\"data:image/gif;…"
+  },
+  {
+   "seed": 13,
+   "step": 45,
+   "op": "pasteSlice",
+   "kind": "replicas-diverged",
+   "detail": "@34: …{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f57fbeb-a05b3465b550db9ee4b3\"},\"content\":[{\"type… vs …{\"type\":\"doc\",\"content\":[{\"type\":\"image\",\"attrs\":{\"bid\":\"01a15f57fc31-a0a60db49f89402827c9\",\"src\":\"data:image/gif;…"
+  },
+  {
+   "seed": 13,
+   "step": 46,
+   "op": "type",
+   "kind": "replicas-diverged",
+   "detail": "@34: …{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f57fbeb-a05b3465b550db9ee4b3\"},\"content\":[{\"type… vs …{\"type\":\"doc\",\"content\":[{\"type\":\"image\",\"attrs\":{\"bid\":\"01a15f57fc31-a0a60db49f89402827c9\",\"src\":\"data:image/gif;…"
+  },
+  {
+   "seed": 13,
+   "step": 47,
+   "op": "type",
+   "kind": "replicas-diverged",
+   "detail": "@34: …{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f57fbeb-a05b3465b550db9ee4b3\"},\"content\":[{\"type… vs …{\"type\":\"doc\",\"content\":[{\"type\":\"image\",\"attrs\":{\"bid\":\"01a15f57fc31-a0a60db49f89402827c9\",\"src\":\"data:image/gif;…"
+  },
+  {
+   "seed": 13,
+   "step": 48,
+   "op": "joinBackward",
+   "kind": "replicas-diverged",
+   "detail": "@34: …{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f57fbeb-a05b3465b550db9ee4b3\"},\"content\":[{\"type… vs …{\"type\":\"doc\",\"content\":[{\"type\":\"image\",\"attrs\":{\"bid\":\"01a15f57fc31-a0a60db49f89402827c9\",\"src\":\"data:image/gif;…"
+  },
+  {
+   "seed": 13,
+   "step": 49,
+   "op": "type",
+   "kind": "replicas-diverged",
+   "detail": "@34: …{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f57fbeb-a05b3465b550db9ee4b3\"},\"content\":[{\"type… vs …{\"type\":\"doc\",\"content\":[{\"type\":\"image\",\"attrs\":{\"bid\":\"01a15f57fc31-a0a60db49f89402827c9\",\"src\":\"data:image/gif;…"
+  },
+  {
+   "seed": 13,
+   "step": 50,
+   "op": "lift",
+   "kind": "replicas-diverged",
+   "detail": "@34: …{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f57fbeb-a05b3465b550db9ee4b3\"},\"content\":[{\"type… vs …{\"type\":\"doc\",\"content\":[{\"type\":\"image\",\"attrs\":{\"bid\":\"01a15f57fc31-a0a60db49f89402827c9\",\"src\":\"data:image/gif;…"
+  },
+  {
+   "seed": 13,
+   "step": 51,
+   "op": "type",
+   "kind": "replicas-diverged",
+   "detail": "@34: …{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f57fbeb-a05b3465b550db9ee4b3\"},\"content\":[{\"type… vs …{\"type\":\"doc\",\"content\":[{\"type\":\"image\",\"attrs\":{\"bid\":\"01a15f57fc31-a0a60db49f89402827c9\",\"src\":\"data:image/gif;…"
+  },
+  {
+   "seed": 13,
+   "step": 52,
+   "op": "type",
+   "kind": "replicas-diverged",
+   "detail": "@34: …{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f57fbeb-a05b3465b550db9ee4b3\"},\"content\":[{\"type… vs …{\"type\":\"doc\",\"content\":[{\"type\":\"image\",\"attrs\":{\"bid\":\"01a15f57fc31-a0a60db49f89402827c9\",\"src\":\"data:image/gif;…"
+  },
+  {
+   "seed": 13,
+   "step": 53,
+   "op": "type",
+   "kind": "replicas-diverged",
+   "detail": "@34: …{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f57fbeb-a05b3465b550db9ee4b3\"},\"content\":[{\"type… vs …{\"type\":\"doc\",\"content\":[{\"type\":\"image\",\"attrs\":{\"bid\":\"01a15f57fc31-a0a60db49f89402827c9\",\"src\":\"data:image/gif;…"
+  },
+  {
+   "seed": 13,
+   "step": 54,
+   "op": "type",
+   "kind": "replicas-diverged",
+   "detail": "@34: …{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f57fbeb-a05b3465b550db9ee4b3\"},\"content\":[{\"type… vs …{\"type\":\"doc\",\"content\":[{\"type\":\"image\",\"attrs\":{\"bid\":\"01a15f57fc31-a0a60db49f89402827c9\",\"src\":\"data:image/gif;…"
+  },
+  {
+   "seed": 13,
+   "step": 55,
+   "op": "type",
+   "kind": "replicas-diverged",
+   "detail": "@34: …{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f57fbeb-a05b3465b550db9ee4b3\"},\"content\":[{\"type… vs …{\"type\":\"doc\",\"content\":[{\"type\":\"image\",\"attrs\":{\"bid\":\"01a15f57fc31-a0a60db49f89402827c9\",\"src\":\"data:image/gif;…"
+  },
+  {
+   "seed": 13,
+   "step": 56,
+   "op": "pasteSlice",
+   "kind": "replicas-diverged",
+   "detail": "@34: …{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f57fbeb-a05b3465b550db9ee4b3\"},\"content\":[{\"type… vs …{\"type\":\"doc\",\"content\":[{\"type\":\"image\",\"attrs\":{\"bid\":\"01a15f57fc31-a0a60db49f89402827c9\",\"src\":\"data:image/gif;…"
+  },
+  {
+   "seed": 13,
+   "step": 57,
+   "op": "type",
+   "kind": "replicas-diverged",
+   "detail": "@34: …{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f57fbeb-a05b3465b550db9ee4b3\"},\"content\":[{\"type… vs …{\"type\":\"doc\",\"content\":[{\"type\":\"image\",\"attrs\":{\"bid\":\"01a15f57fc31-a0a60db49f89402827c9\",\"src\":\"data:image/gif;…"
+  },
+  {
+   "seed": 13,
+   "step": 58,
+   "op": "pasteSlice",
+   "kind": "replicas-diverged",
+   "detail": "@34: …{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f57fbeb-a05b3465b550db9ee4b3\"},\"content\":[{\"type… vs …{\"type\":\"doc\",\"content\":[{\"type\":\"image\",\"attrs\":{\"bid\":\"01a15f57fc31-a0a60db49f89402827c9\",\"src\":\"data:image/gif;…"
+  },
+  {
+   "seed": 13,
+   "step": 58,
+   "op": "pasteSlice",
+   "kind": "crdt-editor-mismatch",
+   "detail": "replica 1: @205: …lt\":null,\"title\":null,\"width\":null,\"height\":null}},{\"type\":\"heading\",\"attrs\":{\"bid\":\"01a15f57fcdd-f81ae33e2d261de74947\",\"level\":2},\"content\"… vs …lt\":null,\"title\":null,\"width\":null,\"height\":null}},{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f57fc2e-0c05563daf056c27acf4\"},\"content\":[{\"type…"
+  },
+  {
+   "seed": 13,
+   "step": 59,
+   "op": "type",
+   "kind": "replicas-diverged",
+   "detail": "@34: …{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f57fbeb-a05b3465b550db9ee4b3\"},\"content\":[{\"type… vs …{\"type\":\"doc\",\"content\":[{\"type\":\"image\",\"attrs\":{\"bid\":\"01a15f57fc31-a0a60db49f89402827c9\",\"src\":\"data:image/gif;…"
+  },
+  {
+   "seed": 13,
+   "step": 59,
+   "op": "type",
+   "kind": "crdt-editor-mismatch",
+   "detail": "replica 1: @205: …lt\":null,\"title\":null,\"width\":null,\"height\":null}},{\"type\":\"heading\",\"attrs\":{\"bid\":\"01a15f57fcdd-f81ae33e2d261de74947\",\"level\":2},\"content\"… vs …lt\":null,\"title\":null,\"width\":null,\"height\":null}},{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f57fc2e-0c05563daf056c27acf4\"},\"content\":[{\"type…"
+  },
+  {
+   "seed": 1035,
+   "step": 149,
+   "op": "undo",
+   "kind": "exception",
+   "detail": "TypeError: Cannot read properties of null (reading 'nodeSize')\n    at new NodeSelection (file:///<repo>/spike/web/node_modules/prosemirror-state/dist/index.js:342:57)\n    at NodeSelection.create (file:///<repo>/spike/web/node_modules/prosemirror-state/dist/index.js:375:16)\n    at restoreRelativeSelection (file:///<repo>/spike/web/node_modules/y-prosemirror"
+  },
+  {
+   "seed": 1053,
+   "step": 258,
+   "op": "splitBlock",
+   "kind": "exception",
+   "detail": "TypeError: Cannot read properties of null (reading 'nodeSize')\n    at new NodeSelection (file:///<repo>/spike/web/node_modules/prosemirror-state/dist/index.js:342:57)\n    at NodeSelection.create (file:///<repo>/spike/web/node_modules/prosemirror-state/dist/index.js:375:16)\n    at restoreRelativeSelection (file:///<repo>/spike/web/node_modules/y-prosemirror"
+  },
+  {
+   "seed": 1053,
+   "step": 500,
+   "op": "sync",
+   "kind": "not-converged",
+   "detail": "@34: …{\"type\":\"doc\",\"content\":[{\"type\":\"taskList\",\"content\":[{\"type\":\"taskItem\",\"attrs\":{\"bid\":\"01a15f59aae5-4bc85f3626e… vs …{\"type\":\"doc\",\"content\":[{\"type\":\"heading\",\"attrs\":{\"bid\":\"01a15f59a33c-bbfb993566bd15aee190\",\"level\":2},\"content\"…"
+  },
+  {
+   "seed": 1053,
+   "step": 500,
+   "op": "sync",
+   "kind": "crdt-editor-mismatch",
+   "detail": "replica 2: @34: …{\"type\":\"doc\",\"content\":[{\"type\":\"taskList\",\"content\":[{\"type\":\"taskItem\",\"attrs\":{\"bid\":\"01a15f59aae5-4bc85f3626e… vs …{\"type\":\"doc\",\"content\":[{\"type\":\"heading\",\"attrs\":{\"bid\":\"01a15f59a33c-bbfb993566bd15aee190\",\"level\":2},\"content\"…"
+  },
+  {
+   "seed": 1055,
+   "step": 84,
+   "op": "undo",
+   "kind": "exception",
+   "detail": "TypeError: Cannot read properties of null (reading 'nodeSize')\n    at new NodeSelection (file:///<repo>/spike/web/node_modules/prosemirror-state/dist/index.js:342:57)\n    at NodeSelection.create (file:///<repo>/spike/web/node_modules/prosemirror-state/dist/index.js:375:16)\n    at restoreRelativeSelection (file:///<repo>/spike/web/node_modules/y-prosemirror"
+  },
+  {
+   "seed": 1081,
+   "step": 310,
+   "op": "moveBlock",
+   "kind": "exception",
+   "detail": "TypeError: Cannot read properties of null (reading 'nodeSize')\n    at new NodeSelection (file:///<repo>/spike/web/node_modules/prosemirror-state/dist/index.js:342:57)\n    at NodeSelection.create (file:///<repo>/spike/web/node_modules/prosemirror-state/dist/index.js:375:16)\n    at restoreRelativeSelection (file:///<repo>/spike/web/node_modules/y-prosemirror"
+  },
+  {
+   "seed": 1081,
+   "step": 500,
+   "op": "sync",
+   "kind": "not-converged",
+   "detail": "@689: …agraph\",\"attrs\":{\"bid\":\"01a15f5acc6e-efc78f1992031227c8cd\"}}]},{\"type\":\"listItem\",\"attrs\":{\"bid\":\"01a15f5ac9d8-fe7259c8b88166f0c0fb\"},\"conte… vs …agraph\",\"attrs\":{\"bid\":\"01a15f5acc6e-efc78f1992031227c8cd\"}},{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f5acea6-f19c70bfdcd71ce411e6\"}},{\"type…"
+  },
+  {
+   "seed": 1081,
+   "step": 500,
+   "op": "sync",
+   "kind": "crdt-editor-mismatch",
+   "detail": "replica 0: @689: …agraph\",\"attrs\":{\"bid\":\"01a15f5acc6e-efc78f1992031227c8cd\"}},{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f5acea6-f19c70bfdcd71ce411e6\"}},{\"type… vs …agraph\",\"attrs\":{\"bid\":\"01a15f5acc6e-efc78f1992031227c8cd\"}}]},{\"type\":\"listItem\",\"attrs\":{\"bid\":\"01a15f5ac9d8-fe7259c8b88166f0c0fb\"},\"conte…"
+  },
+  {
+   "seed": 1116,
+   "step": 68,
+   "op": "undo",
+   "kind": "exception",
+   "detail": "TypeError: Cannot read properties of null (reading 'nodeSize')\n    at new NodeSelection (file:///<repo>/spike/web/node_modules/prosemirror-state/dist/index.js:342:57)\n    at NodeSelection.create (file:///<repo>/spike/web/node_modules/prosemirror-state/dist/index.js:375:16)\n    at restoreRelativeSelection (file:///<repo>/spike/web/node_modules/y-prosemirror"
+  },
+  {
+   "seed": 1139,
+   "step": 251,
+   "op": "deleteRange",
+   "kind": "exception",
+   "detail": "TypeError: Cannot read properties of null (reading 'nodeSize')\n    at new NodeSelection (file:///<repo>/spike/web/node_modules/prosemirror-state/dist/index.js:342:57)\n    at NodeSelection.create (file:///<repo>/spike/web/node_modules/prosemirror-state/dist/index.js:375:16)\n    at restoreRelativeSelection (file:///<repo>/spike/web/node_modules/y-prosemirror"
+  },
+  {
+   "seed": 1139,
+   "step": 500,
+   "op": "sync",
+   "kind": "not-converged",
+   "detail": "@278: …ent\":[{\"type\":\"text\",\"text\":\"白henotellCRD To板块引用CRDT\"}]}]}]}]}… vs …ent\":[{\"type\":\"text\",\"text\":\"白henotellCRD To板块引用CRDT\"}]}]}]},{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f5d39c5-77159ae4149f4ce844b4\"},\"conten…"
+  },
+  {
+   "seed": 1139,
+   "step": 500,
+   "op": "sync",
+   "kind": "crdt-editor-mismatch",
+   "detail": "replica 0: @278: …ent\":[{\"type\":\"text\",\"text\":\"白henotellCRD To板块引用CRDT\"}]}]}]},{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f5d39c5-77159ae4149f4ce844b4\"},\"conten… vs …ent\":[{\"type\":\"text\",\"text\":\"白henotellCRD To板块引用CRDT\"}]}]}]}]}…"
+  }
+ ]
+}

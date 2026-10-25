@@ -1,0 +1,29 @@
+{
+ "engine": "yjs",
+ "days": 365,
+ "ops": 200750,
+ "updates": 198063,
+ "finalChars": 8432,
+ "updateLogBytes": 4773581,
+ "snapshotBytes": 2307177,
+ "compactBytes": 2307177,
+ "bytesPerFinalChar": {
+  "snapshot": 273.62,
+  "compact": 273.62
+ },
+ "editSeconds": 64.9,
+ "openFromSnapshot": {
+  "n": 5,
+  "p50": 248.27,
+  "p95": 295.41,
+  "max": 295.41,
+  "mean": 265.879
+ },
+ "openFromCompact": {
+  "n": 5,
+  "p50": 273.904,
+  "p95": 281.532,
+  "max": 281.532,
+  "mean": 257.391
+ }
+}

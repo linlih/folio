@@ -1,0 +1,46 @@
+/* The settings window (settings/SettingsDialog.tsx). */
+.dialog.settings {
+  flex-direction: row;
+  width: min(860px, calc(100vw - 32px));
+  height: min(600px, 80vh);
+  max-height: none;
+  padding: 0;
+  overflow: hidden;
+}
+.settings-nav {
+  flex: none;
+  width: 190px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 16px 8px;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  color: var(--secondary);
+}
+.settings-heading { margin: 0 8px 10px; font: 600 15px/1.4 var(--font-ui); color: var(--text); }
+.settings-body { flex: 1; min-width: 0; display: flex; flex-direction: column; padding: 16px 22px 18px; }
+.settings-gap { height: 10px; }
+.settings-content { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
+.settings-row { display: flex; align-items: center; gap: 16px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.settings-row-label { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; color: var(--text); font-size: 13.5px; }
+.settings-row-label small { color: var(--muted); font-size: 12px; line-height: 1.5; }
+.settings-row-control { flex: none; max-width: 60%; display: flex; align-items: center; }
+.settings-value { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 12.5px var(--font-mono); color: var(--secondary); -webkit-user-select: text; user-select: text; }
+.segmented { display: inline-flex; padding: 2px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
+.segmented button { padding: 3px 12px; border-radius: 6px; font-size: 13px; color: var(--secondary); }
+.segmented button:hover { color: var(--text); }
+/* Raised a little above the page in both themes. */
+.segmented button.on { background: color-mix(in srgb, var(--paper) 82%, white); color: var(--text); box-shadow: 0 1px 2px rgb(0 0 0 / 0.12); }
+/* The panels moved here from their own dialogs. */
+.settings-content > .dialog-actions { margin-top: 10px; }
+/* Where the library is: the path under the label, the actions on a line of
+   their own, and what a choice will do, before it is done. */
+.place-row { flex-wrap: wrap; align-items: flex-start; }
+.place-row .settings-row-label { flex-basis: 100%; }
+.place-path { white-space: normal; overflow-wrap: anywhere; margin-top: 2px; }
+.settings-row-label small.place-warning, .place-confirm .place-warning { color: #b5523f; }
+.place-actions { max-width: none; flex-wrap: wrap; gap: 8px; }
+.place-confirm { flex-basis: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: color-mix(in srgb, var(--ink) 3%, transparent); }
+.place-confirm p { margin: 0 0 8px; font-size: 13px; line-height: 1.55; color: var(--text); overflow-wrap: anywhere; }
+.place-confirm-actions { display: flex; justify-content: flex-end; gap: 8px; }

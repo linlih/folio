@@ -1,0 +1,40 @@
+.search-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding-top: 12vh;
+  background: color-mix(in srgb, var(--ink) 18%, transparent);
+}
+.search-panel {
+  width: min(620px, calc(100vw - 32px));
+  max-height: 68vh;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--popup);
+  box-shadow: var(--shadow), 0 20px 60px rgb(0 0 0 / 0.12);
+  overflow: hidden;
+}
+.search-field { display: flex; align-items: center; gap: 10px; padding: 12px 16px; color: var(--muted); border-bottom: 1px solid var(--border); }
+.search-field input { flex: 1; min-width: 0; border: 0; outline: none; background: none; color: var(--text); font: 16px var(--font-ui); }
+.search-field kbd { font: 11px var(--font-ui); color: var(--muted); border: 1px solid var(--border); border-radius: 4px; padding: 0 5px; }
+.search-results { list-style: none; margin: 0; padding: 6px; overflow-y: auto; }
+.search-row { display: flex; align-items: flex-start; gap: 10px; width: 100%; padding: 8px 10px; border-radius: 6px; text-align: left; color: var(--secondary); }
+.search-row svg { flex: none; margin-top: 3px; }
+.search-row.active { background: var(--hover); color: var(--text); }
+.search-main { display: grid; gap: 2px; min-width: 0; }
+.search-title { color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.search-snippet { color: var(--text); font: 14px/1.5 var(--font-body); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.search-snippet mark { background: color-mix(in srgb, var(--accent) 22%, transparent); color: inherit; border-radius: 2px; padding: 0 1px; }
+.search-in { font-size: 12px; color: var(--muted); }
+.search-section { padding: 8px 10px 4px; font: 12px var(--font-ui); color: var(--muted); }
+li:first-child > .search-section { padding-top: 4px; }
+.search-empty { padding: 12px; color: var(--muted); }
+
+/* Commands (type > first): the shortcut at the end of the row. */
+.search-combo { margin-left: auto; align-self: center; flex: none; padding-left: 12px; font: 12px var(--font-ui); color: var(--muted); }
+.search-hint { margin: 0; padding: 8px 16px 10px; color: var(--muted); font-size: 12.5px; }

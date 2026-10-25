@@ -1,0 +1,38 @@
+:root {
+  --bg: #fafaf9;
+  --fg: #1c1917;
+  --muted: #78716c;
+  --line: #e7e5e4;
+  --card: #ffffff;
+  --accent: #2563eb;
+  color-scheme: light dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #1c1917; --fg: #f5f5f4; --muted: #a8a29e; --line: #44403c; --card: #292524; --accent: #60a5fa; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.5 -apple-system, "PingFang SC", "Noto Sans CJK SC", system-ui, sans-serif; }
+main { padding: 12px 16px; }
+nav { display: flex; gap: 6px; margin-bottom: 10px; }
+button { font: inherit; padding: 4px 10px; border: 1px solid var(--line); background: var(--card); color: var(--fg); border-radius: 6px; cursor: pointer; }
+button.on { border-color: var(--accent); color: var(--accent); }
+button:disabled { opacity: .5; }
+select { font: inherit; }
+.bar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
+.status { color: var(--muted); }
+.panes { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 720px) { .panes { grid-template-columns: 1fr; } }
+.pane { border: 1px solid var(--line); border-radius: 8px; background: var(--card); min-width: 0; }
+.pane-bar { display: flex; gap: 6px; align-items: center; padding: 6px 8px; border-bottom: 1px solid var(--line); color: var(--muted); flex-wrap: wrap; }
+.pane-bar button { padding: 2px 8px; font-size: 12px; }
+.editor { padding: 8px 14px; min-height: 260px; }
+.editor .ProseMirror { outline: none; min-height: 240px; }
+.editor [data-bid]::before { content: attr(data-bid); display: none; }
+.out { white-space: pre-wrap; font: 12px/1.4 ui-monospace, Menlo, monospace; background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 10px; max-height: 60vh; overflow: auto; }
+.bench-host { position: absolute; left: -10000px; top: 0; width: 700px; }
+.board { height: calc(100vh - 120px); border: 1px solid var(--line); border-radius: 8px; }
+.card-node { width: 240px; background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font-size: 12px; box-shadow: 0 1px 2px rgb(0 0 0 / .06); }
+.card-node h4 { margin: 0 0 4px; font-size: 13px; }
+.card-node p { margin: 0 0 4px; color: var(--muted); }
+.card-node ul { margin: 0; padding-left: 16px; }
+.card-node.title-only { height: 36px; overflow: hidden; }

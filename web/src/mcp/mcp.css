@@ -1,0 +1,20 @@
+/* AI access (MCP) dialogs. */
+.mcp { display: grid; gap: 12px; overflow-y: auto; }
+.mcp-switch { display: flex; align-items: center; gap: 8px; color: var(--text); }
+.mcp-state { margin-left: auto; padding: 1px 8px; border-radius: 10px; background: var(--hover); color: var(--secondary); font-size: 12px; }
+.mcp-state.on { background: color-mix(in srgb, #3f9a5b 16%, transparent); color: #3f9a5b; }
+.mcp-error { margin: 0; color: #b5523f; font-size: 13px; }
+.mcp-field { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.mcp-field > span { width: 5.5em; flex: none; color: var(--muted); }
+.mcp-field code { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 12.5px var(--font-mono); color: var(--text); }
+.mcp-copy { border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.mcp-copy-head { display: flex; align-items: center; justify-content: space-between; padding: 4px 6px 4px 10px; background: var(--hover); font-size: 12px; color: var(--secondary); }
+.mcp-copy pre { margin: 0; padding: 8px 10px; font: 12px/1.5 var(--font-mono); white-space: pre-wrap; word-break: break-all; color: var(--text); }
+.mcp-subtitle { margin: 4px 0 0; font: 600 12px var(--font-ui); color: var(--muted); }
+.mcp-clients { list-style: none; margin: 0; padding: 0; }
+.mcp-clients li { display: flex; align-items: center; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid var(--border); }
+.mcp-approval-actions { justify-content: flex-end; margin: 4px 0 0; }
+.mcp-clients-pick { display: flex; flex-wrap: wrap; gap: 4px; }
+.mcp-client { padding: 3px 10px; border: 1px solid var(--border); border-radius: 14px; font-size: 12.5px; color: var(--secondary); }
+.mcp-client:hover { background: var(--hover); color: var(--text); }
+.mcp-client.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); color: var(--text); }

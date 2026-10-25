@@ -1,0 +1,21 @@
+{
+ "name": "css",
+ "ua": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.7977.167 Safari/537.36",
+ "at": "2026-10-23",
+ "data": {
+  "text-autospace: normal": true,
+  "text-autospace: ideograph-alpha ideograph-numeric": false,
+  "text-spacing-trim: normal": true,
+  "text-spacing-trim: trim-start": true,
+  "hanging-punctuation: first last": false,
+  "text-wrap: pretty": true,
+  "text-wrap: balance": true,
+  "line-break: strict": true,
+  "word-break: auto-phrase": true,
+  "hyphens: auto": true,
+  "font-feature-settings: 'chws'": true,
+  "font-optical-sizing: auto": true,
+  "view-transition-name": true,
+  "startViewTransition": true
+ }
+}

@@ -1,0 +1,35 @@
+/* Dialogs over the app (shell/Dialog.tsx). */
+.dialog-backdrop { position: fixed; inset: 0; z-index: 90; background: color-mix(in srgb, var(--ink) 18%, transparent); }
+.dialog {
+  position: fixed;
+  z-index: 91;
+  top: 12vh;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(560px, calc(100vw - 32px));
+  max-height: 72vh;
+  display: flex;
+  flex-direction: column;
+  padding: 18px 20px 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--popup);
+  box-shadow: var(--shadow), 0 20px 60px rgb(0 0 0 / 0.12);
+  outline: none;
+}
+.dialog-header { display: flex; align-items: center; gap: 8px; }
+.dialog-title { flex: 1; margin: 0; font: 600 16px/1.4 var(--font-ui); color: var(--text); }
+.dialog-description { margin: 6px 0 14px; color: var(--secondary); font-size: 13px; line-height: 1.55; }
+.dialog-actions { display: flex; gap: 8px; margin-bottom: 12px; }
+.dialog-empty { color: var(--muted); margin: 8px 0; }
+
+.dialog.wide { width: min(720px, calc(100vw - 32px)); }
+
+/* Shortcuts dialog */
+.shortcut-groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 4px 28px; overflow-y: auto; }
+.shortcut-group h3 { margin: 6px 0 4px; font: 600 12px var(--font-ui); color: var(--muted); }
+.shortcut-group dl { margin: 0 0 10px; }
+.shortcut-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 4px 0; border-bottom: 1px solid var(--border); }
+.shortcut-row dt { color: var(--text); }
+.shortcut-row dd { margin: 0; }
+.shortcut-row kbd { font: 12px var(--font-ui); color: var(--secondary); padding: 1px 6px; border: 1px solid var(--border); border-radius: 4px; background: var(--paper); white-space: nowrap; }

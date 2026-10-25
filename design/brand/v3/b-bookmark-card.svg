@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4f86bd"/><stop offset="1" stop-color="#22497a"/></linearGradient>
+    <linearGradient id="paper" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#efe8dd"/></linearGradient>
+    <linearGradient id="rib" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#c2412c"/><stop offset="0.55" stop-color="#e2654c"/><stop offset="1" stop-color="#b8392a"/></linearGradient>
+    <filter id="sh" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur in="SourceAlpha" stdDeviation="24"/><feOffset dy="24"/><feComponentTransfer><feFuncA type="linear" slope="0.3"/></feComponentTransfer><feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  </defs>
+  <rect width="1024" height="1024" fill="url(#bg)"/>
+  <g filter="url(#sh)">
+    <rect x="160" y="192" width="704" height="640" rx="64" fill="url(#paper)"/>
+    <rect x="160" y="192" width="704" height="640" rx="64" fill="none" stroke="#fff" stroke-opacity="0.85" stroke-width="4"/>
+  </g>
+  <path d="M584 160 H712 V512 L648 456 L584 512 Z" fill="url(#rib)"/>
+    <g fill="#c9d9ea">
+    <rect x="256" y="320" width="256" height="20" rx="10" fill="#2f5d8a"/>
+    <rect x="256" y="568" width="512" height="14" rx="7"/>
+    <rect x="256" y="632" width="512" height="14" rx="7"/>
+    <rect x="256" y="696" width="336" height="14" rx="7"/>
+  </g>
+</svg>

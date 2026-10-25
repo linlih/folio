@@ -1,0 +1,97 @@
+import type { BackupInfo, McpStatus, SyncStatus, TagInfo, TopicCount, CardText } from "../bindings/commands";
+import type { LibraryLocation, PickedFolder } from "../bindings/commands";
+import type { AppInfo, Backlink, BlockText, CardRow, DocKind, JournalDay, SearchHit } from "../bindings/commands";
+
+/** Everything the UI may ask of the host. The Tauri app and web mode each
+ *  implement it; UI code never imports `@tauri-apps/api` directly. */
+export interface Backend {
+  readonly kind: "tauri" | "memory";
+  appInfo(): Promise<AppInfo>;
+  listCards(limit?: number): Promise<CardRow[]>;
+  /** Creates an empty note on the host and returns its id. */
+  createCard(title: string): Promise<string>;
+  /** The document as a Loro snapshot; null when it was never written (an
+   *  untouched journal day). */
+  docSnapshot(id: string): Promise<Uint8Array | null>;
+  /** A Loro update made by this device's frontend replica. Creates the
+   *  document if it does not exist yet. */
+  applyUpdate(id: string, kind: DocKind, bytes: Uint8Array): Promise<void>;
+  trashCard(id: string): Promise<void>;
+  restoreCard(id: string): Promise<void>;
+  listTrash(limit?: number): Promise<CardRow[]>;
+  /** Pins a card to the sidebar, or unpins it (a card field: it syncs). */
+  pinCard(id: string, pinned: boolean): Promise<void>;
+  /** Pinned cards not in the trash, in the order they were pinned. */
+  pinnedCards(): Promise<CardRow[]>;
+  /** Written journal days between two dates (inclusive), newest first. */
+  journalDays(from: string, to: string): Promise<JournalDay[]>;
+  /** Blocks in other cards that link to this card or reference its blocks. */
+  backlinks(id: string): Promise<Backlink[]>;
+  /** Blocks in other cards that mention this card's title without a link. */
+  unlinkedReferences(id: string, limit?: number): Promise<Backlink[]>;
+  /** Cards by title and blocks by text, title matches first. */
+  search(query: string, limit?: number): Promise<SearchHit[]>;
+  /** Current text of blocks (for block references). */
+  blockTexts(bids: string[]): Promise<BlockText[]>;
+  /** #tags in use, most recently used first. */
+  tags(limit?: number): Promise<TagInfo[]>;
+  /** Cards in a topic (§4.7, by id), most recently changed first. */
+  topicCards(topic: string): Promise<CardRow[]>;
+  /** How many cards each topic has. */
+  topicCounts(): Promise<TopicCount[]>;
+  /** Titles and body text of cards (trashed ones too). */
+  cardTexts(ids: string[]): Promise<CardText[]>;
+  /** Every [card, topic] pair (cards not in the trash). */
+  cardTopicPairs(): Promise<[string, string][]>;
+  /** Blocks with a tag (any case), newest cards first; `via` is "tag". */
+  tagged(tag: string, limit?: number): Promise<Backlink[]>;
+  /** Current titles of cards (card links show them). */
+  titles(ids: string[]): Promise<[string, string][]>;
+  /** Settings that stay on this device (§4.4 `local_settings`). */
+  getLocalSetting<T>(key: string): Promise<T | null>;
+  setLocalSetting(key: string, value: unknown): Promise<void>;
+  /** Writes a diagnostics file and returns its path; null where unsupported. */
+  exportDiagnostics(): Promise<string | null>;
+  /** Asks for a folder and exports every card as Markdown into a new
+   *  subfolder `folderName`; null when cancelled or unsupported. */
+  exportMarkdown(folderName: string, untitled: string): Promise<ExportResult | null>;
+  /** One card as Markdown with its title as a heading; null where unsupported. */
+  cardMarkdown(id: string): Promise<string | null>;
+  /** Saves one card as a Markdown file (asks where); the path, or null. */
+  exportCard(id: string, fileName: string): Promise<string | null>;
+  /** Saves a whiteboard as a .canvas file (asks where); the path, or null. */
+  saveTextFile(fileName: string, content: string): Promise<string | null>;
+  /** Local backups, newest first (§5.4). */
+  listBackups(): Promise<BackupInfo[]>;
+  backupNow(): Promise<BackupInfo>;
+  /** Replaces the whole library with a backup (the page must reload after). */
+  restoreLibrary(backup: string): Promise<void>;
+  revealBackups(): Promise<void>;
+  /** The library folder (§5.7): where it is, moving it, opening another.
+   *  Moving and opening swap the open library; the window reloads after. */
+  libraryLocation(): Promise<LibraryLocation>;
+  pickLibraryFolder(purpose: "move" | "open"): Promise<PickedFolder | null>;
+  moveLibrary(to: string): Promise<string>;
+  openLibrary(path: string): Promise<string>;
+  revealLibrary(): Promise<void>;
+  /** The read-only MCP server for AI tools (§0.3); desktop only. */
+  mcpStatus(): Promise<McpStatus | null>;
+  setMcpEnabled(enabled: boolean): Promise<McpStatus>;
+  regenerateMcpToken(): Promise<McpStatus>;
+  revokeMcpClient(client: string): Promise<McpStatus>;
+  answerMcpApproval(id: string, allow: boolean): Promise<void>;
+  /** Sync with the self-hosted server (§5.3); null where unsupported. */
+  syncStatus(): Promise<SyncStatus | null>;
+  /** The first device: creates the workspace on the server. */
+  syncCreate(server: string, token: string, passphrase: string): Promise<SyncStatus>;
+  /** Another device: joins with the sync code and passphrase. */
+  syncJoin(code: string, passphrase: string): Promise<SyncStatus>;
+  syncNow(): Promise<void>;
+  syncDisable(): Promise<SyncStatus>;
+}
+
+export interface ExportResult {
+  dir: string;
+  cards: number;
+  journals: number;
+}

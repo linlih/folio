@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024"><defs>
+<linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2a3f6e"/><stop offset="1" stop-color="#0f1a35"/></linearGradient><linearGradient id="paper" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#efe8dd"/></linearGradient>
+<filter id="glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="14" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
+<rect width="1024" height="1024" fill="url(#bg)"/>
+<g fill="#ffffff" fill-opacity="0.5"><circle cx="180" cy="200" r="5"/><circle cx="840" cy="170" r="6"/><circle cx="880" cy="560" r="4"/><circle cx="150" cy="700" r="5"/><circle cx="620" cy="860" r="4"/><circle cx="330" cy="880" r="6"/></g>
+<g stroke="#9cc0e6" stroke-opacity="0.75" stroke-width="10" stroke-linecap="round" fill="none">
+<path d="M300 330 L520 470 L740 330"/><path d="M520 470 L420 720"/><path d="M520 470 L700 700"/></g>
+<g filter="url(#glow)" fill="url(#paper)">
+<rect x="230" y="276" width="140" height="108" rx="22"/>
+<rect x="670" y="276" width="140" height="108" rx="22"/>
+<rect x="410" y="384" width="220" height="172" rx="32"/>
+<rect x="350" y="666" width="140" height="108" rx="22"/>
+<rect x="630" y="646" width="140" height="108" rx="22"/>
+</g>
+</svg>

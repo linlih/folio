@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024"><defs><linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4f86bd"/><stop offset="1" stop-color="#22497a"/></linearGradient><filter id="sh" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur in="SourceAlpha" stdDeviation="20"/><feOffset dy="20"/><feComponentTransfer><feFuncA type="linear" slope="0.3"/></feComponentTransfer><feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge></filter><linearGradient id="paper" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#efe8dd"/></linearGradient>
+<linearGradient id="pb" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#dcebfa"/><stop offset="1" stop-color="#a9c8e8"/></linearGradient>
+<radialGradient id="core" cx="0.4" cy="0.35" r="0.7"><stop offset="0" stop-color="#ff8a6a"/><stop offset="1" stop-color="#c23f2a"/></radialGradient></defs>
+<rect width="1024" height="1024" fill="url(#bg)"/>
+<g filter="url(#sh)">
+<g transform="rotate(-18 512 512)">
+<rect x="432" y="176" width="160" height="300" rx="44" fill="url(#pb)" transform="rotate(36 512 512)"/>
+<rect x="432" y="176" width="160" height="300" rx="44" fill="url(#pb)" transform="rotate(108 512 512)"/>
+<rect x="432" y="176" width="160" height="300" rx="44" fill="url(#pb)" transform="rotate(180 512 512)"/>
+<rect x="432" y="176" width="160" height="300" rx="44" fill="url(#pb)" transform="rotate(252 512 512)"/>
+<rect x="432" y="176" width="160" height="300" rx="44" fill="url(#paper)" transform="rotate(324 512 512)"/>
+<rect x="432" y="176" width="160" height="300" rx="44" fill="url(#paper)"/>
+</g>
+<circle cx="512" cy="512" r="86" fill="url(#core)"/>
+</g>
+</svg>

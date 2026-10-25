@@ -1,0 +1,28 @@
+/* Body fonts, bundled with the desktop app (design/ARCHITECTURE.md §0.2).
+   scripts/fetch-fonts.sh puts the files in web/public/fonts. Without them the
+   stacks in tokens.css fall back to system serifs. */
+
+@font-face {
+  font-family: "Source Serif 4";
+  src: url("/fonts/SourceSerif4-Variable.ttf") format("truetype");
+  font-weight: 200 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Source Serif 4";
+  src: url("/fonts/SourceSerif4-Italic-Variable.ttf") format("truetype");
+  font-weight: 200 900;
+  font-style: italic;
+  font-display: swap;
+}
+
+/* Source Han Serif, as distributed by Google Fonts under the name Noto Serif SC. */
+@font-face {
+  font-family: "Noto Serif SC";
+  src: url("/fonts/NotoSerifSC-Variable.ttf") format("truetype");
+  font-weight: 200 900;
+  font-style: normal;
+  font-display: swap;
+}

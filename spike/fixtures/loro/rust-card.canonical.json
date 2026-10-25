@@ -1,0 +1,179 @@
+{
+  "attrs": {},
+  "content": [
+    {
+      "attrs": {
+        "bid": "01a15f38b592-16818bfc109a604f95ef",
+        "level": 1
+      },
+      "content": [
+        {
+          "marks": [],
+          "text": "互通测试"
+        }
+      ],
+      "type": "heading"
+    },
+    {
+      "attrs": {
+        "bid": "01a15f38b592-e9e8e96359fa792dcee4"
+      },
+      "content": [
+        {
+          "marks": [],
+          "text": "普通 "
+        },
+        {
+          "marks": [
+            "bold"
+          ],
+          "text": "加粗"
+        },
+        {
+          "marks": [],
+          "text": " "
+        },
+        {
+          "marks": [
+            "italic"
+          ],
+          "text": "斜体"
+        },
+        {
+          "marks": [],
+          "text": " 文本"
+        }
+      ],
+      "type": "paragraph"
+    },
+    {
+      "attrs": {},
+      "content": [
+        {
+          "attrs": {
+            "bid": "01a15f38b5ab-dd6e3b2f4b13db22862f"
+          },
+          "content": [
+            {
+              "attrs": {
+                "bid": "01a15f38b5ab-f89b1b8a2cc5891d6399"
+              },
+              "content": [
+                {
+                  "marks": [],
+                  "text": "列表一"
+                }
+              ],
+              "type": "paragraph"
+            },
+            {
+              "attrs": {},
+              "content": [
+                {
+                  "attrs": {
+                    "bid": "01a15f38b5ab-a1fd8cd27c7e6874f3eb"
+                  },
+                  "content": [
+                    {
+                      "attrs": {
+                        "bid": "01a15f38b5ab-bae270cb7bfdcf9bf692"
+                      },
+                      "content": [
+                        {
+                          "marks": [],
+                          "text": "嵌套"
+                        }
+                      ],
+                      "type": "paragraph"
+                    },
+                    {
+                      "attrs": {},
+                      "content": [
+                        {
+                          "attrs": {
+                            "bid": "01a15f38b5c4-35282f318b465a45ea7f",
+                            "checked": true
+                          },
+                          "content": [
+                            {
+                              "attrs": {
+                                "bid": "01a15f38b5c4-1203850b42ae59da2042"
+                              },
+                              "content": [
+                                {
+                                  "marks": [],
+                                  "text": "已完成"
+                                }
+                              ],
+                              "type": "paragraph"
+                            },
+                            {
+                              "attrs": {
+                                "bid": "01a15f38b5d7-b0167e4333dc3e607579"
+                              },
+                              "content": [
+                                {
+                                  "marks": [],
+                                  "text": "let x = 1;"
+                                }
+                              ],
+                              "type": "codeBlock"
+                            },
+                            {
+                              "attrs": {
+                                "bid": "01a15f38b5d7-ad71b11be27c959e47d4"
+                              },
+                              "content": [
+                                {
+                                  "marks": [],
+                                  "text": "结尾"
+                                }
+                              ],
+                              "type": "paragraph"
+                            }
+                          ],
+                          "type": "taskItem"
+                        }
+                      ],
+                      "type": "taskList"
+                    }
+                  ],
+                  "type": "listItem"
+                }
+              ],
+              "type": "bulletList"
+            }
+          ],
+          "type": "listItem"
+        }
+      ],
+      "type": "bulletList"
+    },
+    {
+      "attrs": {
+        "bid": "rust-p1"
+      },
+      "content": [
+        {
+          "marks": [],
+          "text": "Rust 导入的段落"
+        }
+      ],
+      "type": "paragraph"
+    },
+    {
+      "attrs": {
+        "bid": "rust-h1",
+        "level": 2
+      },
+      "content": [
+        {
+          "marks": [],
+          "text": "Rust 导入的标题"
+        }
+      ],
+      "type": "heading"
+    }
+  ],
+  "type": "doc"
+}

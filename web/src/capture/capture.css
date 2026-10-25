@@ -1,0 +1,6 @@
+.capture-backdrop { position: fixed; inset: 0; z-index: 85; display: flex; justify-content: center; align-items: flex-start; padding-top: 16vh; background: color-mix(in srgb, var(--ink) 16%, transparent); }
+.capture-panel { width: min(560px, calc(100vw - 32px)); padding: 14px 16px 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--popup); box-shadow: var(--shadow), 0 20px 60px rgb(0 0 0 / 0.12); }
+.capture-head { margin-bottom: 8px; font: 600 13px var(--font-ui); color: var(--secondary); }
+.capture-panel textarea { width: 100%; min-height: 96px; resize: vertical; border: 0; outline: none; background: none; color: var(--text); font: 16px/1.6 var(--font-body); }
+.capture-foot { display: flex; align-items: center; gap: 10px; margin-top: 6px; color: var(--muted); font-size: 12px; }
+.capture-foot span { margin-right: auto; }

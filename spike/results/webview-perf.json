@@ -1,0 +1,202 @@
+{
+ "name": "perf",
+ "ua": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko)",
+ "at": "2026-10-21T17:53:19.865Z",
+ "data": {
+  "ua": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko)",
+  "loro": {
+   "engineLoadMs": 58,
+   "cardChars": 4653,
+   "snapshotBytes": 22863,
+   "open": {
+    "n": 30,
+    "p50": 15,
+    "p95": 17,
+    "max": 26,
+    "mean": 14
+   },
+   "decodeOnly": {
+    "n": 30,
+    "p50": 1,
+    "p95": 2,
+    "max": 2,
+    "mean": 0.7
+   },
+   "localKeystroke": {
+    "n": 1000,
+    "p50": 0,
+    "p95": 1,
+    "max": 9,
+    "mean": 0.447
+   },
+   "remoteKeystroke": {
+    "n": 1000,
+    "p50": 2,
+    "p95": 3,
+    "max": 6,
+    "mean": 1.792
+   },
+   "agedOneYearCard": {
+    "snapshot": {
+     "bytes": 2208352,
+     "open": {
+      "n": 10,
+      "p50": 20,
+      "p95": 36,
+      "max": 36,
+      "mean": 21.2
+     },
+     "decodeOnly": {
+      "n": 10,
+      "p50": 2,
+      "p95": 4,
+      "max": 4,
+      "mean": 1.9
+     },
+     "localKeystroke": {
+      "n": 300,
+      "p50": 1,
+      "p95": 1,
+      "max": 6,
+      "mean": 0.637
+     },
+     "remoteKeystroke": {
+      "n": 300,
+      "p50": 1,
+      "p95": 2,
+      "max": 14,
+      "mean": 1.317
+     }
+    },
+    "compact": {
+     "bytes": 61162,
+     "open": {
+      "n": 10,
+      "p50": 20,
+      "p95": 24,
+      "max": 24,
+      "mean": 17.8
+     },
+     "decodeOnly": {
+      "n": 10,
+      "p50": 1,
+      "p95": 1,
+      "max": 1,
+      "mean": 0.9
+     },
+     "localKeystroke": {
+      "n": 300,
+      "p50": 1,
+      "p95": 1,
+      "max": 2,
+      "mean": 0.577
+     },
+     "remoteKeystroke": {
+      "n": 300,
+      "p50": 2,
+      "p95": 3,
+      "max": 19,
+      "mean": 1.727
+     }
+    }
+   }
+  },
+  "yjs": {
+   "engineLoadMs": 31,
+   "cardChars": 4653,
+   "snapshotBytes": 16508,
+   "open": {
+    "n": 30,
+    "p50": 12,
+    "p95": 14,
+    "max": 15,
+    "mean": 10.667
+   },
+   "decodeOnly": {
+    "n": 30,
+    "p50": 0,
+    "p95": 1,
+    "max": 2,
+    "mean": 0.333
+   },
+   "localKeystroke": {
+    "n": 1000,
+    "p50": 0,
+    "p95": 1,
+    "max": 1,
+    "mean": 0.176
+   },
+   "remoteKeystroke": {
+    "n": 1000,
+    "p50": 0,
+    "p95": 1,
+    "max": 1,
+    "mean": 0.138
+   },
+   "agedOneYearCard": {
+    "snapshot": {
+     "bytes": 2307177,
+     "open": {
+      "n": 10,
+      "p50": 135,
+      "p95": 151,
+      "max": 151,
+      "mean": 136.3
+     },
+     "decodeOnly": {
+      "n": 10,
+      "p50": 122,
+      "p95": 135,
+      "max": 135,
+      "mean": 121.4
+     },
+     "localKeystroke": {
+      "n": 300,
+      "p50": 0,
+      "p95": 1,
+      "max": 2,
+      "mean": 0.443
+     },
+     "remoteKeystroke": {
+      "n": 300,
+      "p50": 0,
+      "p95": 1,
+      "max": 1,
+      "mean": 0.47
+     }
+    },
+    "compact": {
+     "bytes": 2307177,
+     "open": {
+      "n": 10,
+      "p50": 131,
+      "p95": 138,
+      "max": 138,
+      "mean": 131.7
+     },
+     "decodeOnly": {
+      "n": 10,
+      "p50": 117,
+      "p95": 124,
+      "max": 124,
+      "mean": 117.7
+     },
+     "localKeystroke": {
+      "n": 300,
+      "p50": 0,
+      "p95": 1,
+      "max": 2,
+      "mean": 0.463
+     },
+     "remoteKeystroke": {
+      "n": 300,
+      "p50": 0,
+      "p95": 1,
+      "max": 2,
+      "mean": 0.487
+     }
+    }
+   }
+  }
+ }
+}

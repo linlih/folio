@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024"><defs><linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4f86bd"/><stop offset="1" stop-color="#22497a"/></linearGradient><filter id="sh" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur in="SourceAlpha" stdDeviation="20"/><feOffset dy="20"/><feComponentTransfer><feFuncA type="linear" slope="0.3"/></feComponentTransfer><feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge></filter><linearGradient id="paper" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#efe8dd"/></linearGradient>
+<linearGradient id="leaf" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#9adb8f"/><stop offset="1" stop-color="#3f9455"/></linearGradient></defs>
+<rect width="1024" height="1024" fill="url(#bg)"/>
+<g filter="url(#sh)">
+<path d="M512 540 V320" stroke="#3f9455" stroke-width="34" stroke-linecap="round" fill="none"/>
+<path d="M512 410 C420 420 320 366 292 240 C410 224 500 296 512 410 Z" fill="url(#leaf)"/>
+<path d="M512 356 C600 366 712 312 736 184 C612 172 524 244 512 356 Z" fill="url(#leaf)"/>
+<rect x="168" y="500" width="688" height="352" rx="64" fill="url(#paper)"/>
+<rect x="256" y="604" width="320" height="26" rx="13" fill="#2f5d8a"/>
+<rect x="256" y="684" width="512" height="16" rx="8" fill="#c9d9ea"/>
+<rect x="256" y="744" width="392" height="16" rx="8" fill="#c9d9ea"/>
+</g>
+</svg>

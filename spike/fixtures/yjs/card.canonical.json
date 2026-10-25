@@ -1,0 +1,154 @@
+{
+ "type": "doc",
+ "attrs": {},
+ "content": [
+  {
+   "type": "heading",
+   "attrs": {
+    "bid": "01a15f38b5fd-dc6a1879884263fdbfff",
+    "level": 1
+   },
+   "content": [
+    {
+     "text": "互通测试",
+     "marks": []
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "attrs": {
+    "bid": "01a15f38b5fd-6c8072fb661f0a739313"
+   },
+   "content": [
+    {
+     "text": "普通 ",
+     "marks": []
+    },
+    {
+     "text": "加粗",
+     "marks": [
+      "bold"
+     ]
+    },
+    {
+     "text": " ",
+     "marks": []
+    },
+    {
+     "text": "斜体",
+     "marks": [
+      "italic"
+     ]
+    },
+    {
+     "text": " 文本",
+     "marks": []
+    }
+   ]
+  },
+  {
+   "type": "bulletList",
+   "attrs": {},
+   "content": [
+    {
+     "type": "listItem",
+     "attrs": {
+      "bid": "01a15f38b608-db3b68d270b21541d167"
+     },
+     "content": [
+      {
+       "type": "paragraph",
+       "attrs": {
+        "bid": "01a15f38b608-c9de40a787fa83034f3d"
+       },
+       "content": [
+        {
+         "text": "列表一",
+         "marks": []
+        }
+       ]
+      },
+      {
+       "type": "bulletList",
+       "attrs": {},
+       "content": [
+        {
+         "type": "listItem",
+         "attrs": {
+          "bid": "01a15f38b608-e98de985c3b2d211ef0a"
+         },
+         "content": [
+          {
+           "type": "paragraph",
+           "attrs": {
+            "bid": "01a15f38b608-4716c4a010b1553f91f5"
+           },
+           "content": [
+            {
+             "text": "嵌套",
+             "marks": []
+            }
+           ]
+          },
+          {
+           "type": "taskList",
+           "attrs": {},
+           "content": [
+            {
+             "type": "taskItem",
+             "attrs": {
+              "bid": "01a15f38b60f-24e5d99fa93bc3aed8d7",
+              "checked": true
+             },
+             "content": [
+              {
+               "type": "paragraph",
+               "attrs": {
+                "bid": "01a15f38b60f-be8fd111660517f371e8"
+               },
+               "content": [
+                {
+                 "text": "已完成",
+                 "marks": []
+                }
+               ]
+              },
+              {
+               "type": "codeBlock",
+               "attrs": {
+                "bid": "01a15f38b61b-bf79f321a07fadcccc73"
+               },
+               "content": [
+                {
+                 "text": "let x = 1;",
+                 "marks": []
+                }
+               ]
+              },
+              {
+               "type": "paragraph",
+               "attrs": {
+                "bid": "01a15f38b61b-d8c9e6c2a04d26738873"
+               },
+               "content": [
+                {
+                 "text": "结尾",
+                 "marks": []
+                }
+               ]
+              }
+             ]
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

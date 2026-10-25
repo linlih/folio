@@ -1,0 +1,69 @@
+/* Design tokens: Ember Paper palette and typography chosen in
+   design/research/ui-research.md. Components read only these variables. */
+
+:root {
+  --paper: #fdfaf6;
+  --ink: #37352f;
+  --accent: #2f5d8a;
+
+  --bg: var(--paper);
+  --text: var(--ink);
+  --secondary: color-mix(in srgb, var(--ink) 72%, var(--paper));
+  --muted: color-mix(in srgb, var(--ink) 55%, var(--paper));
+  --surface: color-mix(in srgb, var(--ink) 3%, var(--paper));
+  --border: color-mix(in srgb, var(--ink) 11%, var(--paper));
+  --hover: color-mix(in srgb, var(--ink) 6%, transparent);
+  --selected: color-mix(in srgb, var(--ink) 8%, transparent);
+  --popup: var(--paper);
+  --shadow: 0 6px 24px rgb(0 0 0 / 0.08), 0 1px 3px rgb(0 0 0 / 0.06);
+
+  --font-body: "Source Serif 4", "Noto Serif SC", ui-serif, Georgia, "Songti SC", serif;
+  --font-ui: system-ui, -apple-system, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+  --body-size: 16px;
+  --body-leading: 1.6;
+  --body-leading-cjk: 1.8;
+  --paragraph-gap: 0.75em;
+  --measure: 680px;
+  --heading-weight: 500;
+  /* Every page's main title (a card's title, a journal day, the library,
+     trash and tag pages): one size, so switching tabs does not jump. */
+  --page-title-size: 28px;
+  --page-title-leading: 1.3;
+  --page-title-weight: 600;
+  /* Headings in a card's body step down from the title (body text is
+     16px): the title stays clearly the top level. */
+  --h1-size: 1.375em;
+  --h2-size: 1.1875em;
+  --h3-size: 1.0625em;
+  --body-heading-weight: 600;
+
+  --ui-size: 14px;
+  --radius: 6px;
+  --sidebar-width: 240px;
+
+  /* Safe areas: iOS reports them here; Android pads natively (§0.2). */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #1c1a17;
+    --ink: #f4f0ea;
+    --accent: #8cb4de;
+    --shadow: 0 6px 24px rgb(0 0 0 / 0.4), 0 1px 3px rgb(0 0 0 / 0.3);
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme="dark"] {
+  --paper: #1c1a17;
+  --ink: #f4f0ea;
+  --accent: #8cb4de;
+  --shadow: 0 6px 24px rgb(0 0 0 / 0.4), 0 1px 3px rgb(0 0 0 / 0.3);
+  color-scheme: dark;
+}

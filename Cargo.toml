@@ -1,0 +1,23 @@
+[workspace]
+resolver = "2"
+members = ["crates/*", "src-tauri"]
+# The spike is a separate project kept for reference.
+exclude = ["spike"]
+
+[workspace.package]
+version = "0.0.1"
+edition = "2024"
+license = "UNLICENSED"
+publish = false
+
+[workspace.dependencies]
+anyhow = "1"
+loro = "1.17.1"
+rusqlite = { version = "0.40", features = ["bundled"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+tracing = "0.1"
+uuid = { version = "1", features = ["v7"] }
+folio-core = { path = "crates/folio-core" }
+folio-store = { path = "crates/folio-store" }

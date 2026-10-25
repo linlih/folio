@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fbf7f1"/><stop offset="1" stop-color="#e9e1d4"/></linearGradient>
+    <linearGradient id="card" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4a80b8"/><stop offset="1" stop-color="#25507f"/></linearGradient>
+    <radialGradient id="pin" cx="0.35" cy="0.3" r="0.75"><stop offset="0" stop-color="#ff9a80"/><stop offset="0.45" stop-color="#d9533c"/><stop offset="1" stop-color="#9e2f1f"/></radialGradient>
+    <filter id="sh" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur in="SourceAlpha" stdDeviation="22"/><feOffset dy="22"/><feComponentTransfer><feFuncA type="linear" slope="0.28"/></feComponentTransfer><feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <filter id="sh2" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur in="SourceAlpha" stdDeviation="10"/><feOffset dx="8" dy="14"/><feComponentTransfer><feFuncA type="linear" slope="0.35"/></feComponentTransfer><feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  </defs>
+  <rect width="1024" height="1024" fill="url(#bg)"/>
+  <g fill="#d6ccbd">
+    <circle cx="160" cy="160" r="14"/><circle cx="352" cy="160" r="14"/><circle cx="544" cy="160" r="14"/><circle cx="736" cy="160" r="14"/><circle cx="864" cy="160" r="14"/>
+    <circle cx="160" cy="352" r="14"/><circle cx="160" cy="544" r="14"/><circle cx="160" cy="736" r="14"/><circle cx="160" cy="864" r="14"/>
+    <circle cx="864" cy="864" r="14"/><circle cx="352" cy="864" r="14"/><circle cx="544" cy="864" r="14"/><circle cx="736" cy="864" r="14"/>
+    <circle cx="864" cy="352" r="14"/><circle cx="864" cy="544" r="14"/><circle cx="864" cy="736" r="14"/>
+  </g>
+  <g filter="url(#sh)" transform="rotate(-7 512 540)">
+    <rect x="208" y="280" width="608" height="512" rx="56" fill="url(#card)"/>
+    <rect x="208" y="280" width="608" height="512" rx="56" fill="none" stroke="#fff" stroke-opacity="0.25" stroke-width="4"/>
+    <rect x="280" y="424" width="300" height="24" rx="12" fill="#fdfaf6"/>
+    <rect x="280" y="512" width="464" height="16" rx="8" fill="#fdfaf6" fill-opacity="0.55"/>
+    <rect x="280" y="576" width="464" height="16" rx="8" fill="#fdfaf6" fill-opacity="0.55"/>
+    <rect x="280" y="640" width="300" height="16" rx="8" fill="#fdfaf6" fill-opacity="0.55"/>
+  </g>
+  <g filter="url(#sh2)"><circle cx="500" cy="300" r="62" fill="url(#pin)"/></g>
+  <ellipse cx="482" cy="280" rx="20" ry="13" fill="#fff" fill-opacity="0.6"/>
+</svg>

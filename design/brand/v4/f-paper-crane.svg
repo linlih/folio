@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024"><defs><linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4f86bd"/><stop offset="1" stop-color="#22497a"/></linearGradient><filter id="sh" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur in="SourceAlpha" stdDeviation="20"/><feOffset dy="20"/><feComponentTransfer><feFuncA type="linear" slope="0.3"/></feComponentTransfer><feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
+<rect width="1024" height="1024" fill="url(#bg)"/>
+<g filter="url(#sh)" stroke-linejoin="round">
+<polygon points="512,600 760,190 584,590" fill="#ddd2c1"/>
+<polygon points="512,600 300,170 452,590" fill="#ffffff"/>
+<polygon points="390,640 230,340 290,350 450,620" fill="#f6f0e6"/>
+<polygon points="230,340 168,388 262,372" fill="#d9533c"/>
+<polygon points="634,640 830,360 860,392 590,624" fill="#ebe3d5"/>
+<polygon points="330,640 512,580 512,780" fill="#ffffff"/>
+<polygon points="694,640 512,580 512,780" fill="#e8dfd0"/>
+</g>
+</svg>

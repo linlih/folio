@@ -1,0 +1,21 @@
+[package]
+name = "folio-mcp"
+description = "MCP server exposing the knowledge base to AI tools; read-only first (M2)."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+folio-core.workspace = true
+folio-store.workspace = true
+folio-io = { path = "../folio-io" }
+serde.workspace = true
+serde_json.workspace = true
+tracing.workspace = true
+tiny_http = "0.12"
+getrandom = "0.3"
+
+[dev-dependencies]
+tempfile = "3"
+loro.workspace = true

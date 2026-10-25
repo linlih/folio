@@ -1,0 +1,328 @@
+/* Card body. Typography comes from .prose (design/base.css). */
+
+.card-body { outline: none; min-height: 1.6em; }
+.card-body > * + * { margin-top: var(--paragraph-gap); }
+.card-body p { margin: 0; }
+.card-body h1 { font-size: var(--h1-size); margin: 1.3em 0 0.4em; }
+.card-body h2 { font-size: var(--h2-size); margin: 1.2em 0 0.3em; }
+.card-body h3 { font-size: var(--h3-size); margin: 1.1em 0 0.25em; }
+.card-body :is(h1, h2, h3) { font-weight: var(--body-heading-weight); }
+.card-body > :first-child { margin-top: 0; }
+
+.card-body ul, .card-body ol { margin: 0; padding-left: 1.4em; }
+.card-body li > p { margin: 0; }
+.card-body li + li { margin-top: 0.2em; }
+.card-body li::marker { color: var(--muted); }
+/* Outline mode: list items are the unit, so they sit closer together. */
+.card-body.mode-outline > ul, .card-body.mode-outline > ol { padding-left: 1.1em; }
+.card-body.mode-outline li + li { margin-top: 0.1em; }
+
+.card-body ul[data-type="taskList"] { list-style: none; padding-left: 0.2em; }
+.card-body blockquote { margin: 0; padding-left: 1em; border-left: 3px solid var(--border); color: var(--secondary); }
+.card-body code { font: 0.88em var(--font-mono); background: var(--hover); padding: 0.1em 0.3em; border-radius: 3px; }
+.card-body pre { font: 0.88em/1.55 var(--font-mono); background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 12px; overflow-x: auto; }
+.card-body pre code { background: none; padding: 0; }
+/* Code blocks (editor/codeBlock.ts): the language picker sits in the top
+   right corner, quiet until the block is hovered or being edited. */
+.card-body .code-block { position: relative; margin: 0.5em 0; }
+.card-body .code-block pre { margin: 0; tab-size: 4; }
+.code-language {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  z-index: 1;
+  max-width: 9em;
+  padding: 1px 4px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--muted);
+  font: 11.5px var(--font-ui);
+  opacity: 0.55;
+  cursor: pointer;
+}
+.code-block:hover .code-language, .code-block:focus-within .code-language, .code-language:focus { opacity: 1; border-color: var(--border); }
+.code-language:focus { outline: 2px solid color-mix(in srgb, var(--accent) 45%, transparent); }
+/* Highlighting colours: one set per theme, from the palette's tones. */
+:root {
+  --code-keyword: #8a3ab9;
+  --code-string: #3c7a3a;
+  --code-number: #b35c00;
+  --code-comment: color-mix(in srgb, var(--ink) 48%, var(--paper));
+  --code-title: #2f5d8a;
+  --code-type: #0f7a7a;
+  --code-attr: #9a5b13;
+  --code-meta: #7a6a2f;
+  --code-deletion: #b5523f;
+  --code-addition: #3c7a3a;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --code-keyword: #c792ea;
+    --code-string: #a5d6a7;
+    --code-number: #f2b37e;
+    --code-title: #8cb4de;
+    --code-type: #7fd4cf;
+    --code-attr: #e6c07b;
+    --code-meta: #d4c98a;
+    --code-deletion: #f08f7a;
+    --code-addition: #a5d6a7;
+  }
+}
+:root[data-theme="dark"] {
+  --code-keyword: #c792ea;
+  --code-string: #a5d6a7;
+  --code-number: #f2b37e;
+  --code-title: #8cb4de;
+  --code-type: #7fd4cf;
+  --code-attr: #e6c07b;
+  --code-meta: #d4c98a;
+  --code-deletion: #f08f7a;
+  --code-addition: #a5d6a7;
+}
+.card-body pre .hljs-keyword, .card-body pre .hljs-selector-tag, .card-body pre .hljs-literal, .card-body pre .hljs-doctag { color: var(--code-keyword); }
+.card-body pre .hljs-string, .card-body pre .hljs-regexp, .card-body pre .hljs-template-tag { color: var(--code-string); }
+.card-body pre .hljs-number, .card-body pre .hljs-symbol, .card-body pre .hljs-bullet { color: var(--code-number); }
+.card-body pre .hljs-comment, .card-body pre .hljs-quote { color: var(--code-comment); font-style: italic; }
+.card-body pre .hljs-title, .card-body pre .hljs-section, .card-body pre .hljs-name { color: var(--code-title); }
+.card-body pre .hljs-type, .card-body pre .hljs-built_in, .card-body pre .hljs-class .hljs-title { color: var(--code-type); }
+.card-body pre .hljs-attr, .card-body pre .hljs-attribute, .card-body pre .hljs-variable, .card-body pre .hljs-property, .card-body pre .hljs-params { color: var(--code-attr); }
+.card-body pre .hljs-meta, .card-body pre .hljs-selector-id, .card-body pre .hljs-selector-class { color: var(--code-meta); }
+.card-body pre .hljs-deletion { color: var(--code-deletion); }
+.card-body pre .hljs-addition { color: var(--code-addition); }
+.card-body pre .hljs-emphasis { font-style: italic; }
+.card-body pre .hljs-strong { font-weight: 600; }
+.card-body hr { border: 0; border-top: 1px solid var(--border); margin: 1.2em 0; }
+.card-body a { color: var(--accent); }
+
+.card-link {
+  color: var(--accent);
+  border-bottom: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+  cursor: pointer;
+}
+/* A #tag: quieter than a link, a pill so it reads as a label. */
+.tag-pill {
+  padding: 0 0.3em;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--accent) 9%, transparent);
+  color: color-mix(in srgb, var(--accent) 85%, var(--ink));
+  font-size: 0.92em;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.tag-pill:hover { background: color-mix(in srgb, var(--accent) 16%, transparent); }
+.tag-pill.ProseMirror-selectednode { outline: 1px solid var(--accent); }
+.card-link.ProseMirror-selectednode { background: color-mix(in srgb, var(--accent) 14%, transparent); border-radius: 2px; }
+
+.card-body .is-empty::before {
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  color: var(--muted);
+  pointer-events: none;
+}
+
+/* The `/` hint only while typing in this editor. */
+.card-body .line-hint::before { display: none; }
+.card-body.ProseMirror-focused .line-hint::before { display: block; }
+
+.editor-note { color: var(--muted); font-size: 13px; }
+
+/* ---- outline (design/outliner.md): gutter, collapse, focus, drag ---- */
+.card-body li { position: relative; }
+/* Items of bullet lists draw their own marker in the gutter: a bullet, or a
+   checkbox for a task. TipTap's task checkbox is not shown there. */
+.card-body ul:not([data-type="taskList"]) > li { list-style: none; }
+.card-body li[data-checked] { display: block; }
+.card-body li[data-checked] > label { display: none; }
+
+.ol-gutter {
+  position: absolute;
+  top: 0;
+  right: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.05em;
+  height: calc(var(--lh) * 1em);
+  margin-right: 0.15em;
+  user-select: none;
+}
+/* In a task the gutter is inside the content box but is still positioned
+   against the li. The chevron is always there (empty without children), so
+   bullets of one level stay in one column. */
+.ol-chevron, .ol-bullet, .ol-status { display: grid; place-items: center; width: 1.15em; height: 1.15em; border-radius: 50%; cursor: pointer; }
+.ol-chevron.empty { visibility: hidden; }
+.ol-bullet, .ol-status { cursor: grab; }
+/* Task status: round icons in Logseq's colours (design/outliner.md "任务"). */
+.ol-status svg, .suggest-icon svg, .popover-icon svg { width: 1.05em; height: 1.05em; display: block; }
+.ol-status:hover { background: var(--hover); }
+/* The bullet or status icon is the block's drag handle (WebKit needs this). */
+.ol-gutter [draggable="true"] { -webkit-user-drag: element; }
+.status-backlog { color: color-mix(in srgb, var(--ink) 38%, var(--paper)); }
+.status-todo { color: color-mix(in srgb, var(--ink) 62%, var(--paper)); }
+.status-doing { color: #c9930a; }
+.status-review { color: #3b74c9; }
+.status-done { color: #3f9a5b; }
+.status-canceled { color: #c9524a; }
+/* Done and canceled: the line greys out and is struck through. (The gutter
+   widget comes first in the content box, hence first-of-type.) */
+.card-body li[data-checked="true"] > div > :is(p, h1, h2, h3, h4, h5, h6):first-of-type,
+.card-body li[data-status="canceled"] > div > :is(p, h1, h2, h3, h4, h5, h6):first-of-type { color: var(--muted); text-decoration: line-through; }
+
+/* Priority before the text, dates after it. */
+.ol-priority { display: inline-grid; place-items: center; vertical-align: -0.12em; margin-right: 0.3em; user-select: none; }
+.ol-priority svg { width: 1em; height: 1em; }
+.priority-low { color: color-mix(in srgb, var(--ink) 50%, var(--paper)); }
+.priority-medium { color: #c9930a; }
+.priority-high { color: #d9762b; }
+.priority-urgent { color: #c9524a; }
+.ol-date {
+  display: inline-block;
+  margin-left: 0.5em;
+  padding: 0 0.45em;
+  border-radius: 4px;
+  font: 0.75em/1.6 var(--font-ui);
+  vertical-align: 0.1em;
+  color: var(--secondary);
+  background: var(--hover);
+  user-select: none;
+}
+.ol-date.deadline { color: #b5523f; background: color-mix(in srgb, #c9524a 10%, transparent); }
+
+/* A block shown as a quote (Logseq's display type). */
+.card-body li[data-display="quote"] > :is(p, h1, h2, h3, h4, h5, h6):first-of-type,
+.card-body li[data-display="quote"] > div > :is(p, h1, h2, h3, h4, h5, h6):first-of-type {
+  padding-left: 0.8em;
+  border-left: 3px solid var(--border);
+  color: var(--secondary);
+}
+
+/* Images and formulas */
+.card-body img { display: block; max-width: 100%; height: auto; margin: 0.4em 0; border-radius: var(--radius); }
+.card-body img.ProseMirror-selectednode { outline: 2px solid var(--accent); }
+.card-body [data-type="block-math"] { margin: 0.4em 0; padding: 0.4em 0; overflow-x: auto; cursor: pointer; border-radius: var(--radius); }
+.card-body [data-type="block-math"]:hover, .card-body [data-type="inline-math"]:hover { background: var(--hover); }
+.card-body [data-type="inline-math"] { cursor: pointer; }
+.card-body h4 { font-size: 1.05em; } .card-body h5 { font-size: 1em; } .card-body h6 { font-size: 0.95em; color: var(--secondary); }
+
+.ol-chevron { opacity: 0; color: var(--muted); }
+.ol-chevron::before {
+  content: "";
+  border: 0.28em solid transparent;
+  border-top-color: currentColor;
+  border-bottom-width: 0;
+  transform: translateY(0.05em);
+  transition: transform 0.12s;
+}
+.ol-chevron.collapsed::before { transform: rotate(-90deg); }
+li:hover > .ol-gutter .ol-chevron, li:hover > div > .ol-gutter .ol-chevron, .ol-chevron.collapsed { opacity: 1; }
+.ol-chevron:hover, .ol-bullet:hover { background: var(--hover); }
+.ol-bullet::before { content: ""; width: 0.36em; height: 0.36em; border-radius: 50%; background: var(--secondary); }
+.ol-bullet.collapsed::before { box-shadow: 0 0 0 0.22em color-mix(in srgb, var(--ink) 16%, transparent); }
+
+li[data-collapsed="true"] > ul, li[data-collapsed="true"] > ol,
+li[data-collapsed="true"] > div > ul, li[data-collapsed="true"] > div > ol { display: none; }
+
+.folio-hidden { display: none !important; }
+ul.folio-focus-path, ol.folio-focus-path { padding-left: 0 !important; }
+li.folio-focus-path > .ol-gutter, li.folio-focus-path > div > .ol-gutter, li.folio-focus-path > label { display: none; }
+li.folio-focus-path { display: block; }
+.folio-focus-root > .ol-gutter, .folio-focus-root > div > .ol-gutter, .folio-focus-root > label { display: none; }
+.folio-focus-root { display: block !important; }
+.folio-focus-root > p:first-of-type, .folio-focus-root > div > p:first-of-type {
+  font-size: 1.35em;
+  font-weight: var(--heading-weight);
+  margin-bottom: 0.4em;
+}
+.folio-focus-root > ul, .folio-focus-root > div > ul { padding-left: 1.4em; }
+
+.focus-trail { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px; margin-bottom: 10px; font: 12px/1.6 var(--font-ui); color: var(--muted); }
+.focus-trail button { padding: 1px 4px; border-radius: 4px; color: var(--secondary); max-width: 18em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.focus-trail button:hover { background: var(--hover); color: var(--text); }
+.focus-trail .sep { margin: 0 2px; }
+
+.editor-host > div { position: relative; }
+.drag-handle {
+  position: absolute;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-user-drag: element;
+  z-index: 2;
+  width: 14px;
+  height: 20px;
+  border-radius: 4px;
+  cursor: grab;
+  opacity: 0.35;
+  /* Six dots drawn by a mask so they take the theme's colour. */
+  background-color: transparent;
+  --dots: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='20'%3E%3Cg fill='%23000'%3E%3Ccircle cx='4.5' cy='5' r='1.25'/%3E%3Ccircle cx='9.5' cy='5' r='1.25'/%3E%3Ccircle cx='4.5' cy='10' r='1.25'/%3E%3Ccircle cx='9.5' cy='10' r='1.25'/%3E%3Ccircle cx='4.5' cy='15' r='1.25'/%3E%3Ccircle cx='9.5' cy='15' r='1.25'/%3E%3C/g%3E%3C/svg%3E");
+  transition: opacity 0.15s, background-color 0.15s;
+  animation: drag-handle-in 0.15s ease-out;
+}
+.drag-handle::before { content: ""; position: absolute; inset: 0; background: var(--muted); -webkit-mask: var(--dots); mask: var(--dots); }
+/* The hit area reaches over the gap to the text. */
+.drag-handle::after { content: ""; position: absolute; inset: -4px -10px -4px -4px; }
+@keyframes drag-handle-in { from { opacity: 0; } }
+.drag-handle:hover { opacity: 0.9; background-color: var(--hover); }
+.drag-handle[hidden] { display: none; }
+
+/* Block selection (Esc): selected blocks, no text caret. */
+.block-selecting { caret-color: transparent; }
+.block-selecting ::selection { background: transparent; }
+li.block-selected { background: color-mix(in srgb, var(--accent) 12%, transparent); border-radius: 4px; }
+li.block-selected li.block-selected { background: none; }
+
+/* Drag and drop: the dragged block fades, a line shows where it lands. */
+li.dragging { opacity: 0.4; }
+.drop-line {
+  position: absolute;
+  z-index: 3;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--accent);
+  pointer-events: none;
+}
+.drop-line[hidden] { display: none; }
+
+/* `/` commands and `[[` card search */
+.suggest { position: fixed; z-index: 50; min-width: 220px; max-width: 320px; max-height: 300px; overflow-y: auto; font: var(--ui-size) / 1.4 var(--font-ui); }
+.suggest-item { display: flex; align-items: center; gap: 8px; width: 100%; padding: 6px 8px; border-radius: 4px; text-align: left; color: var(--text); }
+.suggest-item.active, .suggest-item:hover { background: var(--hover); }
+.suggest-hint { margin-left: auto; color: var(--muted); font: 11px var(--font-mono); }
+.suggest-empty { padding: 6px 8px; color: var(--muted); }
+
+/* A heading as a block's line (design/outliner.md): no document margins, and
+   the gutter is as tall as the heading's line so the bullet stays centred. */
+.card-body li > h1, .card-body li > h2, .card-body li > h3,
+.card-body li > div > h1, .card-body li > div > h2, .card-body li > div > h3 { margin: 0; }
+/* Fixed line height (outranks the CJK line height rule) so the gutter can
+   match it in every language. */
+.prose.card-body li > :is(h1, h2, h3), .prose.card-body li > div > :is(h1, h2, h3) { line-height: 1.3; }
+.ol-gutter:has(+ h1) { height: calc(var(--h1-size) * 1.3); }
+.ol-gutter:has(+ h2) { height: calc(var(--h2-size) * 1.3); }
+.ol-gutter:has(+ h3) { height: calc(var(--h3-size) * 1.3); }
+
+/* Slash menu: groups and icons */
+.suggest { max-height: 340px; }
+.suggest-group { padding: 8px 8px 3px; font: 500 11px var(--font-ui); color: var(--muted); }
+.suggest-icon { display: grid; place-items: center; width: 1.3em; color: var(--secondary); }
+.folio-popover { position: fixed; z-index: 60; }
+.folio-ask { padding: 8px; min-width: 260px; }
+.folio-ask label { display: grid; gap: 6px; font: 12px var(--font-ui); color: var(--muted); }
+.folio-ask input, .folio-ask textarea { font: 13px/1.4 var(--font-ui); color: var(--text); background: var(--bg); border: 1px solid var(--border); border-radius: 5px; padding: 5px 7px; outline: none; }
+.folio-ask textarea { font-family: var(--font-mono); min-height: 64px; resize: vertical; }
+.folio-ask :is(input, textarea):focus { border-color: var(--accent); }
+.popover-icon { display: grid; place-items: center; width: 1.3em; }
+
+/* ((block references)) */
+.block-ref {
+  padding: 0 2px;
+  border-bottom: 1px dashed color-mix(in srgb, var(--accent) 55%, transparent);
+  color: var(--text);
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+  border-radius: 2px;
+  cursor: pointer;
+}
+.block-ref:hover { background: color-mix(in srgb, var(--accent) 14%, transparent); }
+.block-ref.missing { color: var(--muted); border-bottom-style: dotted; }
+.block-ref.ProseMirror-selectednode { outline: 2px solid var(--accent); }

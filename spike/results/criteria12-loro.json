@@ -1,0 +1,41 @@
+{
+ "editor": {
+  "engine": "loro",
+  "suite": "editor",
+  "runs": 50,
+  "steps": 3000,
+  "problems": 0,
+  "byKind": {},
+  "byOp": {},
+  "mergeDuplicateBids": 0,
+  "silentDrops": 10,
+  "silentDropChars": 0,
+  "dropSamples": [
+   "0 chars: Invalid content for node taskList: <>",
+   "0 chars: Invalid content for node taskList: <>",
+   "0 chars: Invalid content for node listItem: <>"
+  ],
+  "seconds": 25.7,
+  "firstProblems": []
+ },
+ "convergence": {
+  "engine": "loro",
+  "suite": "convergence",
+  "runs": 200,
+  "steps": 100000,
+  "problems": 0,
+  "byKind": {},
+  "byOp": {},
+  "mergeDuplicateBids": 0,
+  "silentDrops": 25,
+  "silentDropChars": 19,
+  "dropSamples": [
+   "0 chars: Invalid content for node taskList: <>",
+   "0 chars: Invalid content for node taskList: <>",
+   "0 chars: Invalid content for node listItem: <>"
+  ],
+  "seconds": 1038.4,
+  "firstProblems": []
+ },
+ "allProblems": []
+}

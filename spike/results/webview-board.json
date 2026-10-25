@@ -1,0 +1,63 @@
+{
+ "name": "board",
+ "ua": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko)",
+ "at": "2026-10-21T17:53:47.273Z",
+ "data": [
+  {
+   "n": 300,
+   "mode": "preview",
+   "frameMs": {
+    "n": 343,
+    "p50": 17,
+    "p95": 21,
+    "max": 30,
+    "mean": 17.172
+   },
+   "fps": 58.2,
+   "jankPct": 7.5,
+   "onlyRenderVisible": false
+  },
+  {
+   "n": 300,
+   "mode": "preview",
+   "frameMs": {
+    "n": 335,
+    "p50": 17,
+    "p95": 24,
+    "max": 39,
+    "mean": 17.516
+   },
+   "fps": 57.1,
+   "jankPct": 10.9,
+   "onlyRenderVisible": true
+  },
+  {
+   "n": 300,
+   "mode": "title",
+   "frameMs": {
+    "n": 356,
+    "p50": 17,
+    "p95": 18,
+    "max": 22,
+    "mean": 16.666
+   },
+   "fps": 60,
+   "jankPct": 0.6,
+   "onlyRenderVisible": true
+  },
+  {
+   "n": 1000,
+   "mode": "preview",
+   "frameMs": {
+    "n": 296,
+    "p50": 17,
+    "p95": 42,
+    "max": 70,
+    "mean": 19.909
+   },
+   "fps": 50.2,
+   "jankPct": 16.3,
+   "onlyRenderVisible": true
+  }
+ ]
+}

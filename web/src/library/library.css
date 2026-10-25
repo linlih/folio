@@ -1,0 +1,164 @@
+/* Card library (after Heptabase's): toolbar, rows with a two-line preview,
+   dates on the right, multi-select. */
+
+.library { max-width: calc(var(--measure) + 240px); }
+.library-header-actions { margin-left: auto; display: flex; gap: 8px; align-self: center; }
+.page-header .library-header-actions .button { margin-left: 0; }
+
+.library-toolbar, .library-selection { min-height: 44px; margin-bottom: 12px; }
+/* One line, so it has the selection bar's height and nothing jumps. */
+.library-toolbar { display: flex; align-items: center; gap: 8px; }
+.library-search {
+  flex: 1;
+  min-width: 120px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--muted);
+  background: var(--bg);
+}
+.library-search:focus-within { border-color: var(--accent); }
+.library-search input { flex: 1; min-width: 0; border: 0; outline: none; background: none; color: var(--text); font: inherit; }
+.library-select { display: flex; align-items: center; gap: 6px; color: var(--muted); white-space: nowrap; }
+.library-select select {
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+}
+
+.library-selection {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px 6px 12px;
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  color: var(--text);
+}
+.library-selection > span { margin-right: auto; }
+.button.danger { color: #b5523f; }
+
+.library-list { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--border); }
+.library-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 4px 10px;
+  padding: 10px 8px;
+  border-bottom: 1px solid var(--border);
+}
+.library-row:hover { background: var(--hover); }
+.library-row.selected { background: color-mix(in srgb, var(--accent) 9%, transparent); }
+.library-check { margin: 4px 0 0; accent-color: var(--accent); opacity: 0; }
+.library-row:hover .library-check, .library-list.selecting .library-check, .library-check:focus-visible { opacity: 1; }
+.library-open { display: grid; gap: 3px; min-width: 0; text-align: left; cursor: pointer; }
+.library-title { font: var(--heading-weight) 15.5px/1.4 var(--font-body); color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.library-title.untitled { color: var(--muted); }
+.library-preview {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  color: var(--secondary);
+  line-height: 1.5;
+}
+.library-dates { display: grid; justify-items: end; gap: 2px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.library-dates .created { font-size: 12px; opacity: 0.85; }
+
+.library-views { display: flex; gap: 2px; padding: 2px; border: 1px solid var(--border); border-radius: var(--radius); }
+.library-views .icon-button { width: 26px; height: 26px; }
+.library-views .icon-button.on { background: var(--selected); color: var(--text); }
+
+/* Grid: card previews, like Heptabase's card library. Same width as the
+   list, so switching views doesn't make the page jump. */
+.library-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 14px;
+}
+.library-tile {
+  position: relative;
+  height: 196px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--paper) 70%, white);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.04);
+  transition: box-shadow 0.12s, border-color 0.12s;
+}
+:root[data-theme="dark"] .library-tile { background: color-mix(in srgb, var(--paper) 88%, white); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .library-tile { background: color-mix(in srgb, var(--paper) 88%, white); } }
+.library-tile:hover { border-color: color-mix(in srgb, var(--ink) 20%, var(--paper)); box-shadow: var(--shadow); }
+.library-tile.selected { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.library-tile-open {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  gap: 6px;
+  width: 100%;
+  height: 100%;
+  padding: 14px 14px 10px;
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+}
+.library-tile .library-title { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.library-tile-text {
+  display: -webkit-box;
+  -webkit-line-clamp: 5;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font: 13.5px/1.55 var(--font-body);
+  color: var(--secondary);
+}
+.library-tile-date { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.library-tile .library-check { position: absolute; top: 10px; right: 10px; margin: 0; }
+.library-tile:hover .library-check, .library-grid.selecting .library-check, .library-tile .library-check:focus-visible { opacity: 1; }
+
+/* Narrow library (side pane, small window): the dropdowns speak for
+   themselves, the search field keeps the room. */
+.library { container-type: inline-size; }
+@container (max-width: 640px) {
+  .library-select > span { display: none; }
+}
+
+/* Topics in the library (library/TopicGrid.tsx, §4.7). */
+.library-section { margin: 4px 0 10px; font: 600 13px var(--font-ui); color: var(--secondary); }
+.topic-grid-section { margin-bottom: 22px; }
+.topic-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+.topic-tile { border: 1px solid var(--border); border-radius: 10px; background: var(--surface); transition: border-color 0.12s, box-shadow 0.12s; }
+.topic-tile:hover { border-color: color-mix(in srgb, var(--ink) 20%, var(--paper)); }
+.topic-tile.drop { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent); }
+.topic-tile-open { display: flex; flex-direction: column; gap: 8px; width: 100%; height: 100%; min-height: 128px; padding: 12px 14px; text-align: left; }
+.topic-tile-head { display: flex; align-items: center; gap: 6px; color: var(--muted); }
+.topic-tile-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 600 15px var(--font-ui); color: var(--text); }
+.topic-tile-count { font-size: 12px; font-variant-numeric: tabular-nums; }
+.topic-tile-cards { flex: 1; display: flex; flex-direction: column; gap: 3px; min-width: 0; font-size: 13px; color: var(--secondary); }
+.topic-tile-cards > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.topic-tile-cards > span::before { content: "· "; color: var(--muted); }
+.topic-tile-cards > .topic-tile-empty { color: var(--muted); }
+.topic-tile-cards > .topic-tile-empty::before { content: none; }
+.topic-tile.new { border-style: dashed; background: none; }
+.topic-tile.new .topic-tile-open { align-items: center; justify-content: center; flex-direction: row; gap: 6px; color: var(--muted); }
+.topic-tile.new .topic-tile-open:hover { color: var(--text); }
+.topic-tile.new .topic-name-input { margin: 48px 12px; width: calc(100% - 24px); }
+.topic-name-input { padding: 4px 8px; border: 1px solid var(--accent); border-radius: 6px; background: var(--paper); color: var(--text); font: 13px var(--font-ui); outline: none; }
+.topic-name-input.big { width: 12em; font: var(--page-title-weight) 22px var(--font-body); }
+.library-crumbs { display: flex; align-items: center; gap: 4px; min-width: 0; }
+.library-crumb { color: var(--muted); font: inherit; }
+.library-crumb:hover { color: var(--text); }
+.library-crumb-sep { flex: none; color: var(--muted); }
+.library-crumb-current { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.library-grouping { flex: none; }
+.topic-confirm { display: flex; align-items: center; gap: 8px; margin: 0 0 14px; padding: 10px 12px; border: 1px solid color-mix(in srgb, #b5523f 35%, var(--border)); border-radius: 8px; background: color-mix(in srgb, #b5523f 5%, transparent); }
+.topic-confirm p { flex: 1; margin: 0; font-size: 13px; color: var(--text); }

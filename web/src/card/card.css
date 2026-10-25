@@ -1,0 +1,84 @@
+.card-page { position: relative; }
+.card-page-title {
+  display: block;
+  width: 100%;
+  max-width: var(--measure);
+  margin: 0 0 16px;
+  padding: 0;
+  border: 0;
+  outline: none;
+  resize: none;
+  overflow: hidden;
+  field-sizing: content;
+  background: none;
+  color: var(--text);
+  font: var(--page-title-weight) var(--page-title-size) / var(--page-title-leading) var(--font-body);
+}
+.card-page-title::placeholder { color: var(--muted); }
+/* The title and, at its end, the card's "⋯" menu: faint until the title is
+   pointed at, so it is always findable but never loud. */
+.card-title-row { display: flex; align-items: flex-start; gap: 8px; max-width: var(--measure); }
+.card-title-row .card-page-title { flex: 1; min-width: 0; }
+.card-menu { flex: none; width: 30px; height: 30px; margin-top: 4px; opacity: 0.35; transition: opacity 0.12s; }
+.card-title-row:hover .card-menu, .card-menu[data-popup-open], .card-menu:focus-visible { opacity: 1; }
+
+/* The writing area reaches well below the text, so a click under the last
+   line continues writing there. */
+.card-body-area { min-height: max(240px, 50vh); cursor: text; padding-bottom: 80px; }
+
+/* Linked and unlinked references */
+.backlinks { max-width: var(--measure); margin-top: 8px; padding-top: 16px; border-top: 1px solid var(--border); font-size: var(--ui-size); }
+.backlinks h2 { display: flex; align-items: center; gap: 6px; margin: 0 0 10px; font: 600 13px var(--font-ui); color: var(--secondary); }
+.backlinks ul { list-style: none; margin: 0; padding: 0; }
+.backlink-group { margin-bottom: 12px; }
+.backlink-card { font: var(--heading-weight) 14.5px/1.4 var(--font-body); color: var(--text); padding: 2px 0; }
+.backlink-card:hover { color: var(--accent); }
+.backlink-block {
+  display: block;
+  width: 100%;
+  margin: 2px 0;
+  padding: 5px 10px;
+  border-left: 2px solid var(--border);
+  text-align: left;
+  font: 14px/1.6 var(--font-body);
+  color: var(--secondary);
+  border-radius: 0 4px 4px 0;
+}
+.backlink-block:hover { background: var(--hover); color: var(--text); border-left-color: var(--accent); }
+.backlink-via { margin-right: 6px; padding: 0 5px; border-radius: 3px; font: 11px/1.6 var(--font-ui); color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); }
+/* An unlinked mention: its text, then a button that links it. */
+.backlink-mention { display: flex; align-items: flex-start; gap: 6px; }
+.backlink-mention .backlink-block { flex: 1; min-width: 0; }
+.backlink-link { flex: none; margin-top: 2px; padding: 1px 8px; font-size: 12px; opacity: 0; }
+.backlink-mention:hover .backlink-link, .backlink-link:focus-visible { opacity: 1; }
+.backlinks-link-all { margin: 0 0 10px; padding: 2px 10px; font-size: 12px; }
+.backlinks-empty { margin: 0 0 10px; color: var(--muted); }
+.backlinks-toggle { display: flex; align-items: center; gap: 4px; margin: 6px 0; color: var(--muted); font: 600 13px var(--font-ui); }
+.backlinks-toggle:hover { color: var(--text); }
+.backlinks-toggle svg { transition: transform 0.12s; }
+.backlinks-toggle svg.open { transform: rotate(90deg); }
+
+/* A block revealed from a backlink or search hit */
+@keyframes folio-flash { from { background: color-mix(in srgb, var(--accent) 22%, transparent); } to { background: transparent; } }
+.folio-flash { animation: folio-flash 1.6s ease-out; border-radius: 4px; }
+
+/* The card's topics under its title (card/TopicRow.tsx). */
+.topic-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; max-width: var(--measure); margin: -2px 0 14px; font: 12.5px var(--font-ui); }
+.topic-chip { display: inline-flex; align-items: center; border-radius: 999px; background: color-mix(in srgb, var(--accent) 9%, transparent); color: var(--accent); }
+.topic-chip-name { display: inline-flex; align-items: center; gap: 2px; padding: 2px 4px 2px 9px; color: inherit; }
+.topic-chip-remove { display: grid; place-items: center; width: 18px; height: 18px; margin-right: 3px; border-radius: 50%; color: inherit; opacity: 0; }
+.topic-chip:hover .topic-chip-remove, .topic-chip-remove:focus-visible { opacity: 0.8; }
+.topic-chip-remove:hover { background: color-mix(in srgb, var(--accent) 16%, transparent); }
+.topic-add { display: inline-flex; align-items: center; gap: 4px; padding: 2px 9px; border-radius: 999px; color: var(--muted); opacity: 0.7; }
+.topic-add.compact { padding: 3px 6px; }
+.topic-add:hover, .topic-add[data-popup-open] { background: var(--hover); color: var(--text); opacity: 1; }
+.card-page:not(:hover) .topic-add:not(.compact):not([data-popup-open]) { opacity: 0; }
+.topic-picker { width: 260px; padding: 6px; }
+.topic-picker input { width: 100%; margin-bottom: 4px; padding: 5px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--paper); color: var(--text); font: 13px var(--font-ui); outline: none; }
+.topic-picker input:focus { border-color: var(--accent); }
+.topic-picker ul { list-style: none; margin: 0; padding: 0; max-height: 260px; overflow-y: auto; }
+.topic-picker .popup-item { display: flex; align-items: center; gap: 8px; width: 100%; }
+.topic-picker .popup-item.active { background: var(--hover); }
+.topic-picker .popup-item > span:first-of-type { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; }
+.topic-count { color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.topic-picker-empty { margin: 6px 8px; color: var(--muted); font-size: 12.5px; }

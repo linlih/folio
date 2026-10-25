@@ -1,0 +1,13 @@
+{
+  "name": "folio",
+  "private": true,
+  "workspaces": ["web"],
+  "scripts": {
+    "dev": "npm --prefix web run dev",
+    "tauri": "tauri",
+    "test": "./scripts/test.sh"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "2.12.4"
+  }
+}

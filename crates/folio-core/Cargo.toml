@@ -1,0 +1,13 @@
+[package]
+name = "folio-core"
+description = "Domain model: document ids, the card document layout in Loro, content extraction. No IO."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+loro.workspace = true
+serde.workspace = true
+thiserror.workspace = true
+uuid.workspace = true

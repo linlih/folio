@@ -1,0 +1,218 @@
+.shell {
+  display: grid;
+  /* Sidebar, panes, and the details panel when it is open. */
+  grid-template-columns: var(--sidebar-width) minmax(0, 1fr) auto;
+  height: 100%;
+  padding-top: var(--safe-top);
+}
+/* Hidden sidebar: at once, not animated. Sliding the column reflowed
+   every line of the open cards on each frame, which looked jittery. */
+.shell.sidebar-closed { grid-template-columns: 0 minmax(0, 1fr) auto; }
+.shell.sidebar-closed .sidebar { visibility: hidden; }
+
+/* ---- sidebar ---- */
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: var(--sidebar-width);
+  min-height: 0;
+  overflow: hidden;
+  padding: 12px 8px;
+  background: var(--surface);
+  color: var(--secondary);
+}
+.sidebar-top { display: flex; align-items: center; justify-content: flex-end; flex: none; margin: -4px -2px 6px; }
+.nav-search-row { display: flex; align-items: center; gap: 4px; margin-bottom: 8px; }
+.nav-new { flex: none; width: 30px; height: 30px; }
+.nav-search {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--muted);
+}
+.nav-search kbd { margin-left: auto; font: 11px var(--font-ui); }
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 5px 8px;
+  border-radius: var(--radius);
+  text-align: left;
+}
+.nav-item > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nav-item > .nav-count { margin-left: auto; flex: none; color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.nav-item:hover:not(:disabled) { background: var(--hover); color: var(--text); }
+.nav-item[aria-current="page"] { background: var(--selected); color: var(--text); }
+.nav-item:disabled, .nav-search:disabled { opacity: 0.6; }
+.nav-scroll { flex: 1; min-height: 0; overflow-y: auto; margin-top: 6px; }
+/* Section headings are labels: semibold, darker than what they label.
+   Empty hints are content: lighter, and indented to where item names
+   start (past the 15 px icon and its 8 px gap). */
+.nav-section h2 { margin: 16px 8px 4px; font-size: 12.5px; font-weight: 600; letter-spacing: 0.02em; color: var(--secondary); }
+.nav-row { position: relative; }
+.nav-row > .nav-item { padding-right: 28px; }
+.nav-row-menu { position: absolute; top: 50%; right: 3px; width: 24px; height: 24px; transform: translateY(-50%); opacity: 0; }
+.nav-row:hover .nav-row-menu, .nav-row-menu[data-popup-open], .nav-row-menu:focus-visible { opacity: 1; }
+.nav-footer-row { display: flex; align-items: center; gap: 2px; }
+.nav-footer-row > :first-child { flex: 1; min-width: 0; }
+.sync-indicator { flex: none; width: 28px; height: 28px; color: var(--muted); }
+.sync-indicator.error { color: #b5523f; }
+.spin { animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.show-sidebar { flex: none; width: 28px; height: 28px; margin-right: 4px; align-self: center; }
+.nav-footer { padding-top: 6px; padding-bottom: var(--safe-bottom); }
+
+/* ---- tabs ---- */
+.main { display: flex; min-width: 0; min-height: 0; position: relative; }
+
+/* ---- split view: panes side by side (§0.2) ---- */
+.pane-slot { display: flex; min-width: 0; min-height: 0; flex: 1; }
+.pane-slot[hidden] { display: none; }
+.main[data-panes="2"]:not(.narrow) > .pane-slot:first-child { flex: 0 0 var(--split); }
+.pane { display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; }
+.pane-divider { flex: none; width: 1px; background: var(--border); position: relative; cursor: col-resize; }
+/* A wider invisible grip than the 1px line. */
+.pane-divider::before { content: ""; position: absolute; inset: 0 -4px; }
+.pane-divider:hover, body.resizing .pane-divider { background: var(--accent); }
+body.resizing { cursor: col-resize; user-select: none; }
+/* App chrome is not text to select: in the desktop app's WebKit a drag that
+   starts on it would otherwise select across the whole page. */
+.sidebar, .tabbar, .library-tile, .library-row, .search-row, .backlink-card { -webkit-user-select: none; user-select: none; }
+/* The pane not worked in: its current tab is marked more quietly. */
+.main[data-panes="2"] .pane:not(.focused) .tab[aria-selected="true"] { background: var(--hover); color: var(--secondary); }
+.tabbar {
+  display: flex;
+  gap: 2px;
+  padding: 6px 10px;
+  border-bottom: 1px solid transparent;
+  transition: border-color 0.15s;
+  overflow-x: auto;
+  scrollbar-width: none;
+  color: var(--secondary);
+}
+.pane.scrolled > .tabbar { border-bottom-color: var(--border); }
+.tab {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 200px;
+  padding: 3px 4px 3px 10px;
+  border-radius: var(--radius);
+  white-space: nowrap;
+}
+.tab:hover { background: var(--hover); }
+.tab[aria-selected="true"] { background: var(--selected); color: var(--text); }
+.tab-title { overflow: hidden; text-overflow: ellipsis; }
+.tab-close { width: 20px; height: 20px; opacity: 0; }
+.tabbar-actions { display: flex; align-items: center; gap: 2px; margin-left: auto; padding-left: 8px; position: sticky; right: 0; }
+.tabbar-actions .icon-button { width: 26px; height: 26px; }
+/* ---- title bar drawn by the app (macOS desktop, main.tsx) ----
+   The sidebar's top row holds the traffic lights; each pane's tab bar is
+   the same height, so tabs line up with them, like Claude's desktop app. */
+:root[data-titlebar="overlay"] { --titlebar-h: 46px; }
+:root[data-titlebar="overlay"] .sidebar { padding-top: 0; }
+:root[data-titlebar="overlay"] .sidebar-top { height: var(--titlebar-h); margin: 0 -2px 4px; }
+:root[data-titlebar="overlay"] .tabbar { min-height: var(--titlebar-h); align-items: center; padding-block: 0; }
+/* Sidebar hidden: the leftmost tab bar starts after the traffic lights. */
+:root[data-titlebar="overlay"] .tabbar.sidebar-hidden { padding-left: 80px; }
+.tab:hover .tab-close, .tab[aria-selected="true"] .tab-close, .tab-close:focus-visible { opacity: 1; }
+
+/* ---- views ---- */
+.view { flex: 1; min-height: 0; overflow-y: auto; }
+.view[hidden] { display: none; }
+.page { max-width: calc(var(--measure) + 96px); margin: 0 auto; padding: 40px 48px 80px; }
+.page-header { display: flex; align-items: baseline; gap: 12px; margin-bottom: 20px; }
+.page-header h1 { margin: 0; font: var(--page-title-weight) var(--page-title-size) / var(--page-title-leading) var(--font-body); }
+.page-header .button { margin-left: auto; align-self: center; }
+.page-meta { color: var(--muted); }
+.empty { color: var(--muted); }
+
+.card-list { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--border); }
+.card-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 2px 16px;
+  width: 100%;
+  padding: 10px 8px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+}
+.card-row:hover { background: var(--hover); }
+.card-row.static:hover { background: none; }
+.card-item { position: relative; }
+.card-trash { position: absolute; right: 8px; bottom: 9px; opacity: 0; }
+.card-item:hover .card-trash, .card-trash:focus-visible { opacity: 1; }
+.card-time { display: flex; align-items: center; gap: 10px; }
+.card-title { font: 15px/1.4 var(--font-body); color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.card-preview { grid-column: 1; color: var(--secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.card-time { grid-column: 2; grid-row: 1; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+.web-mode { position: absolute; right: 12px; bottom: 10px; color: var(--muted); font-size: 11px; pointer-events: none; }
+.notice {
+  position: fixed;
+  left: 50%;
+  bottom: calc(20px + var(--safe-bottom));
+  transform: translateX(-50%);
+  max-width: min(560px, calc(100vw - 32px));
+  padding: 8px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--popup);
+  box-shadow: var(--shadow);
+  overflow-wrap: anywhere;
+}
+
+/* Narrow windows: the sidebar gives way; mobile layout proper comes in M4. */
+@media (max-width: 720px) {
+  .shell, .shell.sidebar-closed { grid-template-columns: minmax(0, 1fr); }
+  .sidebar { display: none; }
+  .page { padding: 24px 16px 64px; }
+}
+
+/* ---- dragging a tab (shell/tabDrag.tsx) ---- */
+body.tab-dragging, body.tab-dragging * { cursor: grabbing !important; -webkit-user-select: none !important; user-select: none !important; }
+.tab-ghost {
+  position: fixed;
+  z-index: 100;
+  max-width: 220px;
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--popup);
+  box-shadow: var(--shadow);
+  color: var(--text);
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+}
+.tab-drop-line { position: fixed; z-index: 99; border-radius: 1px; background: var(--accent); pointer-events: none; }
+.tab-drop-area {
+  position: fixed;
+  z-index: 99;
+  border: 2px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  pointer-events: none;
+}
+
+/* ---- empty pages (shell/EmptyState.tsx) ---- */
+.empty-state { display: flex; flex-direction: column; align-items: center; gap: 6px; max-width: 360px; margin: 64px auto 0; text-align: center; }
+.empty-state-icon { display: grid; place-items: center; width: 56px; height: 56px; margin-bottom: 6px; border-radius: 16px; background: var(--surface); color: var(--muted); }
+.empty-state-title { margin: 0; font: 600 15px var(--font-ui); color: var(--text); }
+.empty-state-hint { margin: 0 0 8px; color: var(--muted); font-size: 13px; line-height: 1.6; }
+.empty-state kbd { margin-left: 6px; font: 11px var(--font-ui); opacity: 0.75; }
+
+/* The sidebar's topics heading has a + to make one (§4.7). */
+.nav-section-head { display: flex; align-items: center; justify-content: space-between; }
+.nav-section-head .icon-button { width: 20px; height: 20px; opacity: 0; }
+.nav-section:hover .nav-section-head .icon-button, .nav-section-head .icon-button:focus-visible { opacity: 1; }
+.nav-new-topic { width: 100%; margin: 2px 0; padding: 4px 8px; border: 1px solid var(--accent); border-radius: var(--radius); background: var(--paper); color: var(--text); font: 13px var(--font-ui); outline: none; }

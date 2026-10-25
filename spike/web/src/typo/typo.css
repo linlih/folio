@@ -1,0 +1,96 @@
+/* Typography lab. The control panel uses the spike's own theme (style.css);
+   everything inside .tl-preview reads only the variables the lab sets. */
+
+.tl-lab { display: grid; grid-template-columns: 320px minmax(0, 1fr); gap: 14px; align-items: start; }
+
+/* ---- control panel ---- */
+.tc-panel { position: sticky; top: 8px; max-height: calc(100vh - 80px); overflow: auto; padding: 4px 8px 16px 2px; font-size: 13px; background: var(--bg); }
+.tc-toggle { display: none; }
+
+/* Narrow windows (e.g. the side browser pane): controls sit above the preview
+   in their own scrolling box and can be collapsed, so they never cover it. */
+@media (max-width: 900px) {
+  .tl-lab { grid-template-columns: 1fr; }
+  .tc-toggle { display: flex; align-items: center; gap: 8px; width: 100%; justify-content: space-between; }
+  .tc-panel { position: static; max-height: 42vh; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
+  .tc-panel.tc-closed { display: none; }
+}
+.tc-group { margin: 16px 0 6px; font-weight: 600; color: var(--fg); }
+.tc-row { margin: 8px 0; }
+.tc-label { color: var(--muted); margin-bottom: 4px; }
+.tc-hint { color: var(--muted); font-size: 12px; margin-top: 4px; line-height: 1.5; }
+.tc-choice { display: flex; flex-wrap: wrap; gap: 4px; }
+.tc-choice button { font-size: 12px; padding: 3px 8px; }
+.tc-choice button.on { border-color: var(--accent); color: var(--accent); }
+.tc-slider { display: flex; align-items: center; gap: 8px; }
+.tc-slider input { flex: 1; min-width: 0; }
+.tc-slider span { min-width: 52px; text-align: right; font-variant-numeric: tabular-nums; }
+.tc-ratios { display: grid; gap: 3px; margin: 6px 0; font-size: 12px; }
+.tc-ratio { display: flex; align-items: center; gap: 6px; }
+.tc-ratio.ok { color: var(--fg); }
+.tc-ratio.bad { color: #b42318; }
+.tc-swatch { width: 12px; height: 12px; border-radius: 3px; border: 1px solid var(--line); display: inline-block; }
+.tc-check { display: flex; align-items: center; gap: 6px; margin: 5px 0; }
+.tc-yes { margin-left: auto; color: #2f7d32; font-size: 12px; }
+.tc-no { margin-left: auto; color: var(--muted); font-size: 12px; }
+.tc-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.tc-css { white-space: pre-wrap; font: 11px/1.45 ui-monospace, Menlo, monospace; background: var(--card); border: 1px solid var(--line); border-radius: 6px; padding: 8px; margin-top: 8px; }
+
+/* ---- preview: a slice of the app window ---- */
+.tl-preview { background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.tl-window { display: grid; grid-template-columns: 196px minmax(0, 1fr) 190px; min-height: calc(100vh - 110px); }
+@media (max-width: 1250px) { .tl-window { grid-template-columns: 180px minmax(0, 1fr); } .tl-panel { display: none; } }
+
+.tl-sidebar, .tl-panel, .tl-tabs { font-family: var(--font-ui); font-size: 13px; }
+.tl-sidebar { background: var(--surface); border-right: 1px solid var(--border); padding: 12px 8px; display: flex; flex-direction: column; gap: 1px; color: var(--secondary); }
+.tl-search { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; color: var(--muted); margin-bottom: 6px; }
+.tl-search kbd { margin-left: auto; font: 11px var(--font-ui); color: var(--muted); }
+.tl-nav { display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tl-nav.tl-active { background: color-mix(in srgb, var(--text) 7%, transparent); color: var(--text); }
+.tl-nav.tl-plain { padding-left: 32px; }
+.tl-nav.tl-dim { color: var(--muted); }
+.tl-gap { height: 10px; }
+.tl-spacer { flex: 1; min-height: 16px; }
+.tl-section { margin: 14px 8px 4px; font-size: 11px; color: var(--muted); }
+
+.tl-main { min-width: 0; display: flex; flex-direction: column; }
+.tl-tabs { display: flex; align-items: center; gap: 2px; padding: 6px 10px; border-bottom: 1px solid var(--border); color: var(--secondary); }
+.tl-tabs > span { padding: 4px 10px; border-radius: 6px; white-space: nowrap; }
+.tl-tabs .tl-tab-on { color: var(--text); background: color-mix(in srgb, var(--text) 6%, transparent); }
+.tl-tabs .tl-tabs-end { margin-left: auto; display: flex; color: var(--muted); }
+
+.tl-panel { border-left: 1px solid var(--border); padding: 12px; color: var(--secondary); }
+.tl-panel-title { font-size: 11px; color: var(--muted); margin: 14px 0 6px; }
+.tl-panel-title:first-child { margin-top: 0; }
+.tl-panel-item { display: flex; align-items: center; gap: 6px; padding: 3px 0; }
+
+/* ---- the document: this is what the lab is really about ---- */
+.tl-doc { outline: none; padding: 40px 32px 80px; font-family: var(--font-body); font-size: var(--size); line-height: var(--leading); font-optical-sizing: auto; }
+.tl-doc > * { max-width: var(--measure); margin-left: auto; margin-right: auto; }
+.tl-doc p { margin: 0 0 var(--para); }
+/* Only on elements that carry lang, so headings keep their own line height. */
+.tl-doc [lang|="zh"], .tl-doc [lang|="ja"], .tl-doc [lang|="ko"] { line-height: var(--leading-cjk); }
+.tl-doc [lang|="en"] { line-height: var(--leading); }
+.tl-doc h1 { font-size: 1.75em; line-height: 1.25; font-weight: var(--heading-weight); margin: 0 0 0.2em; text-wrap: balance; }
+.tl-doc h2 { font-size: 1.25em; line-height: 1.35; font-weight: var(--heading-weight); margin: 0 0 0.6em; }
+.tl-doc h3 { font-size: 1.1em; line-height: 1.4; font-weight: var(--heading-weight); margin: 1.2em 0 0.4em; }
+.tl-doc a { color: var(--accent); text-decoration: none; border-bottom: 1px solid color-mix(in srgb, var(--accent) 35%, transparent); cursor: pointer; }
+.tl-doc ul { margin: 0 0 var(--para); padding-left: 1.4em; }
+.tl-doc li { margin: 0.15em 0; }
+.tl-doc li::marker { color: var(--muted); }
+.tl-doc blockquote { margin: 1em 0; padding: 0 0 0 1em; border-left: 2px solid var(--border); border-radius: 0; color: var(--secondary); }
+.tl-doc pre { font-family: var(--font-mono); font-size: 0.82em; line-height: 1.6; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 12px 14px; overflow-x: auto; }
+.tl-doc ::selection { background: var(--accent-bg); }
+
+.tl-date { color: var(--text); }
+.tl-journal { padding-bottom: 28px; margin-bottom: 36px; border-bottom: 1px solid var(--border); }
+.tl-journal > ul { padding-left: 1.1em; }
+.tl-task { list-style: none; margin-left: -1.1em !important; }
+.tl-done { color: var(--muted); text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--muted) 60%, transparent); }
+.tl-tag { font-family: var(--font-ui); font-size: 0.78em; color: var(--accent); background: var(--accent-bg); padding: 1px 6px; border-radius: 4px; text-decoration: none; display: inline-block; }
+.tl-card { padding-bottom: 32px; margin-bottom: 36px; border-bottom: 1px solid var(--border); }
+.tl-meta { font-family: var(--font-ui); font-size: 0.8em; color: var(--muted); margin-bottom: 1.4em !important; }
+.tl-hint { font-family: var(--font-ui); font-size: 0.75em; color: var(--muted); }
+
+/* Narrow column so punctuation lands at line edges. */
+.tl-stress p { max-width: 17em; padding: 6px 10px; border: 1px dashed var(--border); border-radius: 6px; }

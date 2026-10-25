@@ -1,0 +1,21 @@
+/* Sync settings (sync/SyncPanel.tsx); shares the AI access panel's pieces. */
+.sync { display: grid; gap: 10px; overflow-y: auto; }
+.sync-hint { margin: 0; color: var(--secondary); font-size: 13px; line-height: 1.55; }
+.sync-note { margin: 0; color: var(--muted); font-size: 12.5px; }
+.sync-field { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.sync-field > span { width: 6.5em; flex: none; color: var(--muted); }
+.sync-field input {
+  flex: 1;
+  min-width: 0;
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--paper);
+  color: var(--text);
+  font: 13px var(--font-ui);
+  outline: none;
+}
+.sync-field input:focus { border-color: var(--accent); }
+.sync-state { flex: 1; color: var(--text); font-size: 13px; }
+.sync-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-top: 4px; }
+.sync-actions .sync-note { margin-right: auto; }

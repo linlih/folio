@@ -1,0 +1,15 @@
+[package]
+name = "folio-io"
+description = "Import and export: Logseq Markdown import, Markdown export and mirror, JSON Canvas (M2 / M6)."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+loro.workspace = true
+folio-core.workspace = true
+serde.workspace = true
+
+[dev-dependencies]
+tempfile = "3"

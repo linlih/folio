@@ -1,0 +1,498 @@
+{
+ "editor": {
+  "engine": "yjs",
+  "suite": "editor",
+  "runs": 15,
+  "steps": 900,
+  "problems": 60,
+  "byKind": {
+   "exception": 1,
+   "replicas-diverged": 42,
+   "crdt-editor-mismatch": 17
+  },
+  "byOp": {
+   "moveBlock": 7,
+   "deleteRange": 4,
+   "sink": 2,
+   "codeBlock": 2,
+   "heading": 4,
+   "pasteSlice": 7,
+   "splitBlock": 5,
+   "type": 18,
+   "undo": 5,
+   "joinBackward": 4,
+   "redo": 1,
+   "lift": 1
+  },
+  "mergeDuplicateBids": 0,
+  "silentDrops": 0,
+  "dropSamples": [],
+  "seconds": 2.2,
+  "firstProblems": [
+   {
+    "seed": 13,
+    "step": 18,
+    "op": "moveBlock",
+    "kind": "exception",
+    "detail": "TypeError: Cannot read properties of null (reading 'nodeSize')\n    at new NodeSelection (file:///<repo>/spike/web/node_modules/prosemirror-state/dist/index.js:342:57)\n    at NodeSelection.create (file:///<repo>/spike/web/node_modules/prosemirror-state/dist/index.js:375:16)\n    at restoreRelativeSelection (file:///<repo>/spike/web/node_modules/y-prosemirror"
+   },
+   {
+    "seed": 13,
+    "step": 18,
+    "op": "moveBlock",
+    "kind": "replicas-diverged",
+    "detail": "@34: …{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f37c170-2f1595ffe6978b3fc654\"},\"content\":[{\"type… vs …{\"type\":\"doc\",\"content\":[{\"type\":\"image\",\"attrs\":{\"bid\":\"01a15f37c197-efb57c19ee1004150928\",\"src\":\"data:image/gif;…"
+   },
+   {
+    "seed": 13,
+    "step": 18,
+    "op": "moveBlock",
+    "kind": "crdt-editor-mismatch",
+    "detail": "replica 0: @34: …{\"type\":\"doc\",\"content\":[{\"type\":\"image\",\"attrs\":{\"bid\":\"01a15f37c197-efb57c19ee1004150928\",\"src\":\"data:image/gif;… vs …{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f37c170-2f1595ffe6978b3fc654\"},\"content\":[{\"type…"
+   },
+   {
+    "seed": 13,
+    "step": 19,
+    "op": "deleteRange",
+    "kind": "replicas-diverged",
+    "detail": "@34: …{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f37c170-2f1595ffe6978b3fc654\"},\"content\":[{\"type… vs …{\"type\":\"doc\",\"content\":[{\"type\":\"image\",\"attrs\":{\"bid\":\"01a15f37c197-efb57c19ee1004150928\",\"src\":\"data:image/gif;…"
+   }
+  ]
+ },
+ "convergence": {
+  "engine": "yjs",
+  "suite": "convergence",
+  "runs": 10,
+  "steps": 3000,
+  "problems": 0,
+  "byKind": {},
+  "byOp": {},
+  "mergeDuplicateBids": 0,
+  "silentDrops": 0,
+  "dropSamples": [],
+  "seconds": 5.9,
+  "firstProblems": []
+ },
+ "allProblems": [
+  {
+   "seed": 13,
+   "step": 18,
+   "op": "moveBlock",
+   "kind": "exception",
+   "detail": "TypeError: Cannot read properties of null (reading 'nodeSize')\n    at new NodeSelection (file:///<repo>/spike/web/node_modules/prosemirror-state/dist/index.js:342:57)\n    at NodeSelection.create (file:///<repo>/spike/web/node_modules/prosemirror-state/dist/index.js:375:16)\n    at restoreRelativeSelection (file:///<repo>/spike/web/node_modules/y-prosemirror"
+  },
+  {
+   "seed": 13,
+   "step": 18,
+   "op": "moveBlock",
+   "kind": "replicas-diverged",
+   "detail": "@34: …{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f37c170-2f1595ffe6978b3fc654\"},\"content\":[{\"type… vs …{\"type\":\"doc\",\"content\":[{\"type\":\"image\",\"attrs\":{\"bid\":\"01a15f37c197-efb57c19ee1004150928\",\"src\":\"data:image/gif;…"
+  },
+  {
+   "seed": 13,
+   "step": 18,
+   "op": "moveBlock",
+   "kind": "crdt-editor-mismatch",
+   "detail": "replica 0: @34: …{\"type\":\"doc\",\"content\":[{\"type\":\"image\",\"attrs\":{\"bid\":\"01a15f37c197-efb57c19ee1004150928\",\"src\":\"data:image/gif;… vs …{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f37c170-2f1595ffe6978b3fc654\"},\"content\":[{\"type…"
+  },
+  {
+   "seed": 13,
+   "step": 19,
+   "op": "deleteRange",
+   "kind": "replicas-diverged",
+   "detail": "@34: …{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f37c170-2f1595ffe6978b3fc654\"},\"content\":[{\"type… vs …{\"type\":\"doc\",\"content\":[{\"type\":\"image\",\"attrs\":{\"bid\":\"01a15f37c197-efb57c19ee1004150928\",\"src\":\"data:image/gif;…"
+  },
+  {
+   "seed": 13,
+   "step": 19,
+   "op": "deleteRange",
+   "kind": "crdt-editor-mismatch",
+   "detail": "replica 1: @34: …{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f37c170-2f1595ffe6978b3fc654\"},\"content\":[{\"type… vs …{\"type\":\"doc\",\"content\":[{\"type\":\"image\",\"attrs\":{\"bid\":\"01a15f37c197-efb57c19ee1004150928\",\"src\":\"data:image/gif;…"
+  },
+  {
+   "seed": 13,
+   "step": 20,
+   "op": "deleteRange",
+   "kind": "replicas-diverged",
+   "detail": "@34: …{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f37c170-2f1595ffe6978b3fc654\"},\"content\":[{\"type… vs …{\"type\":\"doc\",\"content\":[{\"type\":\"image\",\"attrs\":{\"bid\":\"01a15f37c197-efb57c19ee1004150928\",\"src\":\"data:image/gif;…"
+  },
+  {
+   "seed": 13,
+   "step": 20,
+   "op": "deleteRange",
+   "kind": "crdt-editor-mismatch",
+   "detail": "replica 1: @302: …70-2f1595ffe6978b3fc654\"},\"content\":[{\"type\":\"text\",\"text\":\"粘贴一段\"}]},{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f37c195-1c05e19270919c9aad38\"}… vs …70-2f1595ffe6978b3fc654\"},\"content\":[{\"type\":\"text\",\"text\":\"卡片note第\"}]},{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f37c195-1c05e19270919c9aad3…"
+  },
+  {
+   "seed": 13,
+   "step": 21,
+   "op": "sink",
+   "kind": "replicas-diverged",
+   "detail": "@34: …{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f37c170-2f1595ffe6978b3fc654\"},\"content\":[{\"type… vs …{\"type\":\"doc\",\"content\":[{\"type\":\"image\",\"attrs\":{\"bid\":\"01a15f37c197-efb57c19ee1004150928\",\"src\":\"data:image/gif;…"
+  },
+  {
+   "seed": 13,
+   "step": 21,
+   "op": "sink",
+   "kind": "crdt-editor-mismatch",
+   "detail": "replica 1: @302: …70-2f1595ffe6978b3fc654\"},\"content\":[{\"type\":\"text\",\"text\":\"粘贴一段\"}]},{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f37c195-1c05e19270919c9aad38\"}… vs …70-2f1595ffe6978b3fc654\"},\"content\":[{\"type\":\"text\",\"text\":\"卡片note第\"}]},{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f37c195-1c05e19270919c9aad3…"
+  },
+  {
+   "seed": 13,
+   "step": 22,
+   "op": "codeBlock",
+   "kind": "replicas-diverged",
+   "detail": "@34: …{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f37c170-2f1595ffe6978b3fc654\"},\"content\":[{\"type… vs …{\"type\":\"doc\",\"content\":[{\"type\":\"image\",\"attrs\":{\"bid\":\"01a15f37c197-efb57c19ee1004150928\",\"src\":\"data:image/gif;…"
+  },
+  {
+   "seed": 13,
+   "step": 22,
+   "op": "codeBlock",
+   "kind": "crdt-editor-mismatch",
+   "detail": "replica 1: @302: …70-2f1595ffe6978b3fc654\"},\"content\":[{\"type\":\"text\",\"text\":\"粘贴一段\"}]},{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f37c195-1c05e19270919c9aad38\"}… vs …70-2f1595ffe6978b3fc654\"},\"content\":[{\"type\":\"text\",\"text\":\"卡片note第\"}]},{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f37c195-1c05e19270919c9aad3…"
+  },
+  {
+   "seed": 13,
+   "step": 23,
+   "op": "heading",
+   "kind": "replicas-diverged",
+   "detail": "@34: …{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f37c170-2f1595ffe6978b3fc654\"},\"content\":[{\"type… vs …{\"type\":\"doc\",\"content\":[{\"type\":\"image\",\"attrs\":{\"bid\":\"01a15f37c197-efb57c19ee1004150928\",\"src\":\"data:image/gif;…"
+  },
+  {
+   "seed": 13,
+   "step": 23,
+   "op": "heading",
+   "kind": "crdt-editor-mismatch",
+   "detail": "replica 1: @302: …70-2f1595ffe6978b3fc654\"},\"content\":[{\"type\":\"text\",\"text\":\"粘贴一段\"}]},{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f37c195-1c05e19270919c9aad38\"}… vs …70-2f1595ffe6978b3fc654\"},\"content\":[{\"type\":\"text\",\"text\":\"卡片note第\"}]},{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f37c195-1c05e19270919c9aad3…"
+  },
+  {
+   "seed": 13,
+   "step": 24,
+   "op": "pasteSlice",
+   "kind": "replicas-diverged",
+   "detail": "@34: …{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f37c170-2f1595ffe6978b3fc654\"},\"content\":[{\"type… vs …{\"type\":\"doc\",\"content\":[{\"type\":\"image\",\"attrs\":{\"bid\":\"01a15f37c197-efb57c19ee1004150928\",\"src\":\"data:image/gif;…"
+  },
+  {
+   "seed": 13,
+   "step": 24,
+   "op": "pasteSlice",
+   "kind": "crdt-editor-mismatch",
+   "detail": "replica 1: @242: …eight\":null}},{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f37c1aa-715e5e257bcc567ef824\"},\"content\":[{\"type\":\"text\",\"text\":\"inline paste\"}]},{\"t… vs …eight\":null}},{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f37c170-2f1595ffe6978b3fc654\"},\"content\":[{\"type\":\"text\",\"text\":\"卡片note第\"}]},{\"type\":…"
+  },
+  {
+   "seed": 13,
+   "step": 25,
+   "op": "splitBlock",
+   "kind": "replicas-diverged",
+   "detail": "@34: …{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f37c170-2f1595ffe6978b3fc654\"},\"content\":[{\"type… vs …{\"type\":\"doc\",\"content\":[{\"type\":\"image\",\"attrs\":{\"bid\":\"01a15f37c197-efb57c19ee1004150928\",\"src\":\"data:image/gif;…"
+  },
+  {
+   "seed": 13,
+   "step": 26,
+   "op": "type",
+   "kind": "replicas-diverged",
+   "detail": "@34: …{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f37c170-2f1595ffe6978b3fc654\"},\"content\":[{\"type… vs …{\"type\":\"doc\",\"content\":[{\"type\":\"image\",\"attrs\":{\"bid\":\"01a15f37c197-efb57c19ee1004150928\",\"src\":\"data:image/gif;…"
+  },
+  {
+   "seed": 13,
+   "step": 27,
+   "op": "splitBlock",
+   "kind": "replicas-diverged",
+   "detail": "@34: …{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f37c170-2f1595ffe6978b3fc654\"},\"content\":[{\"type… vs …{\"type\":\"doc\",\"content\":[{\"type\":\"image\",\"attrs\":{\"bid\":\"01a15f37c197-efb57c19ee1004150928\",\"src\":\"data:image/gif;…"
+  },
+  {
+   "seed": 13,
+   "step": 27,
+   "op": "splitBlock",
+   "kind": "crdt-editor-mismatch",
+   "detail": "replica 1: @477: …\":\"粘贴一段白板\"}]},{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f37c1b0-c90c1be505c97c38d368\"}},{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f37c195-c324… vs …\":\"粘贴一段白板\"}]},{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f37c195-c32412c940eb079c8e49\"},\"content\":[{\"type\":\"text\",\"text\":\"白板第二段\"}]},{\"type\":\"p…"
+  },
+  {
+   "seed": 13,
+   "step": 28,
+   "op": "heading",
+   "kind": "replicas-diverged",
+   "detail": "@34: …{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f37c170-2f1595ffe6978b3fc654\"},\"content\":[{\"type… vs …{\"type\":\"doc\",\"content\":[{\"type\":\"image\",\"attrs\":{\"bid\":\"01a15f37c197-efb57c19ee1004150928\",\"src\":\"data:image/gif;…"
+  },
+  {
+   "seed": 13,
+   "step": 28,
+   "op": "heading",
+   "kind": "crdt-editor-mismatch",
+   "detail": "replica 1: @440: …d38\"},\"content\":[{\"type\":\"text\",\"text\":\"粘贴一段白板\"}]},{\"type\":\"heading\",\"attrs\":{\"bid\":\"01a15f37c1b0-c90c1be505c97c38d368\",\"level\":1}},{\"type\":… vs …d38\"},\"content\":[{\"type\":\"text\",\"text\":\"粘贴一段白板\"}]},{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f37c195-c32412c940eb079c8e49\"},\"content\":[{\"type…"
+  },
+  {
+   "seed": 13,
+   "step": 29,
+   "op": "undo",
+   "kind": "replicas-diverged",
+   "detail": "@34: …{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f37c170-2f1595ffe6978b3fc654\"},\"content\":[{\"type… vs …{\"type\":\"doc\",\"content\":[{\"type\":\"image\",\"attrs\":{\"bid\":\"01a15f37c197-efb57c19ee1004150928\",\"src\":\"data:image/gif;…"
+  },
+  {
+   "seed": 13,
+   "step": 29,
+   "op": "undo",
+   "kind": "crdt-editor-mismatch",
+   "detail": "replica 1: @440: …d38\"},\"content\":[{\"type\":\"text\",\"text\":\"粘贴一段白板\"}]},{\"type\":\"heading\",\"attrs\":{\"bid\":\"01a15f37c1b0-c90c1be505c97c38d368\",\"level\":1}},{\"type\":… vs …d38\"},\"content\":[{\"type\":\"text\",\"text\":\"粘贴一段白板\"}]},{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f37c195-c32412c940eb079c8e49\"},\"content\":[{\"type…"
+  },
+  {
+   "seed": 13,
+   "step": 30,
+   "op": "type",
+   "kind": "replicas-diverged",
+   "detail": "@34: …{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f37c170-2f1595ffe6978b3fc654\"},\"content\":[{\"type… vs …{\"type\":\"doc\",\"content\":[{\"type\":\"image\",\"attrs\":{\"bid\":\"01a15f37c197-efb57c19ee1004150928\",\"src\":\"data:image/gif;…"
+  },
+  {
+   "seed": 13,
+   "step": 31,
+   "op": "joinBackward",
+   "kind": "replicas-diverged",
+   "detail": "@34: …{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f37c170-2f1595ffe6978b3fc654\"},\"content\":[{\"type… vs …{\"type\":\"doc\",\"content\":[{\"type\":\"image\",\"attrs\":{\"bid\":\"01a15f37c197-efb57c19ee1004150928\",\"src\":\"data:image/gif;…"
+  },
+  {
+   "seed": 13,
+   "step": 31,
+   "op": "joinBackward",
+   "kind": "crdt-editor-mismatch",
+   "detail": "replica 1: @823: …c654~1\"},\"content\":[{\"type\":\"text\",\"text\":\"一卡片\"}]},{\"type\":\"bulletList\",\"content\":[{\"type\":\"listItem\",\"attrs\":{\"bid\":\"01a15f37c18e-51d2aad14… vs …c654~1\"},\"content\":[{\"type\":\"text\",\"text\":\"一卡片\"}]},{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f37c17d-157d0ac4af25c52c6fc6\"}},{\"type\":\"bulletL…"
+  },
+  {
+   "seed": 13,
+   "step": 32,
+   "op": "pasteSlice",
+   "kind": "replicas-diverged",
+   "detail": "@34: …{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f37c170-2f1595ffe6978b3fc654\"},\"content\":[{\"type… vs …{\"type\":\"doc\",\"content\":[{\"type\":\"image\",\"attrs\":{\"bid\":\"01a15f37c197-efb57c19ee1004150928\",\"src\":\"data:image/gif;…"
+  },
+  {
+   "seed": 13,
+   "step": 33,
+   "op": "joinBackward",
+   "kind": "replicas-diverged",
+   "detail": "@34: …{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f37c170-2f1595ffe6978b3fc654\"},\"content\":[{\"type… vs …{\"type\":\"doc\",\"content\":[{\"type\":\"image\",\"attrs\":{\"bid\":\"01a15f37c197-efb57c19ee1004150928\",\"src\":\"data:image/gif;…"
+  },
+  {
+   "seed": 13,
+   "step": 34,
+   "op": "type",
+   "kind": "replicas-diverged",
+   "detail": "@34: …{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f37c170-2f1595ffe6978b3fc654\"},\"content\":[{\"type… vs …{\"type\":\"doc\",\"content\":[{\"type\":\"image\",\"attrs\":{\"bid\":\"01a15f37c197-efb57c19ee1004150928\",\"src\":\"data:image/gif;…"
+  },
+  {
+   "seed": 13,
+   "step": 35,
+   "op": "splitBlock",
+   "kind": "replicas-diverged",
+   "detail": "@34: …{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f37c170-2f1595ffe6978b3fc654\"},\"content\":[{\"type… vs …{\"type\":\"doc\",\"content\":[{\"type\":\"image\",\"attrs\":{\"bid\":\"01a15f37c197-efb57c19ee1004150928\",\"src\":\"data:image/gif;…"
+  },
+  {
+   "seed": 13,
+   "step": 35,
+   "op": "splitBlock",
+   "kind": "crdt-editor-mismatch",
+   "detail": "replica 1: @365: …helloote第\"}]},{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f37c1aa-715e5e257bcc567ef824~1\"},\"content\":[{\"type\":\"text\",\"text\":\"nline paste\"}]},{\"… vs …helloote第\"}]},{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f37c195-1c05e19270919c9aad38\"},\"content\":[{\"type\":\"text\",\"text\":\"粘贴一段白板\"}]},{\"type\":\"…"
+  },
+  {
+   "seed": 13,
+   "step": 36,
+   "op": "type",
+   "kind": "replicas-diverged",
+   "detail": "@34: …{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f37c170-2f1595ffe6978b3fc654\"},\"content\":[{\"type… vs …{\"type\":\"doc\",\"content\":[{\"type\":\"image\",\"attrs\":{\"bid\":\"01a15f37c197-efb57c19ee1004150928\",\"src\":\"data:image/gif;…"
+  },
+  {
+   "seed": 13,
+   "step": 36,
+   "op": "type",
+   "kind": "crdt-editor-mismatch",
+   "detail": "replica 1: @365: …helloote第\"}]},{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f37c1aa-715e5e257bcc567ef824~1\"},\"content\":[{\"type\":\"text\",\"text\":\"nline paste\"}]},{\"… vs …helloote第\"}]},{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f37c195-1c05e19270919c9aad38\"},\"content\":[{\"type\":\"text\",\"text\":\"粘贴一段白板\"}]},{\"type\":\"…"
+  },
+  {
+   "seed": 13,
+   "step": 37,
+   "op": "undo",
+   "kind": "replicas-diverged",
+   "detail": "@34: …{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f37c170-2f1595ffe6978b3fc654\"},\"content\":[{\"type… vs …{\"type\":\"doc\",\"content\":[{\"type\":\"image\",\"attrs\":{\"bid\":\"01a15f37c197-efb57c19ee1004150928\",\"src\":\"data:image/gif;…"
+  },
+  {
+   "seed": 13,
+   "step": 37,
+   "op": "undo",
+   "kind": "crdt-editor-mismatch",
+   "detail": "replica 1: @365: …helloote第\"}]},{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f37c1aa-715e5e257bcc567ef824~1\"},\"content\":[{\"type\":\"text\",\"text\":\"nline paste\"}]},{\"… vs …helloote第\"}]},{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f37c195-1c05e19270919c9aad38\"},\"content\":[{\"type\":\"text\",\"text\":\"粘贴一段白板\"}]},{\"type\":\"…"
+  },
+  {
+   "seed": 13,
+   "step": 38,
+   "op": "moveBlock",
+   "kind": "replicas-diverged",
+   "detail": "@34: …{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f37c170-2f1595ffe6978b3fc654\"},\"content\":[{\"type… vs …{\"type\":\"doc\",\"content\":[{\"type\":\"image\",\"attrs\":{\"bid\":\"01a15f37c197-efb57c19ee1004150928\",\"src\":\"data:image/gif;…"
+  },
+  {
+   "seed": 13,
+   "step": 38,
+   "op": "moveBlock",
+   "kind": "crdt-editor-mismatch",
+   "detail": "replica 1: @696: …ragraph\",\"attrs\":{\"bid\":\"01a15f37c183-4e1e2ce56326b27765a6\"},\"content\":[{\"type\":\"text\",\"text\":\"，\"}]},{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a… vs …ragraph\",\"attrs\":{\"bid\":\"01a15f37c183-4e1e2ce56326b27765a6\"}},{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f37c170-2f1595ffe6978b3fc654~1\"},\"con…"
+  },
+  {
+   "seed": 13,
+   "step": 39,
+   "op": "moveBlock",
+   "kind": "replicas-diverged",
+   "detail": "@34: …{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f37c170-2f1595ffe6978b3fc654\"},\"content\":[{\"type… vs …{\"type\":\"doc\",\"content\":[{\"type\":\"image\",\"attrs\":{\"bid\":\"01a15f37c197-efb57c19ee1004150928\",\"src\":\"data:image/gif;…"
+  },
+  {
+   "seed": 13,
+   "step": 40,
+   "op": "type",
+   "kind": "replicas-diverged",
+   "detail": "@34: …{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f37c170-2f1595ffe6978b3fc654\"},\"content\":[{\"type… vs …{\"type\":\"doc\",\"content\":[{\"type\":\"image\",\"attrs\":{\"bid\":\"01a15f37c197-efb57c19ee1004150928\",\"src\":\"data:image/gif;…"
+  },
+  {
+   "seed": 13,
+   "step": 41,
+   "op": "redo",
+   "kind": "replicas-diverged",
+   "detail": "@34: …{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f37c170-2f1595ffe6978b3fc654\"},\"content\":[{\"type… vs …{\"type\":\"doc\",\"content\":[{\"type\":\"image\",\"attrs\":{\"bid\":\"01a15f37c197-efb57c19ee1004150928\",\"src\":\"data:image/gif;…"
+  },
+  {
+   "seed": 13,
+   "step": 42,
+   "op": "type",
+   "kind": "replicas-diverged",
+   "detail": "@34: …{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f37c170-2f1595ffe6978b3fc654\"},\"content\":[{\"type… vs …{\"type\":\"doc\",\"content\":[{\"type\":\"image\",\"attrs\":{\"bid\":\"01a15f37c197-efb57c19ee1004150928\",\"src\":\"data:image/gif;…"
+  },
+  {
+   "seed": 13,
+   "step": 43,
+   "op": "moveBlock",
+   "kind": "replicas-diverged",
+   "detail": "@34: …{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f37c170-2f1595ffe6978b3fc654\"},\"content\":[{\"type… vs …{\"type\":\"doc\",\"content\":[{\"type\":\"image\",\"attrs\":{\"bid\":\"01a15f37c197-efb57c19ee1004150928\",\"src\":\"data:image/gif;…"
+  },
+  {
+   "seed": 13,
+   "step": 44,
+   "op": "undo",
+   "kind": "replicas-diverged",
+   "detail": "@34: …{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f37c170-2f1595ffe6978b3fc654\"},\"content\":[{\"type… vs …{\"type\":\"doc\",\"content\":[{\"type\":\"image\",\"attrs\":{\"bid\":\"01a15f37c197-efb57c19ee1004150928\",\"src\":\"data:image/gif;…"
+  },
+  {
+   "seed": 13,
+   "step": 45,
+   "op": "pasteSlice",
+   "kind": "replicas-diverged",
+   "detail": "@34: …{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f37c170-2f1595ffe6978b3fc654\"},\"content\":[{\"type… vs …{\"type\":\"doc\",\"content\":[{\"type\":\"image\",\"attrs\":{\"bid\":\"01a15f37c197-efb57c19ee1004150928\",\"src\":\"data:image/gif;…"
+  },
+  {
+   "seed": 13,
+   "step": 46,
+   "op": "type",
+   "kind": "replicas-diverged",
+   "detail": "@34: …{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f37c170-2f1595ffe6978b3fc654\"},\"content\":[{\"type… vs …{\"type\":\"doc\",\"content\":[{\"type\":\"image\",\"attrs\":{\"bid\":\"01a15f37c197-efb57c19ee1004150928\",\"src\":\"data:image/gif;…"
+  },
+  {
+   "seed": 13,
+   "step": 47,
+   "op": "type",
+   "kind": "replicas-diverged",
+   "detail": "@34: …{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f37c170-2f1595ffe6978b3fc654\"},\"content\":[{\"type… vs …{\"type\":\"doc\",\"content\":[{\"type\":\"image\",\"attrs\":{\"bid\":\"01a15f37c197-efb57c19ee1004150928\",\"src\":\"data:image/gif;…"
+  },
+  {
+   "seed": 13,
+   "step": 48,
+   "op": "joinBackward",
+   "kind": "replicas-diverged",
+   "detail": "@34: …{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f37c170-2f1595ffe6978b3fc654\"},\"content\":[{\"type… vs …{\"type\":\"doc\",\"content\":[{\"type\":\"image\",\"attrs\":{\"bid\":\"01a15f37c197-efb57c19ee1004150928\",\"src\":\"data:image/gif;…"
+  },
+  {
+   "seed": 13,
+   "step": 49,
+   "op": "type",
+   "kind": "replicas-diverged",
+   "detail": "@34: …{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f37c170-2f1595ffe6978b3fc654\"},\"content\":[{\"type… vs …{\"type\":\"doc\",\"content\":[{\"type\":\"image\",\"attrs\":{\"bid\":\"01a15f37c197-efb57c19ee1004150928\",\"src\":\"data:image/gif;…"
+  },
+  {
+   "seed": 13,
+   "step": 50,
+   "op": "lift",
+   "kind": "replicas-diverged",
+   "detail": "@34: …{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f37c170-2f1595ffe6978b3fc654\"},\"content\":[{\"type… vs …{\"type\":\"doc\",\"content\":[{\"type\":\"image\",\"attrs\":{\"bid\":\"01a15f37c197-efb57c19ee1004150928\",\"src\":\"data:image/gif;…"
+  },
+  {
+   "seed": 13,
+   "step": 51,
+   "op": "type",
+   "kind": "replicas-diverged",
+   "detail": "@34: …{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f37c170-2f1595ffe6978b3fc654\"},\"content\":[{\"type… vs …{\"type\":\"doc\",\"content\":[{\"type\":\"image\",\"attrs\":{\"bid\":\"01a15f37c197-efb57c19ee1004150928\",\"src\":\"data:image/gif;…"
+  },
+  {
+   "seed": 13,
+   "step": 52,
+   "op": "type",
+   "kind": "replicas-diverged",
+   "detail": "@34: …{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f37c170-2f1595ffe6978b3fc654\"},\"content\":[{\"type… vs …{\"type\":\"doc\",\"content\":[{\"type\":\"image\",\"attrs\":{\"bid\":\"01a15f37c197-efb57c19ee1004150928\",\"src\":\"data:image/gif;…"
+  },
+  {
+   "seed": 13,
+   "step": 53,
+   "op": "type",
+   "kind": "replicas-diverged",
+   "detail": "@34: …{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f37c170-2f1595ffe6978b3fc654\"},\"content\":[{\"type… vs …{\"type\":\"doc\",\"content\":[{\"type\":\"image\",\"attrs\":{\"bid\":\"01a15f37c197-efb57c19ee1004150928\",\"src\":\"data:image/gif;…"
+  },
+  {
+   "seed": 13,
+   "step": 54,
+   "op": "type",
+   "kind": "replicas-diverged",
+   "detail": "@34: …{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f37c170-2f1595ffe6978b3fc654\"},\"content\":[{\"type… vs …{\"type\":\"doc\",\"content\":[{\"type\":\"image\",\"attrs\":{\"bid\":\"01a15f37c197-efb57c19ee1004150928\",\"src\":\"data:image/gif;…"
+  },
+  {
+   "seed": 13,
+   "step": 55,
+   "op": "type",
+   "kind": "replicas-diverged",
+   "detail": "@34: …{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f37c170-2f1595ffe6978b3fc654\"},\"content\":[{\"type… vs …{\"type\":\"doc\",\"content\":[{\"type\":\"image\",\"attrs\":{\"bid\":\"01a15f37c197-efb57c19ee1004150928\",\"src\":\"data:image/gif;…"
+  },
+  {
+   "seed": 13,
+   "step": 56,
+   "op": "pasteSlice",
+   "kind": "replicas-diverged",
+   "detail": "@34: …{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f37c170-2f1595ffe6978b3fc654\"},\"content\":[{\"type… vs …{\"type\":\"doc\",\"content\":[{\"type\":\"image\",\"attrs\":{\"bid\":\"01a15f37c197-efb57c19ee1004150928\",\"src\":\"data:image/gif;…"
+  },
+  {
+   "seed": 13,
+   "step": 57,
+   "op": "type",
+   "kind": "replicas-diverged",
+   "detail": "@34: …{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f37c170-2f1595ffe6978b3fc654\"},\"content\":[{\"type… vs …{\"type\":\"doc\",\"content\":[{\"type\":\"image\",\"attrs\":{\"bid\":\"01a15f37c197-efb57c19ee1004150928\",\"src\":\"data:image/gif;…"
+  },
+  {
+   "seed": 13,
+   "step": 58,
+   "op": "pasteSlice",
+   "kind": "replicas-diverged",
+   "detail": "@34: …{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f37c170-2f1595ffe6978b3fc654\"},\"content\":[{\"type… vs …{\"type\":\"doc\",\"content\":[{\"type\":\"image\",\"attrs\":{\"bid\":\"01a15f37c197-efb57c19ee1004150928\",\"src\":\"data:image/gif;…"
+  },
+  {
+   "seed": 13,
+   "step": 58,
+   "op": "pasteSlice",
+   "kind": "crdt-editor-mismatch",
+   "detail": "replica 1: @205: …lt\":null,\"title\":null,\"width\":null,\"height\":null}},{\"type\":\"heading\",\"attrs\":{\"bid\":\"01a15f37c1e9-22bbd059eb66269b7565\",\"level\":2},\"content\"… vs …lt\":null,\"title\":null,\"width\":null,\"height\":null}},{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f37c195-1c05e19270919c9aad38\"},\"content\":[{\"type…"
+  },
+  {
+   "seed": 13,
+   "step": 59,
+   "op": "type",
+   "kind": "replicas-diverged",
+   "detail": "@34: …{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f37c170-2f1595ffe6978b3fc654\"},\"content\":[{\"type… vs …{\"type\":\"doc\",\"content\":[{\"type\":\"image\",\"attrs\":{\"bid\":\"01a15f37c197-efb57c19ee1004150928\",\"src\":\"data:image/gif;…"
+  },
+  {
+   "seed": 13,
+   "step": 59,
+   "op": "type",
+   "kind": "crdt-editor-mismatch",
+   "detail": "replica 1: @205: …lt\":null,\"title\":null,\"width\":null,\"height\":null}},{\"type\":\"heading\",\"attrs\":{\"bid\":\"01a15f37c1e9-22bbd059eb66269b7565\",\"level\":2},\"content\"… vs …lt\":null,\"title\":null,\"width\":null,\"height\":null}},{\"type\":\"paragraph\",\"attrs\":{\"bid\":\"01a15f37c195-1c05e19270919c9aad38\"},\"content\":[{\"type…"
+  }
+ ]
+}

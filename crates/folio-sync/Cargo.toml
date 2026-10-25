@@ -1,0 +1,30 @@
+[package]
+name = "folio-sync"
+description = "Sync (M3): the encrypted update protocol, the relay's storage (used by folio-server), and the client engine over folio-store."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+folio-core.workspace = true
+folio-store.workspace = true
+loro.workspace = true
+rusqlite.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+chacha20poly1305 = "0.10"
+argon2 = "0.5"
+hkdf = "0.12"
+hmac = "0.12"
+sha2 = "0.10"
+base64 = "0.22"
+getrandom = "0.3"
+# Blocking HTTP and WebSocket for the client (runs on its own thread).
+ureq = { version = "2", features = ["json"] }
+tungstenite = "0.24"
+
+[dev-dependencies]
+tempfile = "3"
