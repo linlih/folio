@@ -118,7 +118,7 @@ reload_shared() {
 }
 
 # The Caddy we added our site to, as recorded at install.
-shared_setting() { [[ -f "$ENV_FILE" ]] && sed -n "s/^$1=//p" "$ENV_FILE"; }
+shared_setting() { [[ -f "$ENV_FILE" ]] && sed -n "s/^$1=//p" "$ENV_FILE"; return 0; }
 
 # ---- uninstall ----
 if [[ $uninstall -eq 1 ]]; then
@@ -150,7 +150,7 @@ if [[ $uninstall -eq 1 ]]; then
 fi
 
 # ---- domain and ports, asked step by step ----
-saved() { [[ -f "$ENV_FILE" ]] && sed -n "s/^$1=//p" "$ENV_FILE"; }
+saved() { [[ -f "$ENV_FILE" ]] && sed -n "s/^$1=//p" "$ENV_FILE"; return 0; }   # used in $(...) under set -e
 # Defaults: what this machine was set up with before, else the usual ones.
 saved_domain="$(saved FOLIO_DOMAIN)"
 saved_https="$(saved FOLIO_HTTPS_PORT)"
