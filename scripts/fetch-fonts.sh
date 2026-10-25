@@ -19,7 +19,10 @@ SourceSerif4-Italic-Variable.ttf|sourceserif4/SourceSerif4-Italic%5Bopsz,wght%5D
 SourceSerif4-OFL.txt|sourceserif4/OFL.txt|5f94c3fd3a23131a417ab5a0c8452de57e70c3cfb9f604d88241f7065ebf9fd9
 "
 
-sha() { shasum -a 256 "$1" | awk '{print $1}'; }
+# sha256sum on Linux and Git Bash for Windows, shasum on macOS.
+sha() {
+  if command -v sha256sum >/dev/null; then sha256sum "$1" | awk '{print $1}'; else shasum -a 256 "$1" | awk '{print $1}'; fi
+}
 
 for line in $FILES; do
   IFS='|' read -r name path want <<<"$line"
