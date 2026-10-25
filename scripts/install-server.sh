@@ -446,9 +446,10 @@ setup_bundled_caddy() {
 
   install_bundled_caddy
 
-  # With HTTPS on another port, the certificate comes over port 80 only.
+  # With HTTPS on another port, a public certificate comes over port 80 only
+  # (.localhost names get Caddy's own certificates either way).
   local tls=""
-  if [[ "$https_port" != 443 ]]; then tls=$'\ttls {\n\t\tissuer acme {\n\t\t\tdisable_tlsalpn_challenge\n\t\t}\n\t}\n'; fi
+  if [[ "$https_port" != 443 && "$domain" != *.localhost ]]; then tls=$'\ttls {\n\t\tissuer acme {\n\t\t\tdisable_tlsalpn_challenge\n\t\t}\n\t}\n'; fi
   {
     [[ -n "$email" ]] && printf '{\n\temail %s\n}\n\n' "$email"
     printf '%s {\n\treverse_proxy 127.0.0.1:%s\n%s}\n' "$site" "$port" "$tls"
