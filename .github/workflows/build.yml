@@ -148,6 +148,9 @@ jobs:
       # The Android project is generated here (src-tauri/gen/android is not
       # committed until it needs changes of its own, M4).
       - run: npx tauri android init --ci
+      # The generated project carries Tauri's template icon; ours replace it.
+      - name: App icon
+        run: cp -R src-tauri/icons/android/. src-tauri/gen/android/app/src/main/res/
       - run: npx tauri android build --apk --target aarch64 --ci
       # Signed with the project's own key (repository secrets), so a new
       # build installs over the last one. Without the secrets the APK stays
