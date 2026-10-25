@@ -1,0 +1,73 @@
+# Runs scripts/install-server.sh on a fresh Ubuntu machine: installing
+# Caddy, upgrading in place, sharing a Caddyfile with another site, and
+# uninstalling. `.localhost` names get certificates from Caddy's own CA.
+name: Server install
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - scripts/install-server.sh
+      - crates/folio-server/**
+      - .github/workflows/server-install.yml
+
+jobs:
+  install:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: server-install
+      - run: cargo build --release -p folio-server
+
+      - name: Fresh install (installs Caddy)
+        run: sudo ./scripts/install-server.sh --domain folio-a.localhost --binary target/release/folio-server --yes
+
+      - name: The server answers through Caddy, WebSocket too
+        run: |
+          token=$(sudo sed -n 's/^FOLIO_SERVER_TOKEN=//p' /etc/folio-server/env)
+          echo "$token" > /tmp/token-before
+          test "$(curl -fsSk https://folio-a.localhost/health)" = ok
+          code=$(curl -sk -o /dev/null -w '%{http_code}' --http1.1 --max-time 5 \
+            -H "Connection: Upgrade" -H "Upgrade: websocket" -H "Sec-WebSocket-Version: 13" \
+            -H "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==" \
+            -H "Authorization: Bearer $token" -H "X-Folio-Device: ci" \
+            https://folio-a.localhost/v1/w/ci-test/live || true)
+          echo "live: $code"
+          test "$code" = 101
+          test "$(curl -sk -o /dev/null -w '%{http_code}' https://folio-a.localhost/v1/w/ci-test/pull)" = 401
+
+      - name: Running again upgrades and keeps the token
+        run: |
+          sudo ./scripts/install-server.sh --domain folio-a.localhost --binary target/release/folio-server --yes
+          test "$(sudo sed -n 's/^FOLIO_SERVER_TOKEN=//p' /etc/folio-server/env)" = "$(cat /tmp/token-before)"
+          test "$(grep -c 'folio-server (managed' /etc/caddy/Caddyfile)" = 1
+
+      - name: A Caddyfile with another site keeps it
+        run: |
+          printf '\nother.localhost {\n\trespond "other site"\n}\n' | sudo tee -a /etc/caddy/Caddyfile > /dev/null
+          sudo systemctl reload caddy
+          sudo ./scripts/install-server.sh --domain folio-b.localhost --binary target/release/folio-server --yes
+          cat /etc/caddy/Caddyfile
+          test "$(curl -fsSk https://folio-b.localhost/health)" = ok
+          test "$(curl -fsSk https://other.localhost)" = "other site"
+          ! grep -q folio-a.localhost /etc/caddy/Caddyfile
+
+      - name: Uninstall keeps the data and the other site
+        run: |
+          sudo ./scripts/install-server.sh --uninstall --yes
+          ! systemctl is-active --quiet folio-server
+          test ! -e /usr/local/bin/folio-server
+          sudo test -e /var/lib/folio-server/folio-server.db
+          ! grep -q 'folio-server (managed' /etc/caddy/Caddyfile
+          test "$(curl -fsSk https://other.localhost)" = "other site"
+
+      - name: Logs
+        if: failure()
+        run: |
+          sudo journalctl -u folio-server -n 50 --no-pager || true
+          sudo journalctl -u caddy -n 50 --no-pager || true
+          sudo cat /etc/caddy/Caddyfile || true

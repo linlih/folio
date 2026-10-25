@@ -24,7 +24,11 @@ base64 = "0.22"
 getrandom = "0.3"
 # Blocking HTTP and WebSocket for the client (runs on its own thread).
 ureq = { version = "2", features = ["json"] }
-tungstenite = "0.24"
+# TLS for wss:// (a server behind HTTPS, scripts/install-server.sh).
+tungstenite = { version = "0.24", features = ["rustls-tls-webpki-roots"] }
+# The crypto provider rustls needs for wss://; named here rather than left to
+# what ureq happens to enable.
+rustls = { version = "0.23", default-features = false, features = ["ring", "std"] }
 
 [dev-dependencies]
 tempfile = "3"

@@ -185,6 +185,47 @@ jobs:
           if-no-files-found: error
           path: out/*.apk
 
+  # The sync server for Linux machines, static (musl) so it runs on any
+  # distribution; scripts/install-server.sh downloads it from the release.
+  server:
+    name: Sync server (${{ matrix.arch }})
+    needs: release
+    if: ${{ !cancelled() && (needs.release.result == 'success' || needs.release.result == 'skipped') }}
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [x86_64, aarch64]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.arch }}-unknown-linux-musl
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: server-${{ matrix.arch }}
+      # Zig as the C compiler and linker for cross builds (SQLite, ring).
+      - run: pip install --quiet cargo-zigbuild
+      - run: cargo zigbuild --release --locked -p folio-server --target ${{ matrix.arch }}-unknown-linux-musl
+      - name: Package
+        run: |
+          mkdir -p out
+          cp target/${{ matrix.arch }}-unknown-linux-musl/release/folio-server out/folio-server-${{ matrix.arch }}-linux
+          cd out && sha256sum folio-server-${{ matrix.arch }}-linux > folio-server-${{ matrix.arch }}-linux.sha256
+          file folio-server-${{ matrix.arch }}-linux
+      - name: Add to the release
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$GITHUB_REF_NAME" out/* --clobber
+      - uses: actions/upload-artifact@v4
+        with:
+          name: folio-server-${{ matrix.arch }}
+          retention-days: 14
+          path: out/*
+
   # Installing on an iPhone needs an Apple developer account and signing
   # (design/ARCHITECTURE.md §7.2); until then this checks that the app
   # builds for iOS and the simulator.

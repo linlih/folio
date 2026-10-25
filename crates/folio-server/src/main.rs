@@ -13,6 +13,22 @@ use std::path::PathBuf;
 
 use folio_sync::relay::Relay;
 
+/// Ctrl-C, or SIGTERM from systemd stopping the service: finish what is in
+/// flight, then exit.
+async fn stopped() {
+    #[cfg(unix)]
+    {
+        let mut term = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()).expect("SIGTERM handler");
+        tokio::select! {
+            _ = tokio::signal::ctrl_c() => {}
+            _ = term.recv() => {}
+        }
+    }
+    #[cfg(not(unix))]
+    let _ = tokio::signal::ctrl_c().await;
+    tracing::info!("stopping");
+}
+
 #[tokio::main]
 async fn main() {
     tracing_subscriber::fmt()
@@ -37,9 +53,7 @@ async fn main() {
     });
     tracing::info!("folio-server listening on http://{addr}, data in {}", db.display());
     axum::serve(listener, folio_server::router(folio_server::Server::new(relay, token)))
-        .with_graceful_shutdown(async {
-            let _ = tokio::signal::ctrl_c().await;
-        })
+        .with_graceful_shutdown(stopped())
         .await
         .unwrap();
 }
