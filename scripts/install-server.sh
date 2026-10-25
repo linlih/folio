@@ -124,9 +124,10 @@ shared_setting() { [[ -f "$ENV_FILE" ]] && sed -n "s/^$1=//p" "$ENV_FILE"; retur
 if [[ $uninstall -eq 1 ]]; then
   step "停止并移除 folio-sync" "Stopping and removing folio-sync"
   systemctl disable --now "$NAME" "$NAME-caddy" 2>/dev/null || true
-  rm -f "$UNIT" "$CADDY_UNIT" "$LOGROTATE" "/usr/local/bin/$NAME"
+  rm -f "$UNIT" "$CADDY_UNIT" "$LOGROTATE" "/usr/bin/$NAME" "/usr/local/bin/$NAME"
   rm -rf "$HOME_DIR/bin"
   systemctl daemon-reload
+  systemctl reset-failed "$NAME" "$NAME-caddy" 2>/dev/null || true
   # Our site in a Caddy we share: as recorded, or in the machine's own.
   s_config="$(shared_setting FOLIO_CADDYFILE)"; s_unit="$(shared_setting FOLIO_CADDY_UNIT)"; s_exe="$(shared_setting FOLIO_CADDY_BIN)"
   if [[ -z "$s_config" ]] && caddy_managed; then s_config="$CADDYFILE"; s_unit=caddy.service; s_exe="$(command -v caddy)"; fi
@@ -528,7 +529,10 @@ USAGE
 esac
 CTL_EOF
 chmod 0755 "$CTL"
-ln -sfn "$CTL" "/usr/local/bin/$NAME"
+# In /usr/bin: sudo's search path leaves out /usr/local/bin on some systems
+# (OpenCloudOS, CentOS); earlier installs linked it there.
+ln -sfn "$CTL" "/usr/bin/$NAME"
+[[ -L "/usr/local/bin/$NAME" ]] && rm -f "/usr/local/bin/$NAME"
 
 systemctl daemon-reload
 systemctl enable --quiet "$NAME"
@@ -672,6 +676,7 @@ retire_bundled_caddy() {
   rm -rf "$CADDY_DIR"
   userdel "$CADDY_USER" 2>/dev/null || true
   systemctl daemon-reload
+  systemctl reset-failed "$NAME-caddy" 2>/dev/null || true
 }
 
 proxy_ready=0

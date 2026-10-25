@@ -48,7 +48,7 @@ jobs:
           test -x /opt/folio-sync/bin/folio-server
           test -x /opt/folio-sync/bin/caddy
           test -x /opt/folio-sync/bin/install-server.sh
-          test "$(readlink /usr/local/bin/folio-sync)" = /opt/folio-sync/bin/folio-sync
+          test "$(readlink /usr/bin/folio-sync)" = /opt/folio-sync/bin/folio-sync
           sudo test -s /opt/folio-sync/data/folio-sync.db
           sudo grep -q "folio-server listening" /opt/folio-sync/logs/folio-sync.log
           sudo test -e /opt/folio-sync/logs/caddy.log
@@ -118,7 +118,7 @@ jobs:
           sudo folio-sync uninstall --yes
           ! systemctl is-active --quiet folio-sync
           ! systemctl is-active --quiet folio-sync-caddy
-          test ! -e /usr/local/bin/folio-sync
+          test ! -e /usr/bin/folio-sync
           test ! -e /opt/folio-sync/bin
           sudo test -e /opt/folio-sync/data/folio-sync.db
           sudo ./scripts/install-server.sh --domain folio-a.localhost --binary target/release/folio-server --yes
