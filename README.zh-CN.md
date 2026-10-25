@@ -25,6 +25,16 @@
 
 安装包暂未经过苹果和微软签名。macOS 首次打开需在“系统设置 → 隐私与安全性”里允许；Windows 上点“更多信息 → 仍要运行”。
 
+## 自己部署同步服务
+
+在一台有 systemd 的 Linux 服务器上，先把域名解析到它，然后运行：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/linlih/folio/main/scripts/install-server.sh | sudo bash -s -- --domain sync.example.com
+```
+
+脚本会把服务装成系统服务，用 Caddy 配好 HTTPS（没装会帮你装；已装会先询问再往现有的 Caddyfile 里加站点），最后打印服务器地址和令牌，填到应用的“设置 → 同步”里即可。再次运行就是升级；`--uninstall` 卸载。服务器上只有加密后的数据。
+
 ## 目录
 
 ```

@@ -25,6 +25,16 @@ Desktop apps check for updates once a day and ask before installing (the AppImag
 
 The builds are not yet signed by Apple or Microsoft. On macOS, allow the app the first time in **System Settings → Privacy & Security**; on Windows, choose **More info → Run anyway**.
 
+## Self-hosting the sync server
+
+On a Linux server with systemd, point a domain at it, then run:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/linlih/folio/main/scripts/install-server.sh | sudo bash -s -- --domain sync.example.com
+```
+
+The script installs the server as a service, sets up HTTPS with Caddy (it installs Caddy if needed, or asks before adding a site to your existing Caddyfile), and prints the server address and token to enter in **Settings → Sync** in the app. Run it again to upgrade; `--uninstall` removes it. The server only ever sees encrypted data.
+
 ## Repository layout
 
 ```
