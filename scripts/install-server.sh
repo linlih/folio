@@ -346,7 +346,9 @@ case "$cmd" in
     if curl -fsS --max-time 3 "http://127.0.0.1:${port:-8787}/health" >/dev/null 2>&1; then echo "server health: ok"; else echo "server health: not answering"; fi
     url="$(sed -n 's/^FOLIO_PUBLIC_URL=//p' "$ENV_FILE" 2>/dev/null || true)"
     if [[ -n "$url" ]]; then
-      if curl -fsS --max-time 5 "$url/health" >/dev/null 2>&1; then echo "https health: ok ($url)"; else echo "https health: not answering ($url)"; fi
+      # .localhost names have certificates from Caddy's own CA (tests).
+      k=(); [[ "$url" == *.localhost* ]] && k=(-k)
+      if curl -fsS "${k[@]}" --max-time 5 "$url/health" >/dev/null 2>&1; then echo "https health: ok ($url)"; else echo "https health: not answering ($url)"; fi
     fi ;;
   logs)
     shift
