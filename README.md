@@ -33,7 +33,13 @@ On a Linux server with systemd, point a domain at it, then run:
 curl -fsSL https://raw.githubusercontent.com/linlih/folio/main/scripts/install-server.sh | sudo bash -s -- --domain sync.example.com
 ```
 
-The script installs the server as a service, sets up HTTPS with Caddy (it installs Caddy if needed, or asks before adding a site to your existing Caddyfile), and prints the server address and token to enter in **Settings → Sync** in the app. Run it again to upgrade; `--uninstall` removes it. The server only ever sees encrypted data.
+The script installs everything under `/opt/folio-sync` (program, settings and token, data, logs rotated daily) as the systemd service `folio-sync`, sets up HTTPS with Caddy (it installs Caddy if needed, or asks before adding a site to your existing Caddyfile), and prints the server address and token to enter in **Settings → Sync** in the app. The server only ever sees encrypted data.
+
+Manage it with the `folio-sync` command:
+
+```
+folio-sync status | start | stop | restart | logs -f | info | upgrade | uninstall [--purge]
+```
 
 ## Repository layout
 

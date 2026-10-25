@@ -28,7 +28,7 @@ jobs:
 
       - name: The server answers through Caddy, WebSocket too
         run: |
-          token=$(sudo sed -n 's/^FOLIO_SERVER_TOKEN=//p' /etc/folio-server/env)
+          token=$(sudo sed -n 's/^FOLIO_SERVER_TOKEN=//p' /opt/folio-sync/etc/folio-sync.env)
           echo "$token" > /tmp/token-before
           test "$(curl -fsSk https://folio-a.localhost/health)" = ok
           code=$(curl -sk -o /dev/null -w '%{http_code}' --http1.1 --max-time 5 \
@@ -40,11 +40,34 @@ jobs:
           test "$code" = 101
           test "$(curl -sk -o /dev/null -w '%{http_code}' https://folio-a.localhost/v1/w/ci-test/pull)" = 401
 
+      - name: Everything is under /opt/folio-sync, managed by folio-sync
+        run: |
+          ls -lR /opt/folio-sync | head -40
+          test -x /opt/folio-sync/bin/folio-server
+          test -x /opt/folio-sync/bin/install-server.sh
+          test "$(readlink /usr/local/bin/folio-sync)" = /opt/folio-sync/bin/folio-sync
+          sudo test -s /opt/folio-sync/data/folio-sync.db
+          sudo grep -q "folio-server listening" /opt/folio-sync/logs/folio-sync.log
+          test -f /etc/logrotate.d/folio-sync && sudo logrotate -d /etc/logrotate.d/folio-sync
+          test "$(stat -c '%U %a' /opt/folio-sync/etc/folio-sync.env)" = "root 640"
+          folio-sync status | tee /tmp/status
+          grep -q "health: ok" /tmp/status
+          sudo folio-sync info | grep -q "server:   https://folio-a.localhost"
+          sudo folio-sync restart
+          sleep 1
+          folio-sync status | grep -q "health: ok"
+          sudo folio-sync stop
+          ! systemctl is-active --quiet folio-sync
+          sudo folio-sync start
+          sleep 1
+          folio-sync status | grep -q "health: ok"
+          sudo folio-sync logs | tail -5
+
       - name: Running again upgrades and keeps the token
         run: |
           sudo ./scripts/install-server.sh --domain folio-a.localhost --binary target/release/folio-server --yes
-          test "$(sudo sed -n 's/^FOLIO_SERVER_TOKEN=//p' /etc/folio-server/env)" = "$(cat /tmp/token-before)"
-          test "$(grep -c 'folio-server (managed' /etc/caddy/Caddyfile)" = 1
+          test "$(sudo sed -n 's/^FOLIO_SERVER_TOKEN=//p' /opt/folio-sync/etc/folio-sync.env)" = "$(cat /tmp/token-before)"
+          test "$(grep -c 'folio-sync (managed' /etc/caddy/Caddyfile)" = 1
 
       - name: A Caddyfile with another site keeps it
         run: |
@@ -56,18 +79,27 @@ jobs:
           test "$(curl -fsSk https://other.localhost)" = "other site"
           ! grep -q folio-a.localhost /etc/caddy/Caddyfile
 
-      - name: Uninstall keeps the data and the other site
+      - name: Uninstall (by the command) keeps the data and the other site
         run: |
-          sudo ./scripts/install-server.sh --uninstall --yes
-          ! systemctl is-active --quiet folio-server
-          test ! -e /usr/local/bin/folio-server
-          sudo test -e /var/lib/folio-server/folio-server.db
-          ! grep -q 'folio-server (managed' /etc/caddy/Caddyfile
+          sudo folio-sync uninstall --yes
+          ! systemctl is-active --quiet folio-sync
+          test ! -e /usr/local/bin/folio-sync
+          test ! -e /opt/folio-sync/bin
+          sudo test -e /opt/folio-sync/data/folio-sync.db
+          ! grep -q 'folio-sync (managed' /etc/caddy/Caddyfile
           test "$(curl -fsSk https://other.localhost)" = "other site"
+
+      - name: Purge removes everything
+        run: |
+          sudo ./scripts/install-server.sh --domain folio-c.localhost --binary target/release/folio-server --yes
+          sudo folio-sync uninstall --purge --yes
+          test ! -e /opt/folio-sync
+          ! id folio-sync
 
       - name: Logs
         if: failure()
         run: |
-          sudo journalctl -u folio-server -n 50 --no-pager || true
+          sudo tail -n 50 /opt/folio-sync/logs/folio-sync.log || true
+          sudo journalctl -u folio-sync -n 50 --no-pager || true
           sudo journalctl -u caddy -n 50 --no-pager || true
           sudo cat /etc/caddy/Caddyfile || true

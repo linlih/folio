@@ -4,29 +4,41 @@
 #
 #   curl -fsSL https://raw.githubusercontent.com/linlih/folio/main/scripts/install-server.sh | sudo bash -s -- --domain sync.example.com
 #
-# Point the domain's DNS (A / AAAA record) at the machine first. Running it
-# again upgrades the server and keeps its token and data. Options:
+# Point the domain's DNS (A / AAAA record) at the machine first. Everything
+# goes under /opt/folio-sync (bin, etc, data, logs); the systemd service and
+# the management command are both called folio-sync:
+#
+#   folio-sync status | start | stop | restart | logs [-f] | info | upgrade | uninstall
+#
+# Running the script again (or `folio-sync upgrade`) upgrades the server and
+# keeps its token and data. Options:
 #
 #   --domain NAME     the address devices use (asked for when missing)
 #   --email ADDR      for Let's Encrypt notices (only when Caddy is set up new)
 #   --port N          local port of the server (default 8787)
 #   --version vX.Y.Z  a release instead of the latest
-#   --binary PATH     install this folio-server file instead of downloading
+#   --binary PATH     install this server file instead of downloading
 #   --no-caddy        do not touch Caddy (put your own proxy in front)
 #   --yes             answer yes to every question
 #   --uninstall       stop and remove the server (data kept; --purge too)
 set -euo pipefail
 
 REPO="linlih/folio"
-NAME="folio-server"
-BIN="/usr/local/bin/$NAME"
-DATA="/var/lib/$NAME"
-CONF_DIR="/etc/$NAME"
-ENV_FILE="$CONF_DIR/env"
+SCRIPT_URL="https://raw.githubusercontent.com/$REPO/main/scripts/install-server.sh"
+NAME="folio-sync"                     # the service, its user and the command
+HOME_DIR="/opt/$NAME"
+BIN="$HOME_DIR/bin/folio-server"
+CTL="$HOME_DIR/bin/$NAME"
+DATA="$HOME_DIR/data"
+CONF_DIR="$HOME_DIR/etc"
+ENV_FILE="$CONF_DIR/$NAME.env"
+LOGS="$HOME_DIR/logs"
+LOG_FILE="$LOGS/$NAME.log"
 UNIT="/etc/systemd/system/$NAME.service"
+LOGROTATE="/etc/logrotate.d/$NAME"
 CADDYFILE="/etc/caddy/Caddyfile"
-BEGIN_MARK="# >>> folio-server (managed by install-server.sh)"
-END_MARK="# <<< folio-server"
+BEGIN_MARK="# >>> folio-sync (managed by install-server.sh)"
+END_MARK="# <<< folio-sync"
 
 domain=""; email=""; port=8787; version="latest"; binary=""; caddy=1; yes=0; uninstall=0; purge=0
 installed_caddy=0
@@ -61,7 +73,7 @@ while [[ $# -gt 0 ]]; do
     --yes|-y) yes=1; shift ;;
     --uninstall) uninstall=1; shift ;;
     --purge) purge=1; shift ;;
-    -h|--help) sed -n '2,22p' "$0" 2>/dev/null || true; exit 0 ;;
+    -h|--help) sed -n '2,28p' "$0" 2>/dev/null || true; exit 0 ;;
     *) die "不认识的参数：$1" "unknown option: $1" ;;
   esac
 done
@@ -81,12 +93,13 @@ reload_caddy() {
 
 # ---- uninstall ----
 if [[ $uninstall -eq 1 ]]; then
-  step "停止并移除 folio-server" "Stopping and removing folio-server"
+  step "停止并移除 folio-sync" "Stopping and removing folio-sync"
   systemctl disable --now "$NAME" 2>/dev/null || true
-  rm -f "$UNIT" "$BIN"
+  rm -f "$UNIT" "$LOGROTATE" "/usr/local/bin/$NAME"
+  rm -rf "$HOME_DIR/bin"
   systemctl daemon-reload
   if caddy_managed && grep -qxF "$BEGIN_MARK" "$CADDYFILE"; then
-    if ask "从 Caddy 配置里删掉 folio-server 的站点？" "Remove the folio-server site from Caddy?"; then
+    if ask "从 Caddy 配置里删掉 folio-sync 的站点？" "Remove the folio-sync site from Caddy?"; then
       cp "$CADDYFILE" "$CADDYFILE.bak-$(date +%Y%m%d%H%M%S)"
       stripped="$(strip_block < "$CADDYFILE")"
       printf '%s\n' "$stripped" > "$CADDYFILE"
@@ -94,11 +107,11 @@ if [[ $uninstall -eq 1 ]]; then
     fi
   fi
   if [[ $purge -eq 1 ]]; then
-    rm -rf "$DATA" "$CONF_DIR"
+    rm -rf "$HOME_DIR"
     userdel "$NAME" 2>/dev/null || true
-    msg "已删除，包括数据和令牌。" "Removed, including its data and token."
+    msg "已删除，包括 $HOME_DIR 里的数据、令牌和日志。" "Removed, including the data, token and logs in $HOME_DIR."
   else
-    msg "已删除。数据在 $DATA，令牌在 $ENV_FILE（--purge 一起删除）。" "Removed. Data stays in $DATA and the token in $ENV_FILE (--purge removes them)."
+    msg "已删除。数据、令牌和日志留在 $HOME_DIR（--purge 一起删除）。" "Removed. The data, token and logs stay in $HOME_DIR (--purge removes them)."
   fi
   exit 0
 fi
@@ -137,23 +150,33 @@ esac
 tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
 if [[ -n "$binary" ]]; then
   step "使用本地的 $binary" "Using the local $binary"
-  cp "$binary" "$tmp/$NAME"
+  cp "$binary" "$tmp/server"
+  release="local"
 else
-  file="$NAME-$arch-linux"
-  if [[ "$version" == latest ]]; then base="https://github.com/$REPO/releases/latest/download"; else base="https://github.com/$REPO/releases/download/$version"; fi
+  file="folio-server-$arch-linux"
+  if [[ "$version" == latest ]]; then
+    # The tag "latest" stands for, to record which version is installed.
+    release="$(curl -fsSLI -o /dev/null -w '%{url_effective}' "https://github.com/$REPO/releases/latest" 2>/dev/null | sed 's#.*/##')"
+    base="https://github.com/$REPO/releases/latest/download"
+  else
+    release="$version"
+    base="https://github.com/$REPO/releases/download/$version"
+  fi
   step "下载 $file（$version）" "Downloading $file ($version)"
   curl -fL --retry 3 -o "$tmp/$file" "$base/$file" || die "下载失败：$base/$file" "download failed: $base/$file"
   curl -fsSL --retry 3 -o "$tmp/$file.sha256" "$base/$file.sha256" || die "下载校验文件失败" "could not download the checksum"
   (cd "$tmp" && sha256sum -c --quiet "$file.sha256") || die "校验和不对，已停止。" "checksum mismatch; stopped."
-  mv "$tmp/$file" "$tmp/$NAME"
+  mv "$tmp/$file" "$tmp/server"
 fi
-chmod 0755 "$tmp/$NAME"
+chmod 0755 "$tmp/server"
 
 # ---- user, data, token ----
 step "设置服务" "Setting up the service"
-id "$NAME" >/dev/null 2>&1 || useradd --system --home-dir "$DATA" --shell /usr/sbin/nologin "$NAME"
-install -d -m 0750 -o "$NAME" -g "$NAME" "$DATA"
+id "$NAME" >/dev/null 2>&1 || useradd --system --no-create-home --home-dir "$DATA" --shell /usr/sbin/nologin "$NAME"
+# Root owns the program and its settings; the service writes only data and logs.
+install -d -m 0755 -o root -g root "$HOME_DIR" "$HOME_DIR/bin"
 install -d -m 0750 -o root -g "$NAME" "$CONF_DIR"
+install -d -m 0750 -o "$NAME" -g "$NAME" "$DATA" "$LOGS"
 token=""
 [[ -f "$ENV_FILE" ]] && token="$(sed -n 's/^FOLIO_SERVER_TOKEN=//p' "$ENV_FILE")"
 if [[ ${#token} -lt 16 ]]; then
@@ -164,14 +187,24 @@ else
 fi
 ( umask 027
 cat > "$ENV_FILE" <<EOF
-# folio-server settings (scripts/install-server.sh). Devices need the token.
+# folio-sync settings (scripts/install-server.sh). Devices need the token.
+# Change them with care, then: folio-sync restart
 FOLIO_SERVER_TOKEN=$token
 FOLIO_SERVER_ADDR=127.0.0.1:$port
-FOLIO_SERVER_DB=$DATA/folio-server.db
+FOLIO_SERVER_DB=$DATA/folio-sync.db
 FOLIO_DOMAIN=$domain
 EOF
 )
 chown root:"$NAME" "$ENV_FILE"; chmod 0640 "$ENV_FILE"
+
+# The log goes to a file under $LOGS (systemd 240+), rotated daily below;
+# older systemd keeps it in the journal.
+logging="StandardOutput=journal"
+if [[ "$(systemctl --version | awk 'NR==1{print $2}')" -ge 240 ]]; then
+  touch "$LOG_FILE"; chown "$NAME:$NAME" "$LOG_FILE"; chmod 0640 "$LOG_FILE"
+  logging="StandardOutput=append:$LOG_FILE
+StandardError=append:$LOG_FILE"
+fi
 
 cat > "$UNIT" <<EOF
 [Unit]
@@ -185,6 +218,8 @@ User=$NAME
 Group=$NAME
 EnvironmentFile=$ENV_FILE
 ExecStart=$BIN
+WorkingDirectory=$DATA
+$logging
 Restart=on-failure
 RestartSec=3
 NoNewPrivileges=true
@@ -195,7 +230,7 @@ PrivateDevices=true
 ProtectKernelTunables=true
 ProtectControlGroups=true
 RestrictSUIDSGID=true
-ReadWritePaths=$DATA
+ReadWritePaths=$DATA $LOGS
 
 [Install]
 WantedBy=multi-user.target
@@ -205,14 +240,99 @@ EOF
 if ! systemctl is-active --quiet "$NAME" && command -v ss >/dev/null && ss -ltnH "sport = :$port" | grep -q .; then
   die "端口 $port 已被占用，用 --port 换一个。" "port $port is taken; choose another with --port."
 fi
-install -m 0755 "$tmp/$NAME" "$BIN.new" && mv -f "$BIN.new" "$BIN"
+install -m 0755 "$tmp/server" "$BIN.new" && mv -f "$BIN.new" "$BIN"
+echo "$release" > "$HOME_DIR/VERSION"
+
+if [[ -d /etc/logrotate.d ]]; then
+  cat > "$LOGROTATE" <<EOF
+$LOGS/*.log {
+	daily
+	rotate 14
+	compress
+	delaycompress
+	missingok
+	notifempty
+	copytruncate
+}
+EOF
+fi
+
+# This script, kept for `folio-sync uninstall` (and offline upgrades).
+if [[ -f "$0" ]] && grep -q "install-server.sh" "$0" 2>/dev/null; then
+  install -m 0755 "$0" "$HOME_DIR/bin/install-server.sh"
+else
+  curl -fsSL --max-time 20 -o "$HOME_DIR/bin/install-server.sh" "$SCRIPT_URL" 2>/dev/null && chmod 0755 "$HOME_DIR/bin/install-server.sh" || true
+fi
+
+# ---- the management command ----
+cat > "$CTL" <<'CTL_EOF'
+#!/usr/bin/env bash
+# folio-sync: manages the Folio sync server (installed by install-server.sh).
+set -euo pipefail
+HOME_DIR=/opt/folio-sync
+ENV_FILE=$HOME_DIR/etc/folio-sync.env
+LOG_FILE=$HOME_DIR/logs/folio-sync.log
+SCRIPT_URL=https://raw.githubusercontent.com/linlih/folio/main/scripts/install-server.sh
+setting() { sed -n "s/^$1=//p" "$ENV_FILE"; }
+cmd="${1:-help}"
+case "$cmd" in
+  start|stop|restart|info|token|upgrade|uninstall)
+    [[ $EUID -eq 0 ]] || exec sudo "$0" "$@" ;;
+esac
+case "$cmd" in
+  start|stop|restart)
+    systemctl "$cmd" folio-sync
+    systemctl --no-pager --lines=0 status folio-sync || true ;;
+  status)
+    systemctl --no-pager --lines=5 status folio-sync || true
+    port="$(sed -n 's/^FOLIO_SERVER_ADDR=.*://p' "$ENV_FILE" 2>/dev/null || true)"
+    if curl -fsS --max-time 3 "http://127.0.0.1:${port:-8787}/health" >/dev/null 2>&1; then echo "health: ok"; else echo "health: not answering"; fi ;;
+  logs)
+    shift
+    if [[ -s "$LOG_FILE" || "${1:-}" == -f ]] && [[ -e "$LOG_FILE" ]]; then tail -n 100 "$@" "$LOG_FILE"; else journalctl -u folio-sync -n 100 --no-pager "$@"; fi ;;
+  info|token)
+    echo "version:  $(cat "$HOME_DIR/VERSION" 2>/dev/null || echo unknown)"
+    echo "server:   https://$(setting FOLIO_DOMAIN)"
+    echo "token:    $(setting FOLIO_SERVER_TOKEN)"
+    echo "listens:  $(setting FOLIO_SERVER_ADDR)"
+    echo "data:     $(setting FOLIO_SERVER_DB)"
+    echo "settings: $ENV_FILE"
+    echo "log:      $LOG_FILE" ;;
+  upgrade)
+    shift
+    port="$(sed -n 's/^FOLIO_SERVER_ADDR=.*://p' "$ENV_FILE")"
+    script="$(mktemp)"; trap 'rm -f "$script"' EXIT
+    curl -fsSL --max-time 30 -o "$script" "$SCRIPT_URL" || cp "$HOME_DIR/bin/install-server.sh" "$script"
+    bash "$script" --domain "$(setting FOLIO_DOMAIN)" --port "${port:-8787}" --yes "$@" ;;
+  uninstall)
+    shift
+    # A copy: the uninstall removes the original along with bin/.
+    script="$(mktemp)"; trap 'rm -f "$script"' EXIT
+    cp "$HOME_DIR/bin/install-server.sh" "$script" 2>/dev/null || curl -fsSL -o "$script" "$SCRIPT_URL"
+    bash "$script" --uninstall "$@" ;;
+  *)
+    cat <<USAGE
+Usage: folio-sync <command>
+  status            is it running and answering
+  start|stop|restart
+  logs [-f]         the last 100 lines (-f: keep following)
+  info              address, token, version and where things are
+  upgrade [--version vX.Y.Z]
+  uninstall [--purge]   remove (--purge: also the data, token and logs)
+USAGE
+    ;;
+esac
+CTL_EOF
+chmod 0755 "$CTL"
+ln -sfn "$CTL" "/usr/local/bin/$NAME"
+
 systemctl daemon-reload
 systemctl enable --quiet "$NAME"
 systemctl restart "$NAME"
 for _ in $(seq 1 20); do curl -fsS "http://127.0.0.1:$port/health" >/dev/null 2>&1 && break; sleep 0.5; done
 curl -fsS "http://127.0.0.1:$port/health" >/dev/null 2>&1 \
-  || { journalctl -u "$NAME" -n 20 --no-pager >&2 || true; die "服务没有启动，上面是日志。" "the server did not start; its log is above."; }
-msg "folio-server 已运行（127.0.0.1:$port）。" "folio-server is running (127.0.0.1:$port)."
+  || { tail -n 20 "$LOG_FILE" >&2 2>/dev/null || journalctl -u "$NAME" -n 20 --no-pager >&2 || true; die "服务没有启动，上面是日志。" "the server did not start; its log is above."; }
+msg "folio-sync 已运行（127.0.0.1:$port），安装在 $HOME_DIR。" "folio-sync is running (127.0.0.1:$port), installed in $HOME_DIR."
 
 # ---- Caddy ----
 block() {
@@ -266,7 +386,7 @@ if [[ $caddy -eq 1 ]]; then
         new="$(printf '%s\n' "$current" | strip_block)"$'\n\n'"$(block)"
         do_write=1
         if [[ "$(printf '%s\n' "$current" | awk -v b="$BEGIN_MARK" '$0==b{getline; print $1; exit}')" != "$domain" ]]; then
-          ask "把 Caddy 里 folio-server 的站点改为 $domain？" "Change the folio-server site in Caddy to $domain?" || do_write=0
+          ask "把 Caddy 里 folio-sync 的站点改为 $domain？" "Change the folio-sync site in Caddy to $domain?" || do_write=0
         fi
       elif grep -Eq "(^|[[:space:],])(https?://)?${domain//./\\.}([[:space:],:{]|$)" "$CADDYFILE"; then
         warn "$CADDYFILE 里已经有 $domain 的站点，没有改动。请确认它代理到 127.0.0.1:$port：" \
@@ -337,5 +457,9 @@ msg "完成。在 Folio 里打开 设置 → 同步 → 新建同步空间，填
 printf '  %-12s %s\n' "$(msg "服务器" "Server")" "$url"
 printf '  %-12s %s\n' "$(msg "服务器令牌" "Token")" "$token"
 if [[ $new_token -eq 0 ]]; then msg "（令牌沿用之前的，已加入的设备不受影响）" "(the token is the same as before; devices already syncing keep working)"; fi
-msg "令牌保存在 $ENV_FILE。再次运行本脚本即可升级。" "The token is kept in $ENV_FILE. Run this script again to upgrade."
+printf '\n'
+msg "管理：folio-sync status | start | stop | restart | logs -f | info | upgrade | uninstall" \
+    "Manage it with: folio-sync status | start | stop | restart | logs -f | info | upgrade | uninstall"
+msg "全部文件在 $HOME_DIR：bin/ 程序，etc/ 设置和令牌，data/ 数据，logs/ 日志（每天轮转，保留 14 天）。" \
+    "Everything is in $HOME_DIR: bin/ program, etc/ settings and token, data/ data, logs/ logs (rotated daily, 14 days kept)."
 [[ $reachable -eq 1 || $proxy_ready -eq 0 ]] || exit 1
