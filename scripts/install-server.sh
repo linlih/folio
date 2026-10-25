@@ -611,6 +611,9 @@ retire_bundled_caddy() {
 }
 
 proxy_ready=0
+# Where Caddy's log stands now: progress is read from here on.
+caddy_since="$(date '+%Y-%m-%d %H:%M:%S')"
+caddy_log_offset="$(stat -c %s "$LOGS/caddy.log" 2>/dev/null || echo 0)"
 if [[ $caddy -eq 1 ]]; then
   step "配置 HTTPS（Caddy）" "Setting up HTTPS (Caddy)"
   case "$caddy_mode" in
@@ -632,18 +635,95 @@ if [[ $caddy -eq 1 ]]; then
 fi
 
 # ---- check from outside ----
+# Caddy's own log tells what the certificate is waiting for; its lines about
+# our domain are shown as they come, so a slow certificate does not look like
+# a hang.
+caddy_event() {
+  local line="$1" m err type retry attempt
+  m="$(sed -n 's/.*"msg":"\([^"]*\)".*/\1/p' <<<"$line")"
+  err="$(sed -n 's/.*"error":"\([^"]*\).*/\1/p' <<<"$line" | cut -c1-200)"
+  case "$m" in
+    "obtaining certificate") msg "开始申请证书" "requesting a certificate" ;;
+    "trying to solve challenge")
+      type="$(sed -n 's/.*"challenge_type":"\([^"]*\)".*/\1/p' <<<"$line")"
+      msg "正在验证域名归属（${type:-challenge}）" "proving the domain is ours (${type:-challenge})" ;;
+    "served key authentication"*) msg "证书机构已访问到这台服务器" "the certificate authority reached this server" ;;
+    "authorization finalized") msg "域名验证通过" "domain verified" ;;
+    "validations succeeded; finalizing order") msg "验证通过，正在签发" "verified; issuing" ;;
+    "certificate obtained successfully") msg "证书已签发" "certificate issued" ;;
+    "challenge failed") msg "验证失败：$err" "challenge failed: $err" ;;
+    "could not get certificate from issuer") msg "这个证书机构没有签发（会换一个或稍后重试）：$err" "this issuer did not issue (another one or a retry follows): $err" ;;
+    "will retry")
+      retry="$(sed -n 's/.*"retrying_in":\([0-9.]*\).*/\1/p' <<<"$line")"; attempt="$(sed -n 's/.*"attempt":\([0-9]*\).*/\1/p' <<<"$line")"
+      msg "第 ${attempt:-?} 次没有成功，${retry%.*} 秒后重试" "attempt ${attempt:-?} failed; retrying in ${retry%.*} s" ;;
+    "job failed") msg "申请失败：$err" "failed: $err" ;;
+    *) [[ "$line" == *'"level":"error"'* ]] && msg "错误：$m $err" "error: $m $err" ;;
+  esac
+  return 0   # used in $(...) under set -e
+}
+
+# Why it failed, from Caddy's errors.
+certificate_hint() {
+  local errors="$1"
+  case "$errors" in
+    *"Timeout during connect"*|*"connection refused"*|*"Connection refused"*|*"timeout"*)
+      msg "证书机构连不上这台服务器的 80 端口：检查云服务商的安全组 / 防火墙是否放行 TCP 80。" \
+          "The certificate authority cannot reach port 80 on this server: check that your provider's security group / firewall allows TCP 80." ;;
+    *"NXDOMAIN"*|*"DNS problem"*|*"no valid A records"*)
+      msg "证书机构查不到域名的解析：等 DNS 生效，或检查 A / AAAA 记录（AAAA 记录指错也会失败）。" \
+          "The certificate authority cannot resolve the domain: wait for DNS, or check the A / AAAA records (a wrong AAAA record fails too)." ;;
+    *"rateLimited"*|*"too many"*)
+      msg "达到了证书机构的频率限制，需要等一段时间（通常一小时以内）再试。" \
+          "The certificate authority's rate limit was hit; wait a while (usually under an hour) and try again." ;;
+    *"unauthorized"*|*"Invalid response"*|*"403"*|*"404"*)
+      msg "证书机构访问到的不是这台 Caddy：可能有 CDN / 代理挡在前面，或者服务器在中国大陆而域名没有 ICP 备案（云服务商会拦截 80/443）。" \
+          "The certificate authority did not reach this Caddy: a CDN / proxy may sit in front, or the server is in mainland China and the domain has no ICP filing (providers block ports 80/443)." ;;
+  esac
+}
+
 reachable=0
 if [[ $proxy_ready -eq 1 ]]; then
-  step "等待 HTTPS 生效（首次申请证书可能要一分钟）" "Waiting for HTTPS (the first certificate can take a minute)"
+  step "等待 HTTPS 生效" "Waiting for HTTPS"
+  msg "首次申请证书通常需要 10–60 秒，下面是 Caddy 的进度。证书签发后会保存下来，以后不用再申请。" \
+      "The first certificate usually takes 10–60 seconds; Caddy's progress follows. Once issued it is kept, so this happens only once."
+  events="$tmp/caddy-events"; : > "$events"
+  if [[ $caddy_mode == bundled && -f "$LOGS/caddy.log" ]]; then
+    tail -c +"$((caddy_log_offset + 1))" -F "$LOGS/caddy.log" > "$events" 2>/dev/null &
+  else
+    unit="$shared_unit"; [[ $caddy_mode == bundled ]] && unit="$NAME-caddy"
+    [[ -n "$unit" ]] && journalctl -u "$unit" --since "$caddy_since" -f -o cat > "$events" 2>/dev/null &
+  fi
+  follower=$!
   curl_opts=(-fsS --max-time 10)
   [[ "$domain" == *.localhost ]] && curl_opts+=(-k)
-  for _ in $(seq 1 30); do
+  seen=0; quiet=0; started=$SECONDS; errors=""
+  while (( SECONDS - started < 180 )); do
     if curl "${curl_opts[@]}" "$url/health" >/dev/null 2>&1; then reachable=1; break; fi
+    new=0
+    while IFS= read -r line; do
+      seen=$((seen + 1))
+      [[ "$line" == *"$domain"* ]] || continue
+      said="$(caddy_event "$line")"
+      [[ -n "$said" ]] || continue
+      printf '  [%3ss] %s\n' "$((SECONDS - started))" "$said"
+      [[ "$line" == *'"error"'* ]] && errors+="$line"$'\n'
+      new=1
+    done < <(tail -n +"$((seen + 1))" "$events")
+    if (( new )); then quiet=0; else quiet=$((quiet + 1)); fi
+    if (( quiet > 0 && quiet % 5 == 0 )); then
+      printf '  [%3ss] %s\n' "$((SECONDS - started))" "$(msg "仍在等待…（随时可以 Ctrl-C，Caddy 会在后台继续申请）" "still waiting… (Ctrl-C is fine; Caddy keeps trying in the background)")"
+    fi
     sleep 3
   done
-  if [[ $reachable -eq 0 ]]; then
-    warn "还访问不到 $url/health。检查域名解析，云服务商安全组是否放行 80 和 $https_port 端口，以及 folio-sync logs caddy。" \
-         "$url/health is not reachable yet. Check the DNS record, that your provider's firewall allows ports 80 and $https_port, and folio-sync logs caddy."
+  kill "$follower" 2>/dev/null || true
+  if [[ $reachable -eq 1 ]]; then
+    msg "HTTPS 已可用：$url" "HTTPS works: $url"
+  else
+    warn "3 分钟内还没能访问 $url/health。Caddy 会在后台继续重试，可以用 folio-sync logs caddy -f 查看。" \
+         "$url/health is still not reachable after 3 minutes. Caddy keeps retrying in the background; watch it with folio-sync logs caddy -f."
+    [[ -n "$errors" ]] && certificate_hint "$errors"
+    msg "也请确认：域名解析到这台服务器，云服务商安全组放行 TCP 80 和 $https_port。" \
+        "Also check: the domain resolves to this server, and your provider's security group allows TCP 80 and $https_port."
   fi
 fi
 
