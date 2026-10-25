@@ -3,6 +3,8 @@ import type { AppInfo, BackupInfo, Backlink, BlockText, CardRow, JournalDay, Mcp
 import type { Backend, ExportResult } from "./backend";
 import type { LatestRelease, LibraryLocation, PickedFolder } from "../bindings/commands";
 
+const ANDROID = typeof navigator !== "undefined" && /Android/i.test(navigator.userAgent);
+
 export function tauriBackend(): Backend {
   return {
     kind: "tauri",
@@ -15,8 +17,10 @@ export function tauriBackend(): Backend {
       return bytes.byteLength === 0 ? null : bytes;
     },
     // Raw body plus headers: no JSON number array for binary data (§7.1).
+    // Android has no raw IPC body: Tauri sends JSON there, where a plain
+    // array is half the size of a Uint8Array's JSON object.
     applyUpdate: (id, kind, bytes) =>
-      invoke<void>("apply_update", bytes, { headers: { "x-doc-id": id, "x-doc-kind": kind } }),
+      invoke<void>("apply_update", ANDROID ? Array.from(bytes) : bytes, { headers: { "x-doc-id": id, "x-doc-kind": kind } }),
     trashCard: (id) => invoke<void>("trash_card", { id }),
     restoreCard: (id) => invoke<void>("restore_card", { id }),
     listTrash: (limit) => invoke<CardRow[]>("list_trash", { limit }),

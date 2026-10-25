@@ -216,15 +216,33 @@ fn journal_days(state: tauri::State<AppState>, from: String, to: String) -> CmdR
 
 /// Local edits from the frontend replica: the body is the raw Loro update,
 /// the document id and kind travel as headers.
+/// Binary data sent to a command. The desktop's IPC carries it as a raw body;
+/// Android's webview has no custom-protocol IPC, so Tauri sends the request
+/// as JSON and the bytes arrive as an array (what the frontend sends there),
+/// or as the object JSON makes of a Uint8Array.
+fn body_bytes(body: &InvokeBody) -> Option<std::borrow::Cow<'_, [u8]>> {
+    let byte = |v: &serde_json::Value| v.as_u64().filter(|n| *n < 256).map(|n| n as u8);
+    match body {
+        InvokeBody::Raw(bytes) => Some(std::borrow::Cow::Borrowed(bytes)),
+        InvokeBody::Json(serde_json::Value::Array(items)) => items.iter().map(byte).collect::<Option<Vec<u8>>>().map(Into::into),
+        InvokeBody::Json(serde_json::Value::Object(map)) => {
+            let mut out = vec![0u8; map.len()];
+            for (k, v) in map {
+                *out.get_mut(k.parse::<usize>().ok()?)? = byte(v)?;
+            }
+            Some(out.into())
+        }
+        _ => None,
+    }
+}
+
 #[tauri::command]
 fn apply_update(app: tauri::AppHandle, state: tauri::State<AppState>, request: Request<'_>) -> CmdResult<()> {
-    let InvokeBody::Raw(bytes) = request.body() else {
-        return Err(CommandError::Other("apply_update expects a raw body".into()));
-    };
+    let bytes = body_bytes(request.body()).ok_or_else(|| CommandError::Other("apply_update expects the update's bytes".into()))?;
     let header = |name: &str| request.headers().get(name).and_then(|v| v.to_str().ok()).map(str::to_owned);
     let id = DocId::parse(&header("x-doc-id").ok_or_else(|| CommandError::Other("missing x-doc-id".into()))?)?;
     let kind = header("x-doc-kind").and_then(|k| DocKind::parse(&k)).unwrap_or(DocKind::Card);
-    lock(&state)?.apply_update(&id, kind, bytes, Origin::Local, now_ms())?;
+    lock(&state)?.apply_update(&id, kind, &bytes, Origin::Local, now_ms())?;
     sync::poke(&app);
     Ok(())
 }
@@ -892,6 +910,21 @@ mod tests {
         Store::open(&old.join("data")).unwrap().create_card(CardKind::Note, "另一张", 2).unwrap();
         assert_eq!(adopt_legacy_app_dir(&new, &[OLD]), None);
         std::fs::remove_dir_all(&root).unwrap();
+    }
+
+    #[test]
+    fn update_bytes_arrive_raw_or_as_json() {
+        let raw = InvokeBody::Raw(vec![1, 2, 255]);
+        assert_eq!(body_bytes(&raw).as_deref(), Some(&[1u8, 2, 255][..]));
+        // Android: an array, or the object JSON.stringify makes of a Uint8Array.
+        let array = InvokeBody::Json(serde_json::json!([1, 2, 255]));
+        assert_eq!(body_bytes(&array).as_deref(), Some(&[1u8, 2, 255][..]));
+        let object = InvokeBody::Json(serde_json::json!({"2": 255, "0": 1, "1": 2}));
+        assert_eq!(body_bytes(&object).as_deref(), Some(&[1u8, 2, 255][..]));
+        // Not bytes: refused.
+        assert!(body_bytes(&InvokeBody::Json(serde_json::json!([1, 256]))).is_none());
+        assert!(body_bytes(&InvokeBody::Json(serde_json::json!({"0": 1, "5": 2}))).is_none());
+        assert!(body_bytes(&InvokeBody::Json(serde_json::json!("x"))).is_none());
     }
 
     /// A library as the app has it: open, at the default place.
