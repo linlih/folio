@@ -99,6 +99,6 @@ npm test
 - **CI** runs every test on each push to `main`.
 - **Releasing**: run `./scripts/release.sh 0.2.0 -m "What changed" --push`. It sets the version everywhere, commits, and pushes a tag whose message becomes the release notes. The tag builds and publishes the release: installers, signed update packages, `latest.json` (which installed apps check) and the Android APK. Details in `design/ARCHITECTURE.md` §7.3.
 - **Build apps** can also be run by hand from the Actions tab. It only builds, without publishing; the files stay in that run's artifacts for 14 days.
-- **iOS** builds are only compile-checked for now. Installing on an iPhone needs an Apple developer account and signing (§7.2).
+- **iOS** builds are only compile-checked for now. Installing on an iPhone needs an Apple developer account and signing (§7.2). To try it in the simulator: `npx tauri ios init` once, then copy `src-tauri/icons/ios/` into `src-tauri/gen/apple/Assets.xcassets/AppIcon.appiconset/` (the generated project has Tauri's placeholder icon), and `npx tauri ios build --target aarch64-sim`.
 
 Signing keys live in the repository secrets: `TAURI_SIGNING_PRIVATE_KEY` and its password for updates, `ANDROID_KEYSTORE_B64` and `ANDROID_KEYSTORE_PASSWORD` for the APK.

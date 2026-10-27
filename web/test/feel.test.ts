@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import { initCard } from "../src/docs/card";
 import { isRemoteTx, LoroBinding } from "../src/editor/binding";
 import { baseExtensions } from "../src/editor/extensions";
-import { continueAtEnd } from "../src/editor/outliner/feel";
+import { continueAtEnd, repairComposition } from "../src/editor/outliner/feel";
 import { blockSelection } from "../src/editor/outliner/selection";
 import { bind, caret, cursorAfter, cursorBefore, device, outline, press, settle, typeText } from "./helpers";
 
@@ -100,5 +100,53 @@ describe("input feel", () => {
     document.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
     expect(blockSelection(e.state)).toBeNull();
     expect(e.state.selection.empty).toBe(false);
+  });
+
+  it("puts a composition iOS moved out of an emptied list item back into it", async () => {
+    const e = await journal("<ul><li><p>above</p></li><li><p></p></li></ul><p>测试</p>");
+    const items: string[] = [];
+    e.state.doc.descendants((n) => void (n.type.name === "listItem" && items.push(n.attrs.bid)));
+    cursorAfter(e, "测试");
+    expect(repairComposition(e.view, items[1])).toBe(true);
+    expect(types(e)).toEqual(["bulletList"]);
+    const list = e.state.doc.firstChild!;
+    expect(Array.from({ length: list.childCount }, (_, i) => list.child(i).textContent)).toEqual(["above", "测试"]);
+    expect(caret(e)).toBe("测试|");
+    // Nothing to put back: the cursor's line is where it should be.
+    expect(repairComposition(e.view, items[1])).toBe(false);
+  });
+
+  it("puts a composition iOS moved into a new item back into the emptied one", async () => {
+    const e = await journal("<ul><li><p>above</p></li><li><p></p></li><li><p>你</p></li></ul>");
+    const items: string[] = [];
+    e.state.doc.descendants((n) => void (n.type.name === "listItem" && items.push(n.attrs.bid)));
+    cursorAfter(e, "你");
+    expect(repairComposition(e.view, items[1])).toBe(true);
+    const list = e.state.doc.firstChild!;
+    expect(Array.from({ length: list.childCount }, (_, i) => list.child(i).textContent)).toEqual(["above", "你"]);
+    expect(caret(e)).toBe("你|");
+    // An empty item the composition did not start in is left alone.
+    const f = await journal("<ul><li><p></p></li><li><p>你</p></li></ul>");
+    cursorAfter(f, "你");
+    expect(repairComposition(f.view, "elsewhere")).toBe(false);
+  });
+
+  it("drops the copy when the item iOS moved the composition out of kept it too", async () => {
+    const html = "<ul><li><p>above</p></li><li><p>你好</p></li><li><p>你好</p></li></ul>";
+    const e = await journal(html);
+    const items: string[] = [];
+    e.state.doc.descendants((n) => void (n.type.name === "listItem" && items.push(n.attrs.bid)));
+    // At the end of the last line.
+    e.commands.setTextSelection(e.state.doc.content.size - 3);
+    expect(repairComposition(e.view, items[1])).toBe(true);
+    const list = e.state.doc.firstChild!;
+    expect(Array.from({ length: list.childCount }, (_, i) => list.child(i).textContent)).toEqual(["above", "你好"]);
+    expect(caret(e)).toBe("你好|");
+    // Typed into the last item: two lines alike stay two lines.
+    const f = await journal(html);
+    const last: string[] = [];
+    f.state.doc.descendants((n) => void (n.type.name === "listItem" && last.push(n.attrs.bid)));
+    f.commands.setTextSelection(f.state.doc.content.size - 3);
+    expect(repairComposition(f.view, last[2])).toBe(false);
   });
 });

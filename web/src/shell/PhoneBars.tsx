@@ -139,6 +139,14 @@ function press(key: string, mods: { shift?: boolean; alt?: boolean; mod?: boolea
   );
 }
 
+/** Scrolls the focused editor's caret into its scroller. */
+function caretIntoView() {
+  const sel = document.getSelection();
+  const node = sel?.focusNode;
+  const el = node instanceof HTMLElement ? node : node?.parentElement;
+  if (el?.closest(".ProseMirror, input, textarea")) el.scrollIntoView({ block: "nearest" });
+}
+
 /** A row above the on-screen keyboard while an editor has the focus on a
  *  touch screen: outdent, indent, move the item, fold, and put the keyboard
  *  away. Taps on it do not take the focus, so the keyboard stays. */
@@ -154,8 +162,20 @@ export function KeyboardBar() {
       document.body.classList.toggle("phone-typing", on || (el instanceof HTMLElement && !!el.closest("input, textarea")));
     };
     const vv = window.visualViewport;
+    const root = document.documentElement;
     // The keyboard covers the bottom of the layout; the bar sits on it.
-    const place = () => vv && setBottom(Math.max(0, window.innerHeight - vv.height - vv.offsetTop));
+    // iOS does not shrink the page for the keyboard but scrolls all of it,
+    // top bar included, out of the way: the shell takes the height left
+    // instead, and the page stays where it is.
+    const place = () => {
+      if (!vv) return;
+      const covered = Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop));
+      setBottom(covered);
+      root.style.setProperty("--keyboard", `${covered}px`);
+      if (window.scrollY !== 0) window.scrollTo(0, 0);
+      // The line being typed on may now be under the keyboard.
+      if (covered > 0) caretIntoView();
+    };
     // After focus has moved on (focusout comes before the new focusin).
     const later = () => setTimeout(check);
     document.addEventListener("focusin", check);
@@ -171,6 +191,7 @@ export function KeyboardBar() {
       vv?.removeEventListener("resize", place);
       vv?.removeEventListener("scroll", place);
       document.body.classList.remove("phone-typing");
+      root.style.removeProperty("--keyboard");
     };
   }, []);
   if (!editing) return null;

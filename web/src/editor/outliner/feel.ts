@@ -4,10 +4,10 @@
 import { Extension, type Editor } from "@tiptap/core";
 import { Fragment, type Node as PMNode } from "@tiptap/pm/model";
 import { Plugin, PluginKey, TextSelection, type EditorState, type Transaction } from "@tiptap/pm/state";
-import { Decoration, DecorationSet } from "@tiptap/pm/view";
+import { Decoration, DecorationSet, type EditorView } from "@tiptap/pm/view";
 import i18n from "../../i18n";
 import { plainLine } from "./tasks";
-import { insertItems, isList, itemAt, visibleItems, type Item } from "./tree";
+import { insertItems, isItem, isList, itemAt, visibleItems, type Item } from "./tree";
 
 /** The Markdown shortcut just applied, with the transactions it caused
  *  (block ids for new blocks are added in a follow-up transaction, which
@@ -61,7 +61,7 @@ export const InputFeel = Extension.create<{ placeholder: string; outline: boolea
   name: "inputFeel",
   priority: 1050,
   addProseMirrorPlugins() {
-    return [shortcutPlugin(), linePlaceholder(this.options.placeholder)];
+    return [shortcutPlugin(), linePlaceholder(this.options.placeholder), compositionRepair()];
   },
   addOptions: () => ({ placeholder: "", outline: true }),
   addKeyboardShortcuts() {
@@ -196,4 +196,83 @@ function linePlaceholder(whole: string) {
       },
     },
   });
+}
+
+/** iOS's WebView, committing a composition that is all of a list item's
+ *  text, deletes the composed text first; the item's line is then empty
+ *  and WebKit moves it out of the item, into a new item after it or after
+ *  the list. The chosen characters land on a line of their own and the item
+ *  stays empty, or, when ProseMirror misses the deletion, keeps them too.
+ *  Put them back once the composition is over. (Safari keeps the line in
+ *  place.) */
+function compositionRepair() {
+  let item: string | null = null;
+  let pending: { bid: string; timer: ReturnType<typeof setTimeout> } | null = null;
+  const run = (view: EditorView) => {
+    if (!pending || view.composing) return;
+    clearTimeout(pending.timer);
+    const { bid } = pending;
+    pending = null;
+    if (!view.isDestroyed) repairComposition(view, bid);
+  };
+  return new Plugin({
+    key: new PluginKey("compositionRepair"),
+    props: {
+      handleDOMEvents: {
+        compositionstart(view) {
+          item = (itemAt(view.state.selection.$from)?.node.attrs.bid as string | undefined) ?? null;
+          return false;
+        },
+        compositionend(view) {
+          const bid = item;
+          item = null;
+          // After ProseMirror has read the committed text from the page.
+          if (bid) pending = { bid, timer: setTimeout(() => run(view), 50) };
+          return false;
+        },
+        // A key pressed right away (Enter, say) goes to the repaired line.
+        keydown(view) {
+          run(view);
+          return false;
+        },
+        beforeinput(view) {
+          run(view);
+          return false;
+        },
+      },
+    },
+  });
+}
+
+/** Moves the cursor's line back into the item `bid` when it sits right
+ *  after it, as the only content of the next item or after the list the
+ *  item ends, and the item was left empty or holding the same text. Keeps
+ *  the cursor where it was in the text. */
+export function repairComposition(view: { state: EditorState; dispatch(tr: Transaction): void }, bid: string): boolean {
+  const { state } = view;
+  const { $head } = state.selection;
+  const line = $head.parent;
+  if (!line.isTextblock || line.content.size === 0) return false;
+  const left = (n: PMNode | null | undefined): n is PMNode =>
+    isItem(n) &&
+    n!.attrs.bid === bid &&
+    n!.childCount === 1 &&
+    n!.firstChild!.isTextblock &&
+    (n!.firstChild!.content.size === 0 || n!.firstChild!.textContent === line.textContent);
+  // Replaces the text of the item at `at` with the line, which spans from..to.
+  const move = (from: number, to: number, at: number, target: PMNode) => {
+    const start = at + 2;
+    const tr = state.tr.delete(from, to).replaceWith(start, start + target.firstChild!.content.size, line.content);
+    view.dispatch(tr.setSelection(TextSelection.create(tr.doc, start + $head.parentOffset)));
+    return true;
+  };
+  const own = itemAt($head);
+  if (own && own.node.childCount === 1 && own.depth === $head.depth - 1) {
+    const before = state.doc.resolve(own.pos).nodeBefore;
+    if (left(before)) return move(own.pos, own.pos + own.node.nodeSize, own.pos - before.nodeSize, before);
+  }
+  const lineStart = $head.before();
+  const list = state.doc.resolve(lineStart).nodeBefore;
+  if (!list || !isList(list) || !left(list.lastChild)) return false;
+  return move(lineStart, lineStart + line.nodeSize, lineStart - 1 - list.lastChild.nodeSize, list.lastChild);
 }

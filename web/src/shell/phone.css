@@ -38,8 +38,11 @@
   color: white;
   box-shadow: 0 4px 14px rgb(0 0 0 / 0.18);
 }
-/* While typing, the keyboard and its bar take the bottom. */
+/* While typing, the keyboard and its bar take the bottom; the shell
+   keeps to what is left (--keyboard, from shell/PhoneBars.tsx). */
 body.phone-typing .phone-nav, body.phone-typing .phone-capture { display: none; }
+body.phone-typing .shell { height: calc(100% - var(--keyboard, 0px)); }
+body.phone-typing:has(.keyboard-bar) .shell { padding-bottom: 44px; }
 
 /* Keys the phone keyboard lacks, on top of it. */
 .keyboard-bar {

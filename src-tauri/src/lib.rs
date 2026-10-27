@@ -639,6 +639,34 @@ async fn export_markdown(
     Ok(Some(ExportResult { dir: dir.display().to_string(), cards: summary.cards, journals: summary.journals }))
 }
 
+/// iOS puts a bar with previous, next and done above the keyboard of any
+/// web page; the page has its own toolbar there (web/src/shell/PhoneBars.tsx).
+/// The bar is the web view's input accessory view: its content view answers
+/// none instead.
+#[cfg(target_os = "ios")]
+fn hide_keyboard_bar() {
+    use std::ffi::{c_char, c_void};
+    #[link(name = "objc")]
+    unsafe extern "C" {
+        fn objc_getClass(name: *const c_char) -> *mut c_void;
+        fn sel_registerName(name: *const c_char) -> *mut c_void;
+        fn class_replaceMethod(cls: *mut c_void, sel: *mut c_void, imp: *const c_void, types: *const c_char) -> *const c_void;
+    }
+    extern "C" fn none(_this: *mut c_void, _cmd: *mut c_void) -> *mut c_void {
+        std::ptr::null_mut()
+    }
+    // SAFETY: plain Objective-C runtime calls; the replacement has the
+    // signature of -[UIResponder inputAccessoryView] ("@@:").
+    unsafe {
+        let class = objc_getClass(c"WKContentView".as_ptr());
+        if class.is_null() {
+            tracing::warn!("no WKContentView; the keyboard keeps its bar");
+            return;
+        }
+        class_replaceMethod(class, sel_registerName(c"inputAccessoryView".as_ptr()), none as *const c_void, c"@@:".as_ptr());
+    }
+}
+
 /// The macOS menu: Tauri's default without "Close Window", so ⌘W reaches
 /// the page and closes a tab (web/src/shell/shortcuts.ts). The Edit items
 /// stay: copy, paste and the rest go through them on macOS.
@@ -813,6 +841,8 @@ pub fn run() {
             }
             #[cfg(target_os = "macos")]
             app.set_menu(app_menu(app.handle())?)?;
+            #[cfg(target_os = "ios")]
+            hide_keyboard_bar();
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
