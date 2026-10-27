@@ -979,6 +979,8 @@ pub fn run() {
             sync::sync_join,
             sync::sync_now,
             sync::sync_disable,
+            sync::sync_devices,
+            sync::sync_rename_device,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Folio");

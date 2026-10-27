@@ -7,6 +7,15 @@
 //! - `POST /v1/w/{workspace}/push` — encrypted updates → the new head
 //! - `GET  /v1/w/{workspace}/pull?after=N&limit=M` — updates after a cursor
 //! - `GET  /v1/w/{workspace}/live` — WebSocket; `Live { head }` on new data
+//! - `PUT  /v1/w/{workspace}/device` — this device's name (sealed)
+//! - `GET  /v1/w/{workspace}/devices` — the workspace's devices
+//! - `POST /v1/w/{workspace}/acks` — this device's versions of documents
+//!   (sealed), replacing what it reported before for each
+//! - `GET  /v1/w/{workspace}/acks?after=N&limit=M` — reports after a cursor
+//!
+//! Acknowledgements (`device_acks`, §5.3 compaction): after each sync a
+//! device reports, per changed document, the version it now has. History
+//! older than what every counted device has can be compacted.
 //!
 //! Every request carries `Authorization: Bearer <server token>` (the token
 //! the server was started with) and `X-Folio-Device: <device id>`.
@@ -51,6 +60,43 @@ pub struct PullResponse {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Live {
+    pub head: i64,
+}
+
+/// A device's name, sealed (only devices with the key can read it).
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct DeviceName {
+    pub name: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DeviceInfo {
+    pub device: String,
+    /// Sealed name (base64); None until the device sent one.
+    pub name: Option<String>,
+    pub first_seen: i64,
+    /// Its last request to the server.
+    pub last_seen: i64,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct DevicesResponse {
+    pub devices: Vec<DeviceInfo>,
+}
+
+/// One acknowledgement as pulled: the device's latest report for a document.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PulledAck {
+    pub seq: i64,
+    pub device: String,
+    pub doc: String,
+    pub blob: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AcksResponse {
+    pub acks: Vec<PulledAck>,
     pub head: i64,
 }
 

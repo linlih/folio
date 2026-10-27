@@ -5,6 +5,7 @@ import type { SyncStatus } from "../bindings/commands";
 import { CopyBlock } from "../mcp/McpDialogs";
 import { backend } from "../platform";
 import { useShell } from "../shell/tabs";
+import { DeviceList } from "./DeviceList";
 import { useSyncStatus } from "./status";
 import "./sync.css";
 
@@ -141,6 +142,7 @@ function Enabled({ status, onChange }: { status: SyncStatus; onChange: (s: SyncS
       </div>
       <CopyBlock label={t("sync.codeLabel")} text={status.code} />
       <p className="sync-hint">{t("sync.codeHint")}</p>
+      <DeviceList lastSync={status.lastSync} />
       <div className="sync-actions">
         {confirmStop ? (
           <>

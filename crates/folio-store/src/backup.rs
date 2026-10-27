@@ -139,12 +139,7 @@ impl Store {
     }
 
     fn backup_named(&self, dir: &Path, name: &str) -> Result<()> {
-        std::fs::create_dir_all(dir)?;
-        let path = dir.join(name);
-        // VACUUM INTO refuses an existing file.
-        let _ = std::fs::remove_file(&path);
-        self.conn.execute("VACUUM main INTO ?1", [path.to_string_lossy()])?;
-        Ok(())
+        vacuum_into(&self.conn, dir, name)
     }
 
     /// Makes a backup when the newest is older than a day; returns it if made.
@@ -180,6 +175,20 @@ impl Store {
             None => Ok(None),
         }
     }
+}
+
+fn vacuum_into(conn: &Connection, dir: &Path, name: &str) -> Result<()> {
+    std::fs::create_dir_all(dir)?;
+    let path = dir.join(name);
+    // VACUUM INTO refuses an existing file.
+    let _ = std::fs::remove_file(&path);
+    conn.execute("VACUUM main INTO ?1", [path.to_string_lossy()])?;
+    Ok(())
+}
+
+/// A safety backup before `store.db` migrates (opened, not yet a `Store`).
+pub(crate) fn backup_conn_before_upgrade(conn: &Connection, dir: &Path, now_ms: i64) -> Result<()> {
+    vacuum_into(conn, dir, &format!("{PREFIX}{now_ms}{UPGRADE_SUFFIX}.db"))
 }
 
 /// Asks for the whole library to be restored from `backup` at the next start

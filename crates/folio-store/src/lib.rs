@@ -43,6 +43,10 @@ pub enum StoreError {
 
 pub type Result<T> = std::result::Result<T, StoreError>;
 
+fn now_ms() -> i64 {
+    std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_millis() as i64).unwrap_or(0)
+}
+
 fn loro_err(e: impl std::fmt::Display) -> StoreError {
     StoreError::Loro(e.to_string())
 }
@@ -224,6 +228,9 @@ impl Store {
         conn.execute_batch("PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL; PRAGMA foreign_keys = ON;")?;
         let index_path: PathBuf = dir.join("index.db");
         conn.execute("ATTACH DATABASE ?1 AS idx", [index_path.to_string_lossy()])?;
+        if schema::has_pending_migrations(&conn)? {
+            backup::backup_conn_before_upgrade(&conn, &backup::backups_dir(dir), now_ms())?;
+        }
         let index_recreated = schema::migrate(&conn)?;
         let peer = Self::load_or_create_peer(&conn, "peer.rust")?;
         let mut store = Store { conn, docs: HashMap::new(), peer, dir: dir.to_path_buf() };
@@ -265,8 +272,9 @@ impl Store {
         doc.import(bytes).map_err(loro_err)?;
         let tx = self.conn.unchecked_transaction()?;
         tx.execute(
-            "INSERT INTO docs(doc_id, kind, snapshot, updated_at) VALUES (?1, ?2, NULL, ?3)
-             ON CONFLICT(doc_id) DO UPDATE SET updated_at = excluded.updated_at",
+            "INSERT INTO docs(doc_id, kind, snapshot, updated_at, changed)
+               VALUES (?1, ?2, NULL, ?3, (SELECT COALESCE(MAX(changed), 0) + 1 FROM docs))
+             ON CONFLICT(doc_id) DO UPDATE SET updated_at = excluded.updated_at, changed = excluded.changed",
             params![id.as_str(), kind.as_str(), now_ms],
         )?;
         tx.execute(
@@ -343,6 +351,48 @@ impl Store {
 
     pub fn set_sync_value(&self, key: &str, value: &[u8]) -> Result<()> {
         self.conn.execute("INSERT OR REPLACE INTO sync_state(key, value) VALUES (?1, ?2)", params![key, value])?;
+        Ok(())
+    }
+
+    /// Documents written after change number `after` (see `docs.changed`;
+    /// -1 for all), with their latest change number.
+    pub fn docs_changed_after(&self, after: i64) -> Result<Vec<(DocId, DocKind, i64)>> {
+        let mut stmt = self.conn.prepare_cached("SELECT doc_id, kind, changed FROM docs WHERE changed > ?1 ORDER BY changed")?;
+        let rows = stmt.query_map([after], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?, r.get::<_, i64>(2)?)))?;
+        let mut out = Vec::new();
+        for row in rows {
+            let (id, kind, changed) = row?;
+            let Some(kind) = DocKind::parse(&kind) else { continue };
+            out.push((DocId::parse(&id)?, kind, changed));
+        }
+        Ok(out)
+    }
+
+    /// The version this device has of a document (encoded version vector).
+    pub fn doc_version(&mut self, id: &DocId, kind: DocKind) -> Result<Vec<u8>> {
+        Ok(self.doc_mut(id, kind)?.oplog_vv().encode())
+    }
+
+    /// The version `device` last reported having of a document (§5.3
+    /// compaction); this device's own reports are kept here too.
+    pub fn device_ack(&self, id: &DocId, device: &str) -> Result<Option<Vec<u8>>> {
+        Ok(self
+            .conn
+            .query_row("SELECT version FROM device_acks WHERE doc_id = ?1 AND device_id = ?2", params![id.as_str(), device], |r| r.get(0))
+            .optional()?)
+    }
+
+    pub fn set_device_ack(&self, id: &DocId, device: &str, version: &[u8], at: i64) -> Result<()> {
+        self.conn.execute(
+            "INSERT OR REPLACE INTO device_acks(doc_id, device_id, version, at) VALUES (?1, ?2, ?3, ?4)",
+            params![id.as_str(), device, version, at],
+        )?;
+        Ok(())
+    }
+
+    /// Forgets every report (this device left the workspace).
+    pub fn clear_device_acks(&self) -> Result<()> {
+        self.conn.execute("DELETE FROM device_acks", [])?;
         Ok(())
     }
 
@@ -758,8 +808,7 @@ impl Store {
         };
         // A copy of the library as it was, before anything is rewritten.
         if !rows.is_empty() {
-            let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_millis() as i64).unwrap_or(0);
-            self.backup_before_upgrade(&backup::backups_dir(&self.dir), now)?;
+            self.backup_before_upgrade(&backup::backups_dir(&self.dir), now_ms())?;
         }
         let mut migrated = 0;
         for (id, updated_at) in rows {
@@ -912,6 +961,34 @@ mod tests {
         assert_eq!(s.card_summary(&id).unwrap().text, "来自另一台设备");
         let outbox: i64 = s.conn.query_row("SELECT count(*) FROM outbox", [], |r| r.get(0)).unwrap();
         assert_eq!(outbox, 1, "only the local creation is queued for upload");
+    }
+
+    #[test]
+    fn change_counter_migration_backs_up_and_counts_every_write() {
+        let dir = tempfile::tempdir().unwrap();
+        let (a, b) = {
+            let mut s = Store::open(dir.path()).unwrap();
+            let a = s.create_card(CardKind::Note, "A", 1).unwrap();
+            let b = s.create_card(CardKind::Note, "B", 2).unwrap();
+            // Back to layout 1, as a library from before the counter.
+            s.conn.execute_batch("DROP INDEX docs_by_changed; ALTER TABLE docs DROP COLUMN changed; PRAGMA user_version = 1;").unwrap();
+            (a, b)
+        };
+        let mut s = Store::open(dir.path()).unwrap();
+        let backups = backup::list_backups(&backup::backups_dir(dir.path())).unwrap();
+        assert_eq!(backups.iter().filter(|b| b.reason.as_deref() == Some("upgrade")).count(), 1);
+        let ids = |s: &Store, after| s.docs_changed_after(after).unwrap().into_iter().map(|(id, _, n)| (id, n)).collect::<Vec<_>>();
+        assert_eq!(ids(&s, -1).len(), 2, "existing documents start at 0");
+        assert!(ids(&s, 0).is_empty());
+        // Clocks may go back; the counter does not.
+        s.trash_card(&b, 0).unwrap();
+        s.trash_card(&a, -5).unwrap();
+        assert_eq!(ids(&s, 0), vec![(b.clone(), 1), (a.clone(), 2)]);
+        assert_eq!(ids(&s, 1), vec![(a, 2)]);
+        // Opening again migrates nothing and backs up nothing more.
+        drop(s);
+        Store::open(dir.path()).unwrap();
+        assert_eq!(backup::list_backups(&backup::backups_dir(dir.path())).unwrap().len(), backups.len());
     }
 
     #[test]

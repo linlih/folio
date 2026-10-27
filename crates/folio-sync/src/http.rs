@@ -5,7 +5,7 @@ use std::time::Duration;
 
 use crate::client::Transport;
 use crate::crypto::WrappedKey;
-use crate::protocol::{Live, PullResponse, PushItem, PushRequest, PushResponse, DEVICE_HEADER};
+use crate::protocol::{AcksResponse, DeviceInfo, DeviceName, DevicesResponse, Live, PullResponse, PushItem, PushRequest, PushResponse, DEVICE_HEADER};
 use crate::{Result, SyncError};
 
 /// Where and as whom: the server's address and token, the workspace, this
@@ -85,7 +85,15 @@ impl Http {
     }
 }
 
+fn json<T: serde::de::DeserializeOwned>(r: ureq::Response) -> Result<T> {
+    r.into_json().map_err(|e| SyncError::Protocol(e.to_string()))
+}
+
 impl Transport for Http {
+    fn device(&self) -> &str {
+        &self.device
+    }
+
     fn push(&self, items: &[PushItem]) -> Result<i64> {
         let resp: PushResponse = self
             .req("POST", "push")
@@ -104,5 +112,23 @@ impl Transport for Http {
             .map_err(err)?
             .into_json()
             .map_err(|e| SyncError::Protocol(e.to_string()))
+    }
+
+    fn set_device_name(&self, sealed: &[u8]) -> Result<()> {
+        self.req("PUT", "device").send_json(DeviceName { name: crate::crypto::b64(sealed) }).map_err(err)?;
+        Ok(())
+    }
+
+    fn devices(&self) -> Result<Vec<DeviceInfo>> {
+        Ok(json::<DevicesResponse>(self.req("GET", "devices").call().map_err(err)?)?.devices)
+    }
+
+    fn push_acks(&self, items: &[PushItem]) -> Result<()> {
+        self.req("POST", "acks").send_json(PushRequest { items: items.to_vec() }).map_err(err)?;
+        Ok(())
+    }
+
+    fn pull_acks(&self, after: i64, limit: u32) -> Result<AcksResponse> {
+        json(self.req("GET", "acks").query("after", &after.to_string()).query("limit", &limit.to_string()).call().map_err(err)?)
     }
 }

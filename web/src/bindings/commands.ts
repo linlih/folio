@@ -128,6 +128,17 @@ export interface SyncStatus {
   error: string | null;
 }
 
+/** A device of the sync workspace (src-tauri/src/sync.rs). */
+export interface SyncDevice {
+  id: string;
+  /** Null when it never sent one (or it cannot be opened). */
+  name: string | null;
+  thisDevice: boolean;
+  firstSeen: number;
+  /** Its last request to the server. */
+  lastSeen: number;
+}
+
 /** A #tag in use. */
 export interface TagInfo {
   /** Lower case: what tags are matched by. */

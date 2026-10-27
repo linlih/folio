@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { AppInfo, BackupInfo, Backlink, BlockText, CardRow, JournalDay, McpStatus, SearchHit, SyncStatus, TagInfo, TopicCount, CardText } from "../bindings/commands";
+import type { AppInfo, BackupInfo, Backlink, BlockText, CardRow, JournalDay, McpStatus, SearchHit, SyncDevice, SyncStatus, TagInfo, TopicCount, CardText } from "../bindings/commands";
 import type { Backend, ExportResult } from "./backend";
 import type { LatestRelease, LibraryLocation, PickedFolder } from "../bindings/commands";
 
@@ -67,5 +67,7 @@ export function tauriBackend(): Backend {
     syncJoin: (code, passphrase) => invoke<SyncStatus>("sync_join", { code, passphrase }),
     syncNow: () => invoke<void>("sync_now"),
     syncDisable: () => invoke<SyncStatus>("sync_disable"),
+    syncDevices: () => invoke<SyncDevice[]>("sync_devices"),
+    syncRenameDevice: (name) => invoke<SyncDevice[]>("sync_rename_device", { name }),
   };
 }

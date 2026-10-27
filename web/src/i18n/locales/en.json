@@ -410,7 +410,19 @@
     "codeHint": "The code holds the server address and token, not the passphrase. Share it only with your own devices.",
     "stop": "Stop syncing on this device",
     "stopConfirm": "Notes here stay, the server keeps its data, other devices are not affected.",
-    "openSettings": "Open sync settings"
+    "openSettings": "Open sync settings",
+    "devices": "Devices",
+    "devicesHint": "Every device that has synced with this space.",
+    "devicesError": "Could not load the devices: {{message}}",
+    "thisDevice": "This device",
+    "unnamed": "Unnamed device",
+    "rename": "Rename",
+    "renameSave": "Save",
+    "seenNow": "Synced just now",
+    "seenToday": "Last synced today at {{time}}",
+    "seenYesterday": "Last synced yesterday",
+    "seenDays_other": "Last synced {{count}} days ago",
+    "stale": "Not synced for over {{days}} days. Until it syncs again, sync history cannot be compacted."
   },
   "panel": {
     "title": "Details",

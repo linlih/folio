@@ -38,7 +38,17 @@ const STORE_MIGRATIONS: &[&str] = &[
      CREATE TABLE outbox (
        id INTEGER PRIMARY KEY AUTOINCREMENT, doc_id TEXT NOT NULL, bytes BLOB NOT NULL, at INTEGER NOT NULL
      );",
+    // 2: a counter that grows with every write to a document, unlike
+    // `updated_at` (a clock, which can go back): what sync reports go by.
+    "ALTER TABLE docs ADD COLUMN changed INTEGER NOT NULL DEFAULT 0;
+     CREATE INDEX docs_by_changed ON docs(changed);",
 ];
+
+/// Whether `store.db` has steps to run (and is not new).
+pub fn has_pending_migrations(conn: &Connection) -> rusqlite::Result<bool> {
+    let version: usize = conn.query_row("PRAGMA user_version", [], |r| r.get::<_, i64>(0))? as usize;
+    Ok(version > 0 && version < STORE_MIGRATIONS.len())
+}
 
 /// Bump whenever `INDEX_TABLES` changes.
 const INDEX_VERSION: i64 = 6;

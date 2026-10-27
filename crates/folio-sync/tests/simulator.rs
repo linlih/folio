@@ -19,7 +19,7 @@ use folio_core::{DocId, DocKind};
 use folio_store::{Origin, Store};
 use folio_sync::client::{Engine, Transport};
 use folio_sync::crypto::{Keys, WorkspaceKey};
-use folio_sync::protocol::{PullResponse, PushItem};
+use folio_sync::protocol::{AcksResponse, DeviceInfo, PullResponse, PushItem};
 use folio_sync::relay::Relay;
 
 const WS: &str = "sim-workspace";
@@ -47,11 +47,26 @@ struct Direct<'a> {
 }
 
 impl Transport for Direct<'_> {
+    fn device(&self) -> &str {
+        &self.device
+    }
     fn push(&self, items: &[PushItem]) -> folio_sync::Result<i64> {
         self.relay.push(WS, &self.device, items)
     }
     fn pull(&self, after: i64, limit: u32) -> folio_sync::Result<PullResponse> {
-        self.relay.pull(WS, after, limit)
+        self.relay.pull(WS, &self.device, after, limit)
+    }
+    fn set_device_name(&self, sealed: &[u8]) -> folio_sync::Result<()> {
+        self.relay.set_device_name(WS, &self.device, sealed)
+    }
+    fn devices(&self) -> folio_sync::Result<Vec<DeviceInfo>> {
+        self.relay.devices(WS, &self.device)
+    }
+    fn push_acks(&self, items: &[PushItem]) -> folio_sync::Result<()> {
+        self.relay.push_acks(WS, &self.device, items)
+    }
+    fn pull_acks(&self, after: i64, limit: u32) -> folio_sync::Result<AcksResponse> {
+        self.relay.pull_acks(WS, &self.device, after, limit)
     }
 }
 
@@ -222,7 +237,8 @@ fn step(devices: &mut [Device], relay: &Relay, engine: &Engine, rng: &mut Rng) {
         // Syncing.
         _ if devices[d].online => {
             let t = Direct { relay, device: devices[d].name.clone() };
-            engine.sync(&devices[d].store, &t).unwrap();
+            let r = engine.sync(&devices[d].store, &t).unwrap();
+            assert_eq!(r.acks_error, None);
         }
         _ => {}
     }
@@ -269,6 +285,29 @@ fn assert_converged(devices: &[Device]) -> usize {
     ids.len()
 }
 
+/// After two more rounds (one to report the settled versions, one to
+/// collect them), every device knows the version every other device has of
+/// every document: what compaction will go by.
+fn assert_acks_agree(devices: &[Device], relay: &Relay, engine: &Engine) {
+    for _ in 0..2 {
+        for d in devices {
+            engine.sync(&d.store, &Direct { relay, device: d.name.clone() }).unwrap();
+        }
+    }
+    for d in devices {
+        let mut s = d.store.lock().unwrap();
+        for c in s.live_cards().unwrap() {
+            let id = DocId::parse(&c.id).unwrap();
+            let vv = |b: &[u8]| loro::VersionVector::decode(b).unwrap();
+            let mine = vv(&s.doc_version(&id, DocKind::Card).unwrap());
+            for other in devices {
+                let theirs = s.device_ack(&id, &other.name).unwrap().map(|b| vv(&b));
+                assert_eq!(theirs.as_ref(), Some(&mine), "{}: {}'s report of {id}", d.name, other.name);
+            }
+        }
+    }
+}
+
 fn run(seed: u64, devices: usize, steps: usize) -> usize {
     let mut rng = Rng(seed);
     let relay = Relay::open_in_memory().unwrap();
@@ -283,7 +322,9 @@ fn run(seed: u64, devices: usize, steps: usize) -> usize {
         }
     }
     settle(&mut devices, &relay, &engine);
-    assert_converged(&devices)
+    let docs = assert_converged(&devices);
+    assert_acks_agree(&devices, &relay, &engine);
+    docs
 }
 
 #[test]

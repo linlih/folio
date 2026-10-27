@@ -1,5 +1,7 @@
 /* Sync settings (sync/SyncPanel.tsx); shares the AI access panel's pieces. */
-.sync { display: grid; gap: 10px; overflow-y: auto; }
+/* One column as wide as the panel: long values (the server address) are
+   cut, not let to widen it past a phone screen. */
+.sync { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; overflow-y: auto; }
 .sync-hint { margin: 0; color: var(--secondary); font-size: 13px; line-height: 1.55; }
 .sync-note { margin: 0; color: var(--muted); font-size: 12.5px; }
 .sync-field { display: flex; align-items: center; gap: 8px; font-size: 13px; }
@@ -19,3 +21,27 @@
 .sync-state { flex: 1; color: var(--text); font-size: 13px; }
 .sync-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-top: 4px; }
 .sync-actions .sync-note { margin-right: auto; }
+
+/* The workspace's devices (sync/DeviceList.tsx). */
+.sync-devices { display: grid; gap: 6px; margin-top: 6px; }
+.sync-device-list { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--border); }
+.sync-device { display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+.sync-device-head { display: flex; align-items: center; gap: 8px; min-height: 26px; }
+.sync-device-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
+.sync-device-head .mcp-state { margin-left: 0; }
+.sync-device-head .icon-button { width: 26px; height: 26px; margin-left: auto; color: var(--muted); }
+.sync-device-seen { color: var(--muted); font-size: 12.5px; }
+.sync-device-stale { color: #b5523f; font-size: 12.5px; }
+.sync-device-rename { display: flex; align-items: center; gap: 6px; }
+.sync-device-rename .button { flex: none; }
+.sync-device-rename input {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 8px;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  background: var(--paper);
+  color: var(--text);
+  font: 13px var(--font-ui);
+  outline: none;
+}

@@ -1,4 +1,4 @@
-import type { BackupInfo, McpStatus, SyncStatus, TagInfo, TopicCount, CardText } from "../bindings/commands";
+import type { BackupInfo, McpStatus, SyncDevice, SyncStatus, TagInfo, TopicCount, CardText } from "../bindings/commands";
 import type { LatestRelease, LibraryLocation, PickedFolder } from "../bindings/commands";
 import type { AppInfo, Backlink, BlockText, CardRow, DocKind, JournalDay, SearchHit } from "../bindings/commands";
 
@@ -94,6 +94,10 @@ export interface Backend {
   syncJoin(code: string, passphrase: string): Promise<SyncStatus>;
   syncNow(): Promise<void>;
   syncDisable(): Promise<SyncStatus>;
+  /** The workspace's devices, most recently seen first (asks the server). */
+  syncDevices(): Promise<SyncDevice[]>;
+  /** Names this device; empty goes back to the system's name. */
+  syncRenameDevice(name: string): Promise<SyncDevice[]>;
 }
 
 export interface ExportResult {

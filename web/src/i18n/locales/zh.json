@@ -410,7 +410,19 @@
     "codeHint": "同步码包含服务器地址和令牌，但不含口令。只发给你自己的设备。",
     "stop": "在此设备停止同步",
     "stopConfirm": "本机笔记保留，服务器上的数据也保留，其他设备不受影响。",
-    "openSettings": "打开同步设置"
+    "openSettings": "打开同步设置",
+    "devices": "设备",
+    "devicesHint": "所有和这个同步空间同步过的设备。",
+    "devicesError": "无法获取设备列表：{{message}}",
+    "thisDevice": "本机",
+    "unnamed": "未命名设备",
+    "rename": "重命名",
+    "renameSave": "保存",
+    "seenNow": "刚刚同步过",
+    "seenToday": "今天 {{time}} 同步过",
+    "seenYesterday": "昨天同步过",
+    "seenDays_other": "{{count}} 天前同步过",
+    "stale": "超过 {{days}} 天没有同步。它再次同步之前，同步历史无法压缩。"
   },
   "panel": {
     "title": "详情",

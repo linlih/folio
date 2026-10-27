@@ -13,7 +13,7 @@ use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use folio_sync::crypto::WrappedKey;
-use folio_sync::protocol::{Live, PushRequest, PushResponse, DEVICE_HEADER, MAX_PULL};
+use folio_sync::protocol::{DeviceName, DevicesResponse, Live, PushRequest, PushResponse, DEVICE_HEADER, MAX_PULL};
 use folio_sync::relay::Relay;
 use folio_sync::SyncError;
 use serde::Deserialize;
@@ -45,6 +45,9 @@ pub fn router(server: Arc<Server>) -> Router {
         .route("/v1/w/{ws}/push", post(push))
         .route("/v1/w/{ws}/pull", get(pull))
         .route("/v1/w/{ws}/live", get(live))
+        .route("/v1/w/{ws}/device", axum::routing::put(put_device))
+        .route("/v1/w/{ws}/devices", get(devices))
+        .route("/v1/w/{ws}/acks", get(pull_acks).post(push_acks))
         .route("/health", get(|| async { "ok" }))
         .layer(DefaultBodyLimit::max(BODY_LIMIT))
         .with_state(server)
@@ -136,9 +139,44 @@ struct PullQuery {
 }
 
 async fn pull(State(s): State<Arc<Server>>, Path(ws): Path<String>, headers: HeaderMap, Query(q): Query<PullQuery>) -> Result<Response, Failure> {
-    authorize(&s, &headers)?;
+    let device = authorize(&s, &headers)?;
     check_workspace(&ws)?;
-    let resp = blocking(move || s.relay.pull(&ws, q.after, q.limit.unwrap_or(MAX_PULL))).await?;
+    let resp = blocking(move || s.relay.pull(&ws, &device, q.after, q.limit.unwrap_or(MAX_PULL))).await?;
+    Ok(Json(resp).into_response())
+}
+
+/// Longest sealed device name accepted.
+const MAX_NAME: usize = 1024;
+
+async fn put_device(State(s): State<Arc<Server>>, Path(ws): Path<String>, headers: HeaderMap, Json(req): Json<DeviceName>) -> Result<StatusCode, Failure> {
+    let device = authorize(&s, &headers)?;
+    check_workspace(&ws)?;
+    let name = folio_sync::crypto::unb64(&req.name).map_err(Failure::from)?;
+    if name.len() > MAX_NAME {
+        return Err(Failure(StatusCode::PAYLOAD_TOO_LARGE, "device name too long".into()));
+    }
+    blocking(move || s.relay.set_device_name(&ws, &device, &name)).await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+async fn devices(State(s): State<Arc<Server>>, Path(ws): Path<String>, headers: HeaderMap) -> Result<Json<DevicesResponse>, Failure> {
+    let device = authorize(&s, &headers)?;
+    check_workspace(&ws)?;
+    let devices = blocking(move || s.relay.devices(&ws, &device)).await?;
+    Ok(Json(DevicesResponse { devices }))
+}
+
+async fn push_acks(State(s): State<Arc<Server>>, Path(ws): Path<String>, headers: HeaderMap, Json(req): Json<PushRequest>) -> Result<StatusCode, Failure> {
+    let device = authorize(&s, &headers)?;
+    check_workspace(&ws)?;
+    blocking(move || s.relay.push_acks(&ws, &device, &req.items)).await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+async fn pull_acks(State(s): State<Arc<Server>>, Path(ws): Path<String>, headers: HeaderMap, Query(q): Query<PullQuery>) -> Result<Response, Failure> {
+    let device = authorize(&s, &headers)?;
+    check_workspace(&ws)?;
+    let resp = blocking(move || s.relay.pull_acks(&ws, &device, q.after, q.limit.unwrap_or(MAX_PULL))).await?;
     Ok(Json(resp).into_response())
 }
 

@@ -12,7 +12,7 @@ use std::sync::Mutex;
 use rusqlite::{params, Connection, OptionalExtension};
 
 use crate::crypto::WrappedKey;
-use crate::protocol::{PullResponse, PulledItem, PushItem, MAX_PULL};
+use crate::protocol::{AcksResponse, DeviceInfo, PullResponse, PulledAck, PulledItem, PushItem, MAX_PULL};
 use crate::{Result, SyncError};
 
 const SCHEMA: &str = "
@@ -25,6 +25,20 @@ const SCHEMA: &str = "
     blob BLOB NOT NULL, at INTEGER NOT NULL
   );
   CREATE INDEX IF NOT EXISTS updates_by_workspace ON updates(workspace, seq);
+  CREATE TABLE IF NOT EXISTS devices (
+    workspace TEXT NOT NULL, device TEXT NOT NULL, name BLOB,
+    first_seen INTEGER NOT NULL, last_seen INTEGER NOT NULL,
+    PRIMARY KEY (workspace, device)
+  );
+  -- A device's latest report per document; a new report replaces the row
+  -- and so takes a new seq, which is what pulls go by.
+  CREATE TABLE IF NOT EXISTS acks (
+    seq INTEGER PRIMARY KEY AUTOINCREMENT,
+    workspace TEXT NOT NULL, device TEXT NOT NULL, doc TEXT NOT NULL,
+    blob BLOB NOT NULL, at INTEGER NOT NULL,
+    UNIQUE (workspace, device, doc)
+  );
+  CREATE INDEX IF NOT EXISTS acks_by_workspace ON acks(workspace, seq);
 ";
 
 pub struct Relay {
@@ -83,12 +97,23 @@ impl Relay {
         }
     }
 
+    /// Notes that `device` used the workspace now.
+    fn touch(conn: &Connection, workspace: &str, device: &str, at: i64) -> Result<()> {
+        conn.execute(
+            "INSERT INTO devices(workspace, device, first_seen, last_seen) VALUES (?1, ?2, ?3, ?3)
+             ON CONFLICT(workspace, device) DO UPDATE SET last_seen = excluded.last_seen",
+            params![workspace, device, at],
+        )?;
+        Ok(())
+    }
+
     /// Appends updates; returns the new head.
     pub fn push(&self, workspace: &str, device: &str, items: &[PushItem]) -> Result<i64> {
         let mut conn = self.conn();
         self.require(&conn, workspace)?;
         let tx = conn.transaction()?;
         let at = now_ms();
+        Self::touch(&tx, workspace, device, at)?;
         for item in items {
             let blob = crate::crypto::unb64(&item.blob)?;
             tx.execute(
@@ -101,9 +126,10 @@ impl Relay {
     }
 
     /// Updates after `after`, oldest first.
-    pub fn pull(&self, workspace: &str, after: i64, limit: u32) -> Result<PullResponse> {
+    pub fn pull(&self, workspace: &str, device: &str, after: i64, limit: u32) -> Result<PullResponse> {
         let conn = self.conn();
         self.require(&conn, workspace)?;
+        Self::touch(&conn, workspace, device, now_ms())?;
         let mut stmt = conn.prepare_cached(
             "SELECT seq, doc, device, blob FROM updates WHERE workspace = ?1 AND seq > ?2 ORDER BY seq LIMIT ?3",
         )?;
@@ -112,6 +138,69 @@ impl Relay {
         })?;
         let updates = rows.collect::<std::result::Result<Vec<_>, _>>()?;
         Ok(PullResponse { updates, head: Self::head_of(&conn, workspace)? })
+    }
+
+    /// Sets the device's sealed name.
+    pub fn set_device_name(&self, workspace: &str, device: &str, name: &[u8]) -> Result<()> {
+        let conn = self.conn();
+        self.require(&conn, workspace)?;
+        Self::touch(&conn, workspace, device, now_ms())?;
+        conn.execute("UPDATE devices SET name = ?3 WHERE workspace = ?1 AND device = ?2", params![workspace, device, name])?;
+        Ok(())
+    }
+
+    /// The workspace's devices, most recently seen first.
+    pub fn devices(&self, workspace: &str, device: &str) -> Result<Vec<DeviceInfo>> {
+        let conn = self.conn();
+        self.require(&conn, workspace)?;
+        Self::touch(&conn, workspace, device, now_ms())?;
+        let mut stmt = conn.prepare_cached(
+            "SELECT device, name, first_seen, last_seen FROM devices WHERE workspace = ?1 ORDER BY last_seen DESC, device",
+        )?;
+        let rows = stmt.query_map([workspace], |r| {
+            Ok(DeviceInfo {
+                device: r.get(0)?,
+                name: r.get::<_, Option<Vec<u8>>>(1)?.map(|n| crate::crypto::b64(&n)),
+                first_seen: r.get(2)?,
+                last_seen: r.get(3)?,
+            })
+        })?;
+        Ok(rows.collect::<std::result::Result<Vec<_>, _>>()?)
+    }
+
+    /// Stores the device's reports, each replacing its previous one for
+    /// that document.
+    pub fn push_acks(&self, workspace: &str, device: &str, items: &[PushItem]) -> Result<()> {
+        let mut conn = self.conn();
+        self.require(&conn, workspace)?;
+        let tx = conn.transaction()?;
+        let at = now_ms();
+        Self::touch(&tx, workspace, device, at)?;
+        for item in items {
+            let blob = crate::crypto::unb64(&item.blob)?;
+            tx.execute(
+                "INSERT OR REPLACE INTO acks(workspace, device, doc, blob, at) VALUES (?1, ?2, ?3, ?4, ?5)",
+                params![workspace, device, item.doc, blob, at],
+            )?;
+        }
+        tx.commit()?;
+        Ok(())
+    }
+
+    /// Reports after `after`, oldest first.
+    pub fn pull_acks(&self, workspace: &str, device: &str, after: i64, limit: u32) -> Result<AcksResponse> {
+        let conn = self.conn();
+        self.require(&conn, workspace)?;
+        Self::touch(&conn, workspace, device, now_ms())?;
+        let mut stmt = conn.prepare_cached(
+            "SELECT seq, device, doc, blob FROM acks WHERE workspace = ?1 AND seq > ?2 ORDER BY seq LIMIT ?3",
+        )?;
+        let rows = stmt.query_map(params![workspace, after, limit.clamp(1, MAX_PULL)], |r| {
+            Ok(PulledAck { seq: r.get(0)?, device: r.get(1)?, doc: r.get(2)?, blob: crate::crypto::b64(&r.get::<_, Vec<u8>>(3)?) })
+        })?;
+        let acks = rows.collect::<std::result::Result<Vec<_>, _>>()?;
+        let head = conn.query_row("SELECT COALESCE(MAX(seq), 0) FROM acks WHERE workspace = ?1", [workspace], |r| r.get(0))?;
+        Ok(AcksResponse { acks, head })
     }
 
     pub fn head(&self, workspace: &str) -> Result<i64> {

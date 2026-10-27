@@ -38,6 +38,61 @@ pub struct SyncSettings {
     pub device: String,
     /// The workspace key, base64.
     pub key: String,
+    /// This device's name in the device list; the computer's when empty.
+    #[serde(default)]
+    pub name: String,
+}
+
+/// A device of the workspace, for Settings → Sync.
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SyncDevice {
+    pub id: String,
+    pub name: Option<String>,
+    pub this_device: bool,
+    pub first_seen: i64,
+    /// Its last request to the server.
+    pub last_seen: i64,
+}
+
+/// Longest device name, in characters.
+const MAX_NAME: usize = 64;
+
+/// What the system calls this computer; the platform where there is no such
+/// name to read (phones), until the user names it.
+fn system_device_name() -> String {
+    #[cfg(target_os = "macos")]
+    if let Ok(out) = std::process::Command::new("/usr/sbin/scutil").args(["--get", "ComputerName"]).output() {
+        let name = String::from_utf8_lossy(&out.stdout).trim().to_owned();
+        if out.status.success() && !name.is_empty() {
+            return name;
+        }
+    }
+    #[cfg(target_os = "windows")]
+    if let Some(name) = std::env::var("COMPUTERNAME").ok().filter(|n| !n.trim().is_empty()) {
+        return name;
+    }
+    #[cfg(target_os = "linux")]
+    if let Some(name) = std::fs::read_to_string("/etc/hostname").ok().map(|n| n.trim().to_owned()).filter(|n| !n.is_empty()) {
+        return name;
+    }
+    match std::env::consts::OS {
+        "macos" => "Mac",
+        "ios" => "iPhone / iPad",
+        "android" => "Android",
+        "windows" => "Windows",
+        _ => "Linux",
+    }
+    .into()
+}
+
+fn device_name(s: &SyncSettings) -> String {
+    if s.name.trim().is_empty() { system_device_name() } else { s.name.clone() }
+}
+
+fn keys_of(s: &SyncSettings) -> Option<Keys> {
+    let key = crypto::unb64(&s.key).ok().and_then(|k| <[u8; 32]>::try_from(k).ok())?;
+    Some(Keys::derive(&WorkspaceKey(key)))
 }
 
 #[derive(Clone, Debug, Default, Serialize)]
@@ -121,8 +176,8 @@ pub(crate) fn stop(app: &tauri::AppHandle) {
 
 fn start(app: &tauri::AppHandle, settings: SyncSettings) {
     stop(app);
-    let key = match crypto::unb64(&settings.key).ok().and_then(|k| <[u8; 32]>::try_from(k).ok()) {
-        Some(k) => WorkspaceKey(k),
+    let keys = match keys_of(&settings) {
+        Some(k) => k,
         None => {
             tracing::error!("sync settings hold no usable key");
             return;
@@ -144,8 +199,9 @@ fn start(app: &tauri::AppHandle, settings: SyncSettings) {
     {
         let app = app.clone();
         let stop_flag = stop_flag.clone();
-        let engine = Engine::new(settings.workspace.clone(), Keys::derive(&key));
-        std::thread::Builder::new().name("sync".into()).spawn(move || run(app, engine, http, stop_flag, woken)).ok();
+        let engine = Engine::new(settings.workspace.clone(), keys);
+        let name = device_name(&settings);
+        std::thread::Builder::new().name("sync".into()).spawn(move || run(app, engine, http, name, stop_flag, woken)).ok();
     }
     *app.state::<SyncState>().running.lock().unwrap_or_else(|e| e.into_inner()) = Some(Running { stop: stop_flag, wake });
 }
@@ -170,9 +226,11 @@ fn listen(app: tauri::AppHandle, http: Http, stop: Arc<AtomicBool>, wake: mpsc::
     }
 }
 
-fn run(app: tauri::AppHandle, engine: Engine, http: Http, stop: Arc<AtomicBool>, woken: mpsc::Receiver<()>) {
+fn run(app: tauri::AppHandle, engine: Engine, http: Http, name: String, stop: Arc<AtomicBool>, woken: mpsc::Receiver<()>) {
     let mut wait = Duration::ZERO;
     let mut backoff = BACKOFF;
+    // The name goes up once per start, at the first sync that can send it.
+    let mut named = false;
     loop {
         match woken.recv_timeout(wait) {
             // Gather a burst of edits into one push.
@@ -188,10 +246,16 @@ fn run(app: tauri::AppHandle, engine: Engine, http: Http, stop: Arc<AtomicBool>,
         }
         update(&app, |st| st.syncing = true);
         let state = app.state::<AppState>();
+        if !named {
+            named = engine.set_device_name(&http, &name).map_err(|e| tracing::debug!(error = %e, "sending the device name failed")).is_ok();
+        }
         let result = engine.sync(&state.store, &http as &dyn Transport);
         let pending = lock(&state).ok().and_then(|s| s.outbox_len().ok()).unwrap_or(0);
         match result {
             Ok(report) => {
+                if let Some(e) = &report.acks_error {
+                    tracing::warn!(error = %e, "reporting versions failed");
+                }
                 backoff = BACKOFF;
                 wait = POLL;
                 if !report.applied.is_empty() {
@@ -273,7 +337,7 @@ pub async fn sync_create(app: tauri::AppHandle, server: String, token: String, p
     })
     .await
     .map_err(other)??;
-    enable(&app, SyncSettings { server, token, workspace, device, key: key_b64 })
+    enable(&app, SyncSettings { server, token, workspace, device, key: key_b64, name: String::new() })
 }
 
 /// Another device: joins with the sync code and the passphrase.
@@ -288,7 +352,7 @@ pub async fn sync_join(app: tauri::AppHandle, code: String, passphrase: String) 
     })
     .await
     .map_err(other)??;
-    enable(&app, SyncSettings { server: code.server, token: code.token, workspace: code.workspace, device, key: crypto::b64(&key.0) })
+    enable(&app, SyncSettings { server: code.server, token: code.token, workspace: code.workspace, device, key: crypto::b64(&key.0), name: String::new() })
 }
 
 #[tauri::command]
@@ -306,7 +370,57 @@ pub fn sync_disable(app: tauri::AppHandle) -> CmdResult<SyncStatus> {
         let store = lock(&state)?;
         store.set_local_setting(SETTING, &serde_json::Value::Null)?;
         store.set_sync_value(folio_sync::client::CURSOR, &[])?;
+        // The next start is a new device: it reports everything again.
+        store.set_sync_value(folio_sync::client::ACKS_CURSOR, &[])?;
+        store.set_sync_value(folio_sync::client::ACKS_CHANGED, &[])?;
+        store.clear_device_acks()?;
     }
     update(&app, |st| *st = SyncStatus::default());
     Ok(current(&app))
+}
+
+/// The workspace's devices, most recently seen first (asks the server).
+#[tauri::command]
+pub async fn sync_devices(app: tauri::AppHandle) -> CmdResult<Vec<SyncDevice>> {
+    let settings = load(&app.state::<AppState>()).ok_or_else(|| other("sync is not set up"))?;
+    tauri::async_runtime::spawn_blocking(move || list_devices(&settings)).await.map_err(other)?
+}
+
+/// Names this device in the device list; empty goes back to the system's
+/// name.
+#[tauri::command]
+pub async fn sync_rename_device(app: tauri::AppHandle, name: String) -> CmdResult<Vec<SyncDevice>> {
+    let name = name.trim().to_owned();
+    if name.chars().count() > MAX_NAME {
+        return Err(other(format!("a device name has at most {MAX_NAME} characters")));
+    }
+    let mut settings = load(&app.state::<AppState>()).ok_or_else(|| other("sync is not set up"))?;
+    settings.name = name;
+    lock(&app.state::<AppState>())?.set_local_setting(SETTING, &serde_json::to_value(&settings).map_err(other)?)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let (engine, http) = connect(&settings)?;
+        engine.set_device_name(&http, &device_name(&settings)).map_err(|e| other(message(&e)))?;
+        list_devices(&settings)
+    })
+    .await
+    .map_err(other)?
+}
+
+fn connect(s: &SyncSettings) -> CmdResult<(Engine, Http)> {
+    let keys = keys_of(s).ok_or_else(|| other("sync settings hold no usable key"))?;
+    Ok((Engine::new(s.workspace.clone(), keys), Http::new(&s.server, &s.token, &s.workspace, &s.device)))
+}
+
+fn list_devices(s: &SyncSettings) -> CmdResult<Vec<SyncDevice>> {
+    let (engine, http) = connect(s)?;
+    let devices = engine.devices(&http).map_err(|e| other(message(&e)))?;
+    Ok(devices
+        .into_iter()
+        .map(|d| {
+            let this_device = d.id == s.device;
+            // Until the loop has sent it, this device's name is only here.
+            let name = if this_device { Some(device_name(s)) } else { d.name };
+            SyncDevice { id: d.id, name, this_device, first_seen: d.first_seen, last_seen: d.last_seen }
+        })
+        .collect())
 }

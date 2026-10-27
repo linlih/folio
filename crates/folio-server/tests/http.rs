@@ -100,4 +100,22 @@ fn two_stores_sync_through_the_server() {
     // Nothing more to do on either side.
     let quiet = engine.sync(&a, &ta).unwrap();
     assert_eq!((quiet.pushed, quiet.applied.len()), (0, 0));
+    assert_eq!(quiet.acks_error, None);
+
+    // Each knows the version the other has.
+    engine.sync(&b, &tb).unwrap();
+    engine.sync(&a, &ta).unwrap();
+    let vv = |b: Option<Vec<u8>>| b.map(|b| loro::VersionVector::decode(&b).unwrap());
+    let va = vv(Some(a.lock().unwrap().doc_version(&id, folio_core::DocKind::Card).unwrap()));
+    assert_eq!(vv(b.lock().unwrap().device_ack(&id, "device-a").unwrap()), va);
+    assert_eq!(vv(a.lock().unwrap().device_ack(&id, "device-b").unwrap()), va);
+
+    // Names are sealed; the list has both devices.
+    engine.set_device_name(&ta, "Lin 的 Mac").unwrap();
+    let devices = engine.devices(&tb).unwrap();
+    let names: Vec<_> = devices.iter().map(|d| (d.id.as_str(), d.name.as_deref())).collect();
+    assert!(names.contains(&("device-a", Some("Lin 的 Mac"))), "{names:?}");
+    assert!(names.contains(&("device-b", None)), "{names:?}");
+    let other = Engine::new("ws2", Keys::derive(&WorkspaceKey::generate()));
+    assert!(other.devices(&tb).unwrap().iter().all(|d| d.name.is_none()), "a wrong key opens no name");
 }

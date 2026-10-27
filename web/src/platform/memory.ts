@@ -248,5 +248,9 @@ export function memoryBackend(now: () => number = Date.now): Backend {
     syncDisable: async () => {
       throw new Error("not available in the browser");
     },
+    syncDevices: async () => [],
+    syncRenameDevice: async () => {
+      throw new Error("not available in the browser");
+    },
   };
 }

@@ -1,6 +1,8 @@
 //! The client side of sync (design/ARCHITECTURE.md §5.3): push the outbox
 //! (local updates, encrypted), pull what other devices pushed after the
-//! cursor, apply it through the store's single write path.
+//! cursor, apply it through the store's single write path; then report the
+//! versions this device now has and collect the other devices' reports
+//! (`device_acks`, which compaction goes by).
 //!
 //! The store lock is held only to read the outbox or to apply a batch, never
 //! across a network call, so editing goes on while a sync runs.
@@ -11,15 +13,21 @@ use folio_core::{DocId, DocKind};
 use folio_store::Store;
 
 use crate::crypto::{b64, unb64, Keys};
-use crate::protocol::{PullResponse, PushItem};
+use crate::protocol::{AcksResponse, DeviceInfo, PullResponse, PushItem};
 use crate::{Result, SyncError};
 
 /// The server's side of the conversation; HTTP in the app, the relay
 /// itself in the simulator.
 pub trait Transport {
+    /// The device the requests are made as.
+    fn device(&self) -> &str;
     /// Stores updates; returns the new head.
     fn push(&self, items: &[PushItem]) -> Result<i64>;
     fn pull(&self, after: i64, limit: u32) -> Result<PullResponse>;
+    fn set_device_name(&self, sealed: &[u8]) -> Result<()>;
+    fn devices(&self) -> Result<Vec<DeviceInfo>>;
+    fn push_acks(&self, items: &[PushItem]) -> Result<()>;
+    fn pull_acks(&self, after: i64, limit: u32) -> Result<AcksResponse>;
 }
 
 /// Updates sent per push.
@@ -28,6 +36,11 @@ const PUSH_BATCH: u32 = 200;
 const PULL_BATCH: u32 = 500;
 /// `sync_state` key of the pull cursor: the last sequence applied.
 pub const CURSOR: &str = "sync.cursor";
+/// `sync_state` key of the acks cursor: the last report collected.
+pub const ACKS_CURSOR: &str = "sync.acks.cursor";
+/// `sync_state` key: documents written after this change number
+/// (`docs.changed`) may have a version not yet reported.
+pub const ACKS_CHANGED: &str = "sync.acks.changed";
 
 /// An update from another device that changed a document here.
 #[derive(Clone, Debug)]
@@ -41,6 +54,18 @@ pub struct Report {
     pub pushed: usize,
     pub pulled: usize,
     pub applied: Vec<Applied>,
+    /// Reporting versions failed (the sync itself went through).
+    pub acks_error: Option<String>,
+}
+
+/// A device of the workspace, its name opened.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Device {
+    pub id: String,
+    /// None until it sent one, or if it cannot be opened.
+    pub name: Option<String>,
+    pub first_seen: i64,
+    pub last_seen: i64,
 }
 
 const ENVELOPE_VERSION: u8 = 1;
@@ -84,6 +109,20 @@ fn open_envelope(bytes: &[u8]) -> Result<(DocKind, DocId, &[u8])> {
     let id = bytes.get(4..4 + len).ok_or_else(|| SyncError::Protocol("short envelope".into()))?;
     let id = std::str::from_utf8(id).map_err(|e| SyncError::Protocol(e.to_string()))?;
     Ok((kind, DocId::parse(id).map_err(|e| SyncError::Protocol(e.to_string()))?, &bytes[4 + len..]))
+}
+
+fn read_i64(store: &Store, key: &str, default: i64) -> Result<i64> {
+    Ok(store.sync_value(key)?.and_then(|v| v.try_into().ok()).map(i64::from_le_bytes).unwrap_or(default))
+}
+
+/// What a report or a name is sealed with besides the workspace: bound to
+/// the device, so the server cannot pass one device's off as another's.
+fn ack_aad(tag: &str, device: &str) -> String {
+    format!("{tag}\nack\n{device}")
+}
+
+fn name_aad(device: &str) -> String {
+    format!("device\n{device}")
 }
 
 fn lock(store: &Mutex<Store>) -> std::sync::MutexGuard<'_, Store> {
@@ -165,19 +204,106 @@ impl Engine {
         }
     }
 
-    /// Push, then pull.
+    /// Reports the version this device has of each document written since
+    /// the last report; returns how many.
+    pub fn send_acks(&self, store: &Mutex<Store>, t: &dyn Transport) -> Result<usize> {
+        let device = t.device();
+        let (todo, newest) = {
+            let mut s = lock(store);
+            let after = read_i64(&s, ACKS_CHANGED, -1)?;
+            let mut todo = Vec::new();
+            let mut newest = after;
+            for (id, kind, changed) in s.docs_changed_after(after)? {
+                newest = newest.max(changed);
+                let version = s.doc_version(&id, kind)?;
+                // Encodings of one version can differ in peer order.
+                let sent = s.device_ack(&id, device)?.and_then(|v| loro::VersionVector::decode(&v).ok());
+                if sent != loro::VersionVector::decode(&version).ok() {
+                    todo.push((id, kind, version));
+                }
+            }
+            (todo, newest)
+        };
+        for chunk in todo.chunks(PUSH_BATCH as usize) {
+            let items: Vec<PushItem> = chunk
+                .iter()
+                .map(|(id, kind, version)| {
+                    let tag = self.keys.doc_tag(id.as_str());
+                    let blob = self.keys.seal(&self.workspace, &ack_aad(&tag, device), &envelope(*kind, id, version));
+                    PushItem { doc: tag, blob: b64(&blob) }
+                })
+                .collect();
+            t.push_acks(&items)?;
+            let s = lock(store);
+            for (id, _, version) in chunk {
+                s.set_device_ack(id, device, version, now_ms())?;
+            }
+        }
+        lock(store).set_sync_value(ACKS_CHANGED, &newest.to_le_bytes())?;
+        Ok(todo.len())
+    }
+
+    /// Collects the other devices' reports after the acks cursor; returns
+    /// how many. One that cannot be opened stops it, as in `pull`.
+    pub fn pull_acks(&self, store: &Mutex<Store>, t: &dyn Transport) -> Result<usize> {
+        let mut pulled = 0;
+        loop {
+            let cursor = read_i64(&lock(store), ACKS_CURSOR, 0)?;
+            let resp = t.pull_acks(cursor, PULL_BATCH)?;
+            let Some(last) = resp.acks.last().map(|a| a.seq) else { return Ok(pulled) };
+            let mut opened = Vec::with_capacity(resp.acks.len());
+            for a in resp.acks.iter().filter(|a| a.device != t.device()) {
+                let plain = self.keys.open(&self.workspace, &ack_aad(&a.doc, &a.device), &unb64(&a.blob)?)?;
+                opened.push((a.device.clone(), plain));
+            }
+            {
+                let s = lock(store);
+                for (device, plain) in &opened {
+                    let (_, doc, version) = open_envelope(plain)?;
+                    loro::VersionVector::decode(version).map_err(|e| SyncError::Protocol(format!("bad version: {e}")))?;
+                    s.set_device_ack(&doc, device, version, now_ms())?;
+                }
+                s.set_sync_value(ACKS_CURSOR, &last.to_le_bytes())?;
+            }
+            pulled += resp.acks.len();
+            if last >= resp.head {
+                return Ok(pulled);
+            }
+        }
+    }
+
+    /// Sends this device's name, sealed.
+    pub fn set_device_name(&self, t: &dyn Transport, name: &str) -> Result<()> {
+        t.set_device_name(&self.keys.seal(&self.workspace, &name_aad(t.device()), name.as_bytes()))
+    }
+
+    /// The workspace's devices, names opened.
+    pub fn devices(&self, t: &dyn Transport) -> Result<Vec<Device>> {
+        Ok(t.devices()?
+            .into_iter()
+            .map(|d| {
+                let name = d
+                    .name
+                    .and_then(|n| unb64(&n).ok())
+                    .and_then(|n| self.keys.open(&self.workspace, &name_aad(&d.device), &n).ok())
+                    .and_then(|n| String::from_utf8(n).ok());
+                Device { id: d.device, name, first_seen: d.first_seen, last_seen: d.last_seen }
+            })
+            .collect())
+    }
+
+    /// Push, pull, then exchange version reports. A failed report does not
+    /// fail the sync (an older server may not take them); it is in the
+    /// report.
     pub fn sync(&self, store: &Mutex<Store>, t: &dyn Transport) -> Result<Report> {
         let pushed = self.push(store, t)?;
         let (pulled, applied) = self.pull(store, t)?;
-        Ok(Report { pushed, pulled, applied })
+        let acks_error = self.send_acks(store, t).and_then(|_| self.pull_acks(store, t)).err().map(|e| e.to_string());
+        Ok(Report { pushed, pulled, applied, acks_error })
     }
 
     pub fn cursor(store: &Store) -> Result<i64> {
-        Ok(store
-            .sync_value(CURSOR)?
-            .and_then(|v| v.try_into().ok())
-            .map(i64::from_le_bytes)
-            .unwrap_or(0))
+        read_i64(store, CURSOR, 0)
     }
 }
 

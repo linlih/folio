@@ -1428,6 +1428,7 @@ dependencies = [
  "folio-core",
  "folio-store",
  "folio-sync",
+ "loro",
  "serde",
  "serde_json",
  "tempfile",
