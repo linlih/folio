@@ -12,6 +12,12 @@
 //! - `POST /v1/w/{workspace}/acks` — this device's versions of documents
 //!   (sealed), replacing what it reported before for each
 //! - `GET  /v1/w/{workspace}/acks?after=N&limit=M` — reports after a cursor
+//! - `DELETE /v1/w/{workspace}/devices/{device}` — removes another device;
+//!   its requests get 410 Gone from then on
+//! - `GET  /v1/w/{workspace}/heavy` — documents whose log is due for a
+//!   snapshot
+//! - `POST /v1/w/{workspace}/snapshot` — a document's full snapshot (sealed
+//!   like an update) covering its updates up to `covers`; those are deleted
 //!
 //! Acknowledgements (`device_acks`, §5.3 compaction): after each sync a
 //! device reports, per changed document, the version it now has. History
@@ -98,6 +104,31 @@ pub struct PulledAck {
 pub struct AcksResponse {
     pub acks: Vec<PulledAck>,
     pub head: i64,
+}
+
+/// A document whose log on the server is due for a snapshot.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct HeavyDoc {
+    pub doc: String,
+    pub updates: i64,
+    pub bytes: i64,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct HeavyResponse {
+    pub docs: Vec<HeavyDoc>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct SnapshotRequest {
+    pub item: PushItem,
+    /// The pusher has every update of the document up to this seq.
+    pub covers: i64,
+}
+
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+pub struct SnapshotResponse {
+    pub seq: i64,
 }
 
 /// Most updates a pull returns.

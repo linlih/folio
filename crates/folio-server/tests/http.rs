@@ -13,13 +13,17 @@ use folio_sync::SyncError;
 const TOKEN: &str = "test-token-0123456789";
 
 fn start() -> String {
+    start_with(Relay::open_in_memory().unwrap())
+}
+
+fn start_with(relay: Relay) -> String {
     let (tx, rx) = mpsc::channel();
     std::thread::spawn(move || {
         let rt = tokio::runtime::Runtime::new().unwrap();
         rt.block_on(async {
             let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
             tx.send(listener.local_addr().unwrap()).unwrap();
-            let server = folio_server::Server::new(Relay::open_in_memory().unwrap(), TOKEN);
+            let server = folio_server::Server::new(relay, TOKEN);
             axum::serve(listener, folio_server::router(server)).await.unwrap();
         });
     });
@@ -118,4 +122,49 @@ fn two_stores_sync_through_the_server() {
     assert!(names.contains(&("device-b", None)), "{names:?}");
     let other = Engine::new("ws2", Keys::derive(&WorkspaceKey::generate()));
     assert!(other.devices(&tb).unwrap().iter().all(|d| d.name.is_none()), "a wrong key opens no name");
+}
+
+/// A long log replaced by a snapshot; a device joining later starts from
+/// it; a removed device is refused.
+#[test]
+fn snapshots_and_removal_over_http() {
+    use folio_core::CardKind;
+    use folio_store::Store;
+    use folio_sync::client::Engine;
+    use folio_sync::crypto::Keys;
+    use std::sync::Mutex;
+
+    let base = start_with(Relay::open_in_memory().unwrap().with_snapshot_thresholds(3, 1 << 20));
+    let key = WorkspaceKey::generate();
+    let engine = Engine::new("ws3", Keys::derive(&key));
+    let dirs: Vec<_> = (0..3).map(|_| tempfile::tempdir().unwrap()).collect();
+    let stores: Vec<_> = dirs.iter().map(|d| Mutex::new(Store::open(d.path()).unwrap())).collect();
+    let t: Vec<_> = ["device-a", "device-b", "device-c"].iter().map(|d| Http::new(&base, TOKEN, "ws3", d)).collect();
+    t[0].put_key(&wrap(&key, "passphrase", (1024, 1, 1)).unwrap()).unwrap();
+
+    let id = stores[0].lock().unwrap().create_card(CardKind::Note, "长卡片", 1).unwrap();
+    for i in 0..5 {
+        stores[0].lock().unwrap().pin_card(&id, i % 2 == 0, 2 + i).unwrap();
+        engine.sync(&stores[0], &t[0]).unwrap();
+    }
+    engine.sync(&stores[1], &t[1]).unwrap();
+    assert_eq!(engine.upload_snapshots(&stores[1], &t[1]).unwrap(), 1, "B replaces the log of the card");
+    assert_eq!(engine.upload_snapshots(&stores[1], &t[1]).unwrap(), 0, "and then it is short");
+
+    // C joins now: the snapshot alone, not the six updates it replaced.
+    let pulled = t[2].pull(0, 100).unwrap();
+    assert_eq!(pulled.updates.len(), 1, "{:?}", pulled.updates.iter().map(|u| u.seq).collect::<Vec<_>>());
+    engine.sync(&stores[2], &t[2]).unwrap();
+    let a = stores[0].lock().unwrap().doc_version(&id, folio_core::DocKind::Card).unwrap();
+    let c = stores[2].lock().unwrap().doc_version(&id, folio_core::DocKind::Card).unwrap();
+    assert_eq!(loro::VersionVector::decode(&a).unwrap(), loro::VersionVector::decode(&c).unwrap());
+    assert_eq!(stores[2].lock().unwrap().card_summary(&id).unwrap().title, "长卡片");
+
+    // A removes C: C is refused, and gone from the list.
+    assert!(matches!(engine.remove_device(&t[0], "device-a"), Err(SyncError::Conflict(_))), "not itself");
+    engine.remove_device(&t[0], "device-c").unwrap();
+    assert!(matches!(engine.sync(&stores[2], &t[2]), Err(SyncError::Removed)));
+    assert!(matches!(engine.devices(&t[2]), Err(SyncError::Removed)));
+    assert!(engine.devices(&t[0]).unwrap().iter().all(|d| d.id != "device-c"));
+    assert!(matches!(engine.remove_device(&t[0], "device-c"), Err(SyncError::NotFound(_))));
 }

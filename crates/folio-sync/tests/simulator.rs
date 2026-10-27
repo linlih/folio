@@ -17,9 +17,10 @@ use folio_core::body::{add_block, push_text, tree, TEXTBLOCKS};
 use folio_core::card::{init_card, CardKind};
 use folio_core::{DocId, DocKind};
 use folio_store::{Origin, Store};
-use folio_sync::client::{Engine, Transport};
+use folio_sync::client::{forget_workspace, Engine, Report, Transport};
+use folio_sync::SyncError;
 use folio_sync::crypto::{Keys, WorkspaceKey};
-use folio_sync::protocol::{AcksResponse, DeviceInfo, PullResponse, PushItem};
+use folio_sync::protocol::{AcksResponse, DeviceInfo, HeavyDoc, PullResponse, PushItem};
 use folio_sync::relay::Relay;
 
 const WS: &str = "sim-workspace";
@@ -68,6 +69,15 @@ impl Transport for Direct<'_> {
     fn pull_acks(&self, after: i64, limit: u32) -> folio_sync::Result<AcksResponse> {
         self.relay.pull_acks(WS, &self.device, after, limit)
     }
+    fn remove_device(&self, other: &str) -> folio_sync::Result<()> {
+        self.relay.remove_device(WS, &self.device, other)
+    }
+    fn heavy_docs(&self) -> folio_sync::Result<Vec<HeavyDoc>> {
+        self.relay.heavy_docs(WS, &self.device)
+    }
+    fn push_snapshot(&self, item: &PushItem, covers: i64) -> folio_sync::Result<i64> {
+        self.relay.push_snapshot(WS, &self.device, item, covers)
+    }
 }
 
 struct Device {
@@ -75,6 +85,8 @@ struct Device {
     store: Mutex<Store>,
     peer: u64,
     online: bool,
+    /// Times it joined again after being removed.
+    joins: usize,
     /// The editor's replicas, kept between edits like open cards.
     replicas: RefCell<HashMap<DocId, LoroDoc>>,
     _dir: tempfile::TempDir,
@@ -83,7 +95,7 @@ struct Device {
 impl Device {
     fn new(i: usize, rng: &mut Rng) -> Device {
         let dir = tempfile::tempdir().unwrap();
-        Device { name: format!("device-{i}"), store: Mutex::new(Store::open(dir.path()).unwrap()), peer: rng.next() >> 1, online: true, replicas: RefCell::default(), _dir: dir }
+        Device { name: format!("device-{i}"), store: Mutex::new(Store::open(dir.path()).unwrap()), peer: rng.next() >> 1, online: true, joins: 0, replicas: RefCell::default(), _dir: dir }
     }
 
     fn docs(&self) -> Vec<DocId> {
@@ -234,13 +246,50 @@ fn step(devices: &mut [Device], relay: &Relay, engine: &Engine, rng: &mut Rng) {
         }
         // Going offline or coming back.
         75..=79 => devices[d].online = !devices[d].online,
-        // Syncing.
+        // Syncing; now and then replacing long logs on the server with
+        // snapshots, or removing another device.
         _ if devices[d].online => {
+            sync(&mut devices[d], relay, engine);
             let t = Direct { relay, device: devices[d].name.clone() };
-            let r = engine.sync(&devices[d].store, &t).unwrap();
-            assert_eq!(r.acks_error, None);
+            if rng.chance(10) {
+                match engine.upload_snapshots(&devices[d].store, &t) {
+                    Ok(_) | Err(SyncError::Removed) => {}
+                    Err(e) => panic!("{}: snapshots: {e}", devices[d].name),
+                }
+            }
+            if rng.chance(1) {
+                let o = (d + 1 + rng.below(devices.len() - 1)) % devices.len();
+                match engine.remove_device(&t, &devices[o].name) {
+                    // Already removed, or this device itself was.
+                    Ok(()) | Err(SyncError::NotFound(_)) | Err(SyncError::Removed) => {}
+                    Err(e) => panic!("{}: removing {}: {e}", devices[d].name, devices[o].name),
+                }
+            }
         }
         _ => {}
+    }
+}
+
+/// One sync; a device that was removed joins again as a new one, its notes
+/// (and what it wrote offline) going up with its whole history.
+fn sync(device: &mut Device, relay: &Relay, engine: &Engine) -> Report {
+    let t = Direct { relay, device: device.name.clone() };
+    match engine.sync(&device.store, &t) {
+        Ok(r) => {
+            assert_eq!(r.acks_error, None);
+            r
+        }
+        Err(SyncError::Removed) => {
+            device.joins += 1;
+            device.name = format!("{}-again{}", device.name.split("-again").next().unwrap(), device.joins);
+            {
+                let mut s = device.store.lock().unwrap();
+                forget_workspace(&s).unwrap();
+                s.queue_everything(1).unwrap();
+            }
+            sync(device, relay, engine)
+        }
+        Err(e) => panic!("{}: sync: {e}", device.name),
     }
 }
 
@@ -251,9 +300,8 @@ fn settle(devices: &mut [Device], relay: &Relay, engine: &Engine) {
     }
     for _ in 0..10 {
         let mut quiet = true;
-        for d in devices.iter() {
-            let t = Direct { relay, device: d.name.clone() };
-            let r = engine.sync(&d.store, &t).unwrap();
+        for d in devices.iter_mut() {
+            let r = sync(d, relay, engine);
             quiet &= r.pushed == 0 && r.applied.is_empty();
         }
         if quiet {
@@ -310,7 +358,8 @@ fn assert_acks_agree(devices: &[Device], relay: &Relay, engine: &Engine) {
 
 fn run(seed: u64, devices: usize, steps: usize) -> usize {
     let mut rng = Rng(seed);
-    let relay = Relay::open_in_memory().unwrap();
+    // Low thresholds, so short runs replace logs with snapshots too.
+    let relay = Relay::open_in_memory().unwrap().with_snapshot_thresholds(10, 64 * 1024);
     let key = WorkspaceKey::generate();
     relay.create_workspace(WS, &folio_sync::crypto::wrap(&key, "test", (1024, 1, 1)).unwrap()).unwrap();
     let engine = Engine::new(WS, Keys::derive(&key));
@@ -322,8 +371,18 @@ fn run(seed: u64, devices: usize, steps: usize) -> usize {
         }
     }
     settle(&mut devices, &relay, &engine);
+    // A device that joins now starts from what is left on the server:
+    // snapshots and the updates after them.
+    let late = Device::new(devices.len(), &mut rng);
+    late.store.lock().unwrap().queue_everything(1).unwrap();
+    devices.push(late);
+    settle(&mut devices, &relay, &engine);
     let docs = assert_converged(&devices);
     assert_acks_agree(&devices, &relay, &engine);
+    let (updates, snapshots) = relay.log_stats(WS).unwrap();
+    assert!(snapshots > 0, "seed {seed}: no log was replaced ({updates} updates)");
+    let rejoined: usize = devices.iter().map(|d| d.joins).sum();
+    println!("seed {seed}: {docs} documents; server log {updates} updates + {snapshots} snapshots; {rejoined} rejoins after removal");
     docs
 }
 

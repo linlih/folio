@@ -30,6 +30,8 @@
 .sync-device-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
 .sync-device-head .mcp-state { margin-left: 0; }
 .sync-device-head .icon-button { width: 26px; height: 26px; margin-left: auto; color: var(--muted); }
+.sync-device-head .sync-device-remove { flex: none; margin-left: auto; padding: 2px 10px; font-size: 12.5px; }
+.sync-device-confirm { display: grid; gap: 6px; margin-top: 4px; }
 .sync-device-seen { color: var(--muted); font-size: 12.5px; }
 .sync-device-stale { color: #b5523f; font-size: 12.5px; }
 .sync-device-rename { display: flex; align-items: center; gap: 6px; }

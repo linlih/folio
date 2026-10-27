@@ -35,7 +35,7 @@ export function DeviceList({ lastSync }: { lastSync: number | null }) {
       {devices && (
         <ul className="sync-device-list">
           {devices.map((d) => (
-            <DeviceRow key={d.id} device={d} onRenamed={setDevices} />
+            <DeviceRow key={d.id} device={d} onChanged={setDevices} />
           ))}
         </ul>
       )}
@@ -43,9 +43,10 @@ export function DeviceList({ lastSync }: { lastSync: number | null }) {
   );
 }
 
-function DeviceRow({ device, onRenamed }: { device: SyncDevice; onRenamed: (d: SyncDevice[]) => void }) {
+function DeviceRow({ device, onChanged }: { device: SyncDevice; onChanged: (d: SyncDevice[]) => void }) {
   const { t } = useTranslation();
   const [editing, setEditing] = useState(false);
+  const [confirmRemove, setConfirmRemove] = useState(false);
   const [name, setName] = useState(device.name ?? "");
   const [error, setError] = useState<string | null>(null);
   const when = seen(device.lastSeen, Date.now());
@@ -65,10 +66,14 @@ function DeviceRow({ device, onRenamed }: { device: SyncDevice; onRenamed: (d: S
       (d) => {
         setEditing(false);
         setError(null);
-        onRenamed(d);
+        onChanged(d);
       },
       (e) => setError(String(e)),
     );
+  }
+
+  function remove() {
+    backend.syncRemoveDevice(device.id).then(onChanged, (e) => setError(String(e)));
   }
 
   return (
@@ -115,10 +120,28 @@ function DeviceRow({ device, onRenamed }: { device: SyncDevice; onRenamed: (d: S
               <Pencil size={13} />
             </button>
           )}
+          {!device.thisDevice && !confirmRemove && (
+            <button className="button sync-device-remove" onClick={() => setConfirmRemove(true)}>
+              {t("sync.removeDevice")}
+            </button>
+          )}
         </div>
       )}
       <span className="sync-device-seen">{seenText}</span>
       {stale && <span className="sync-device-stale">{t("sync.stale", { days: STALE_DAYS })}</span>}
+      {confirmRemove && (
+        <div className="sync-device-confirm">
+          <p className="sync-note">{t("sync.removeConfirm")}</p>
+          <div className="sync-actions">
+            <button className="button" onClick={() => setConfirmRemove(false)}>
+              {t("dialog.cancel")}
+            </button>
+            <button className="button danger" onClick={remove}>
+              {t("sync.removeDevice")}
+            </button>
+          </div>
+        </div>
+      )}
       {error && <p className="mcp-error">{error}</p>}
     </li>
   );

@@ -13,7 +13,7 @@ use folio_core::{DocId, DocKind};
 use folio_store::Store;
 
 use crate::crypto::{b64, unb64, Keys};
-use crate::protocol::{AcksResponse, DeviceInfo, PullResponse, PushItem};
+use crate::protocol::{AcksResponse, DeviceInfo, HeavyDoc, PullResponse, PushItem};
 use crate::{Result, SyncError};
 
 /// The server's side of the conversation; HTTP in the app, the relay
@@ -28,6 +28,11 @@ pub trait Transport {
     fn devices(&self) -> Result<Vec<DeviceInfo>>;
     fn push_acks(&self, items: &[PushItem]) -> Result<()>;
     fn pull_acks(&self, after: i64, limit: u32) -> Result<AcksResponse>;
+    fn remove_device(&self, other: &str) -> Result<()>;
+    fn heavy_docs(&self) -> Result<Vec<HeavyDoc>>;
+    /// Stores a document's snapshot covering its updates up to `covers`;
+    /// returns its seq.
+    fn push_snapshot(&self, item: &PushItem, covers: i64) -> Result<i64>;
 }
 
 /// Updates sent per push.
@@ -109,6 +114,17 @@ fn open_envelope(bytes: &[u8]) -> Result<(DocKind, DocId, &[u8])> {
     let id = bytes.get(4..4 + len).ok_or_else(|| SyncError::Protocol("short envelope".into()))?;
     let id = std::str::from_utf8(id).map_err(|e| SyncError::Protocol(e.to_string()))?;
     Ok((kind, DocId::parse(id).map_err(|e| SyncError::Protocol(e.to_string()))?, &bytes[4 + len..]))
+}
+
+/// Forgets this device's place in a workspace (it left, or was removed and
+/// joins again as a new device): cursors and reports start over. Its notes
+/// stay; joining queues their whole history again (`Store::queue_everything`).
+pub fn forget_workspace(store: &Store) -> Result<()> {
+    for key in [CURSOR, ACKS_CURSOR, ACKS_CHANGED] {
+        store.set_sync_value(key, &[])?;
+    }
+    store.clear_device_acks()?;
+    Ok(())
 }
 
 fn read_i64(store: &Store, key: &str, default: i64) -> Result<i64> {
@@ -270,6 +286,40 @@ impl Engine {
                 return Ok(pulled);
             }
         }
+    }
+
+    /// Replaces the server's log of each document it says is long with the
+    /// document's full snapshot (§5.3); returns how many. The snapshot holds
+    /// every update this device has applied, so it covers the server's log
+    /// up to the pull cursor. A document with an update still waiting for
+    /// another is left for later.
+    pub fn upload_snapshots(&self, store: &Mutex<Store>, t: &dyn Transport) -> Result<usize> {
+        let heavy = t.heavy_docs()?;
+        if heavy.is_empty() {
+            return Ok(0);
+        }
+        let (covers, docs) = {
+            let s = lock(store);
+            (Self::cursor(&s)?, s.all_docs()?)
+        };
+        let by_tag: std::collections::HashMap<String, (DocId, DocKind)> =
+            docs.into_iter().map(|(id, kind)| (self.keys.doc_tag(id.as_str()), (id, kind))).collect();
+        let mut sent = 0;
+        for h in heavy {
+            // Not here yet: it arrives with a later pull.
+            let Some((id, kind)) = by_tag.get(&h.doc) else { continue };
+            let Some(snapshot) = lock(store).settled_snapshot(id)? else { continue };
+            let blob = self.keys.seal(&self.workspace, &h.doc, &envelope(*kind, id, &snapshot));
+            t.push_snapshot(&PushItem { doc: h.doc.clone(), blob: b64(&blob) }, covers)?;
+            tracing::info!(doc = %id, updates = h.updates, bytes = h.bytes, snapshot = snapshot.len(), "replaced the server's log with a snapshot");
+            sent += 1;
+        }
+        Ok(sent)
+    }
+
+    /// Removes another device from the workspace.
+    pub fn remove_device(&self, t: &dyn Transport, other: &str) -> Result<()> {
+        t.remove_device(other)
     }
 
     /// Sends this device's name, sealed.

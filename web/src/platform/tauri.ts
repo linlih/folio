@@ -69,5 +69,6 @@ export function tauriBackend(): Backend {
     syncDisable: () => invoke<SyncStatus>("sync_disable"),
     syncDevices: () => invoke<SyncDevice[]>("sync_devices"),
     syncRenameDevice: (name) => invoke<SyncDevice[]>("sync_rename_device", { name }),
+    syncRemoveDevice: (id) => invoke<SyncDevice[]>("sync_remove_device", { id }),
   };
 }

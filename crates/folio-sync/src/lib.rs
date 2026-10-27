@@ -26,6 +26,8 @@ pub enum SyncError {
     Conflict(String),
     #[error("not authorized")]
     Unauthorized,
+    #[error("this device was removed from the workspace")]
+    Removed,
     #[error("network: {0}")]
     Network(String),
     #[error("database: {0}")]

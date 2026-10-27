@@ -26,6 +26,8 @@ const PUSH_DELAY: Duration = Duration::from_millis(800);
 /// Wait after a failed sync, doubling up to `MAX_BACKOFF`.
 const BACKOFF: Duration = Duration::from_secs(2);
 const MAX_BACKOFF: Duration = Duration::from_secs(60);
+/// How often the server is asked which logs to replace with snapshots.
+const SNAPSHOT_EVERY: Duration = Duration::from_secs(60 * 60);
 
 /// Kept in `local_settings`. The workspace key is stored here for now; the
 /// OS keychain comes later (§5.3).
@@ -135,6 +137,7 @@ fn message(e: &SyncError) -> String {
     match e {
         SyncError::Network(m) => format!("cannot reach the server ({m})"),
         SyncError::Unauthorized => "the server refused the token".into(),
+        SyncError::Removed => "another device removed this one from the sync space; stop syncing here and join again to go on".into(),
         e => e.to_string(),
     }
 }
@@ -231,6 +234,7 @@ fn run(app: tauri::AppHandle, engine: Engine, http: Http, name: String, stop: Ar
     let mut backoff = BACKOFF;
     // The name goes up once per start, at the first sync that can send it.
     let mut named = false;
+    let mut snapshots_at: Option<std::time::Instant> = None;
     loop {
         match woken.recv_timeout(wait) {
             // Gather a burst of edits into one push.
@@ -256,6 +260,14 @@ fn run(app: tauri::AppHandle, engine: Engine, http: Http, name: String, stop: Ar
                 if let Some(e) = &report.acks_error {
                     tracing::warn!(error = %e, "reporting versions failed");
                 }
+                if snapshots_at.is_none_or(|t| t.elapsed() >= SNAPSHOT_EVERY) {
+                    snapshots_at = Some(std::time::Instant::now());
+                    match engine.upload_snapshots(&state.store, &http as &dyn Transport) {
+                        Ok(n) if n > 0 => tracing::info!(docs = n, "replaced server logs with snapshots"),
+                        Ok(_) => {}
+                        Err(e) => tracing::warn!(error = %e, "uploading snapshots failed"),
+                    }
+                }
                 backoff = BACKOFF;
                 wait = POLL;
                 if !report.applied.is_empty() {
@@ -274,7 +286,8 @@ fn run(app: tauri::AppHandle, engine: Engine, http: Http, name: String, stop: Ar
             }
             Err(e) => {
                 tracing::warn!(error = %e, "sync failed");
-                wait = backoff;
+                // Removed for good: no use asking every few seconds.
+                wait = if matches!(e, SyncError::Removed) { MAX_BACKOFF } else { backoff };
                 backoff = (backoff * 2).min(MAX_BACKOFF);
                 update(&app, |st| {
                     st.syncing = false;
@@ -369,11 +382,8 @@ pub fn sync_disable(app: tauri::AppHandle) -> CmdResult<SyncStatus> {
     {
         let store = lock(&state)?;
         store.set_local_setting(SETTING, &serde_json::Value::Null)?;
-        store.set_sync_value(folio_sync::client::CURSOR, &[])?;
-        // The next start is a new device: it reports everything again.
-        store.set_sync_value(folio_sync::client::ACKS_CURSOR, &[])?;
-        store.set_sync_value(folio_sync::client::ACKS_CHANGED, &[])?;
-        store.clear_device_acks()?;
+        // The next start is a new device: cursors and reports start over.
+        folio_sync::client::forget_workspace(&store).map_err(|e| other(message(&e)))?;
     }
     update(&app, |st| *st = SyncStatus::default());
     Ok(current(&app))
@@ -400,6 +410,21 @@ pub async fn sync_rename_device(app: tauri::AppHandle, name: String) -> CmdResul
     tauri::async_runtime::spawn_blocking(move || {
         let (engine, http) = connect(&settings)?;
         engine.set_device_name(&http, &device_name(&settings)).map_err(|e| other(message(&e)))?;
+        list_devices(&settings)
+    })
+    .await
+    .map_err(other)?
+}
+
+/// Removes another device from the workspace; it can join again later as
+/// a new device.
+#[tauri::command]
+pub async fn sync_remove_device(app: tauri::AppHandle, id: String) -> CmdResult<Vec<SyncDevice>> {
+    let settings = load(&app.state::<AppState>()).ok_or_else(|| other("sync is not set up"))?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let (engine, http) = connect(&settings)?;
+        engine.remove_device(&http, &id).map_err(|e| other(message(&e)))?;
+        tracing::warn!(device = %id, "removed a device from the sync space");
         list_devices(&settings)
     })
     .await

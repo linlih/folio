@@ -422,7 +422,9 @@
     "seenToday": "今天 {{time}} 同步过",
     "seenYesterday": "昨天同步过",
     "seenDays_other": "{{count}} 天前同步过",
-    "stale": "超过 {{days}} 天没有同步。它再次同步之前，同步历史无法压缩。"
+    "stale": "超过 {{days}} 天没有同步。如果不再使用，可以移除。",
+    "removeDevice": "移除",
+    "removeConfirm": "移除后它不能再同步。之后还要用，就在那台设备上停止同步再重新加入，上面的笔记会合并回来。口令和密钥不会改变。"
   },
   "panel": {
     "title": "详情",

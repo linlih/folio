@@ -422,7 +422,9 @@
     "seenToday": "Last synced today at {{time}}",
     "seenYesterday": "Last synced yesterday",
     "seenDays_other": "Last synced {{count}} days ago",
-    "stale": "Not synced for over {{days}} days. Until it syncs again, sync history cannot be compacted."
+    "stale": "Not synced for over {{days}} days. If it is no longer used, remove it.",
+    "removeDevice": "Remove",
+    "removeConfirm": "It will no longer sync. To use it again, stop syncing on it and join again: its notes merge back. The passphrase and key stay the same."
   },
   "panel": {
     "title": "Details",

@@ -5,7 +5,7 @@ use std::time::Duration;
 
 use crate::client::Transport;
 use crate::crypto::WrappedKey;
-use crate::protocol::{AcksResponse, DeviceInfo, DeviceName, DevicesResponse, Live, PullResponse, PushItem, PushRequest, PushResponse, DEVICE_HEADER};
+use crate::protocol::{AcksResponse, DeviceInfo, DeviceName, DevicesResponse, HeavyDoc, HeavyResponse, Live, PullResponse, PushItem, PushRequest, PushResponse, SnapshotRequest, SnapshotResponse, DEVICE_HEADER};
 use crate::{Result, SyncError};
 
 /// Where and as whom: the server's address and token, the workspace, this
@@ -23,6 +23,7 @@ fn err(e: ureq::Error) -> SyncError {
     match e {
         ureq::Error::Status(401, _) => SyncError::Unauthorized,
         ureq::Error::Status(404, r) => SyncError::NotFound(r.into_string().unwrap_or_default()),
+        ureq::Error::Status(410, _) => SyncError::Removed,
         ureq::Error::Status(409, r) => SyncError::Conflict(r.into_string().unwrap_or_default()),
         ureq::Error::Status(code, r) => SyncError::Network(format!("{code}: {}", r.into_string().unwrap_or_default())),
         ureq::Error::Transport(t) => SyncError::Network(t.to_string()),
@@ -130,5 +131,18 @@ impl Transport for Http {
 
     fn pull_acks(&self, after: i64, limit: u32) -> Result<AcksResponse> {
         json(self.req("GET", "acks").query("after", &after.to_string()).query("limit", &limit.to_string()).call().map_err(err)?)
+    }
+
+    fn remove_device(&self, other: &str) -> Result<()> {
+        self.req("DELETE", &format!("devices/{other}")).call().map_err(err)?;
+        Ok(())
+    }
+
+    fn heavy_docs(&self) -> Result<Vec<HeavyDoc>> {
+        Ok(json::<HeavyResponse>(self.req("GET", "heavy").call().map_err(err)?)?.docs)
+    }
+
+    fn push_snapshot(&self, item: &PushItem, covers: i64) -> Result<i64> {
+        Ok(json::<SnapshotResponse>(self.req("POST", "snapshot").send_json(SnapshotRequest { item: item.clone(), covers }).map_err(err)?)?.seq)
     }
 }

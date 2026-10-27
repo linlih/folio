@@ -98,6 +98,8 @@ export interface Backend {
   syncDevices(): Promise<SyncDevice[]>;
   /** Names this device; empty goes back to the system's name. */
   syncRenameDevice(name: string): Promise<SyncDevice[]>;
+  /** Removes another device from the workspace. */
+  syncRemoveDevice(id: string): Promise<SyncDevice[]>;
 }
 
 export interface ExportResult {

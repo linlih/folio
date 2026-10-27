@@ -10,7 +10,7 @@
 //! snapshot would not carry that update.
 
 use loro::{ExportMode, LoroDoc};
-use folio_core::DocId;
+use folio_core::{DocId, DocKind};
 use rusqlite::{params, Connection};
 
 use crate::{loro_err, Result, Store, StoreError};
@@ -74,6 +74,36 @@ impl Store {
         Ok(true)
     }
 
+    /// Every document, for matching the server's opaque tags.
+    pub fn all_docs(&self) -> Result<Vec<(DocId, DocKind)>> {
+        let mut stmt = self.conn.prepare("SELECT doc_id, kind FROM docs ORDER BY doc_id")?;
+        let rows = stmt.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))?;
+        let mut out = Vec::new();
+        for row in rows {
+            let (id, kind) = row?;
+            let Some(kind) = DocKind::parse(&kind) else { continue };
+            out.push((DocId::parse(&id)?, kind));
+        }
+        Ok(out)
+    }
+
+    /// The document's full snapshot as stored, for the server to replace
+    /// its log with (§5.3); `None` while an update waits for another (the
+    /// snapshot would lack it). Checked to read back the same.
+    pub fn settled_snapshot(&mut self, id: &DocId) -> Result<Option<Vec<u8>>> {
+        let (doc, pending) = read_doc(&self.conn, id)?;
+        if pending {
+            return Ok(None);
+        }
+        let snapshot = doc.export(ExportMode::Snapshot).map_err(loro_err)?;
+        let check = LoroDoc::new();
+        check.import(&snapshot).map_err(loro_err)?;
+        if !same(&doc, &check) {
+            return Err(StoreError::Loro(format!("the snapshot of {id} does not read back the same")));
+        }
+        Ok(Some(snapshot))
+    }
+
     /// Folds one document's update log into its snapshot (see the module).
     pub fn compact_doc(&mut self, id: &DocId) -> Result<Compacted> {
         let rows: i64 = self.conn.query_row("SELECT count(*) FROM doc_updates WHERE doc_id = ?1", [id.as_str()], |r| r.get(0))?;
@@ -107,7 +137,6 @@ impl Store {
 #[cfg(test)]
 mod tests {
     use folio_core::card::{append_paragraph, CardKind};
-    use folio_core::DocKind;
 
     use super::*;
     use crate::Origin;
@@ -175,6 +204,7 @@ mod tests {
         assert!(s.apply_remote(&id, DocKind::Card, &other.export(ExportMode::updates(&v1)).unwrap(), 2).unwrap());
         assert_eq!(s.compact_doc(&id).unwrap(), Compacted::Pending);
         assert_eq!(rows(&s, &id), 2);
+        assert_eq!(s.settled_snapshot(&id).unwrap(), None, "no snapshot for the server either");
     }
 
     #[test]

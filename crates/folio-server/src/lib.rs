@@ -13,7 +13,7 @@ use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use folio_sync::crypto::WrappedKey;
-use folio_sync::protocol::{DeviceName, DevicesResponse, Live, PushRequest, PushResponse, DEVICE_HEADER, MAX_PULL};
+use folio_sync::protocol::{DeviceName, DevicesResponse, HeavyResponse, Live, PushRequest, PushResponse, SnapshotRequest, SnapshotResponse, DEVICE_HEADER, MAX_PULL};
 use folio_sync::relay::Relay;
 use folio_sync::SyncError;
 use serde::Deserialize;
@@ -47,6 +47,9 @@ pub fn router(server: Arc<Server>) -> Router {
         .route("/v1/w/{ws}/live", get(live))
         .route("/v1/w/{ws}/device", axum::routing::put(put_device))
         .route("/v1/w/{ws}/devices", get(devices))
+        .route("/v1/w/{ws}/devices/{device}", axum::routing::delete(remove_device))
+        .route("/v1/w/{ws}/heavy", get(heavy))
+        .route("/v1/w/{ws}/snapshot", post(push_snapshot))
         .route("/v1/w/{ws}/acks", get(pull_acks).post(push_acks))
         .route("/health", get(|| async { "ok" }))
         .layer(DefaultBodyLimit::max(BODY_LIMIT))
@@ -67,6 +70,7 @@ impl From<SyncError> for Failure {
             SyncError::NotFound(_) => StatusCode::NOT_FOUND,
             SyncError::Conflict(_) => StatusCode::CONFLICT,
             SyncError::Unauthorized => StatusCode::UNAUTHORIZED,
+            SyncError::Removed => StatusCode::GONE,
             SyncError::Protocol(_) | SyncError::Crypto(_) => StatusCode::BAD_REQUEST,
             _ => {
                 tracing::error!("relay: {e}");
@@ -166,6 +170,30 @@ async fn devices(State(s): State<Arc<Server>>, Path(ws): Path<String>, headers: 
     Ok(Json(DevicesResponse { devices }))
 }
 
+async fn remove_device(State(s): State<Arc<Server>>, Path((ws, other)): Path<(String, String)>, headers: HeaderMap) -> Result<StatusCode, Failure> {
+    let device = authorize(&s, &headers)?;
+    check_workspace(&ws)?;
+    blocking(move || s.relay.remove_device(&ws, &device, &other)).await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+async fn heavy(State(s): State<Arc<Server>>, Path(ws): Path<String>, headers: HeaderMap) -> Result<Json<HeavyResponse>, Failure> {
+    let device = authorize(&s, &headers)?;
+    check_workspace(&ws)?;
+    let docs = blocking(move || s.relay.heavy_docs(&ws, &device)).await?;
+    Ok(Json(HeavyResponse { docs }))
+}
+
+async fn push_snapshot(State(s): State<Arc<Server>>, Path(ws): Path<String>, headers: HeaderMap, Json(req): Json<SnapshotRequest>) -> Result<Json<SnapshotResponse>, Failure> {
+    let device = authorize(&s, &headers)?;
+    check_workspace(&ws)?;
+    let s2 = s.clone();
+    let ws2 = ws.clone();
+    let seq = blocking(move || s2.relay.push_snapshot(&ws2, &device, &req.item, req.covers)).await?;
+    let _ = s.channel(&ws).send(seq);
+    Ok(Json(SnapshotResponse { seq }))
+}
+
 async fn push_acks(State(s): State<Arc<Server>>, Path(ws): Path<String>, headers: HeaderMap, Json(req): Json<PushRequest>) -> Result<StatusCode, Failure> {
     let device = authorize(&s, &headers)?;
     check_workspace(&ws)?;
@@ -181,11 +209,15 @@ async fn pull_acks(State(s): State<Arc<Server>>, Path(ws): Path<String>, headers
 }
 
 async fn live(State(s): State<Arc<Server>>, Path(ws): Path<String>, headers: HeaderMap, upgrade: WebSocketUpgrade) -> Result<Response, Failure> {
-    authorize(&s, &headers)?;
+    let device = authorize(&s, &headers)?;
     check_workspace(&ws)?;
     let s2 = s.clone();
     let ws2 = ws.clone();
-    let head = blocking(move || s2.relay.head(&ws2)).await?;
+    let head = blocking(move || {
+        s2.relay.check_device(&ws2, &device)?;
+        s2.relay.head(&ws2)
+    })
+    .await?;
     let rx = s.channel(&ws).subscribe();
     Ok(upgrade.on_upgrade(move |socket| watch(socket, head, rx)))
 }

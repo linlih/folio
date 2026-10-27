@@ -981,6 +981,7 @@ pub fn run() {
             sync::sync_disable,
             sync::sync_devices,
             sync::sync_rename_device,
+            sync::sync_remove_device,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Folio");
