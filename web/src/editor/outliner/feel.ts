@@ -208,26 +208,36 @@ function linePlaceholder(whole: string) {
 function compositionRepair() {
   let item: string | null = null;
   let pending: { bid: string; timer: ReturnType<typeof setTimeout> } | null = null;
-  const run = (view: EditorView) => {
-    if (!pending || view.composing) return;
+  // The page scrolls to follow the stray line; it goes back once that is undone.
+  let scrolled: [Element, number][] = [];
+  // Tries the repair; an early try that finds nothing leaves the later ones.
+  const run = (view: EditorView, last = true) => {
+    if (!pending || view.composing || view.isDestroyed) return;
+    const repaired = repairComposition(view, pending.bid);
+    if (!repaired && !last) return;
     clearTimeout(pending.timer);
-    const { bid } = pending;
     pending = null;
-    if (!view.isDestroyed) repairComposition(view, bid);
+    if (repaired) for (const [el, top] of scrolled) el.scrollTop = top;
+    scrolled = [];
   };
   return new Plugin({
     key: new PluginKey("compositionRepair"),
     props: {
       handleDOMEvents: {
         compositionstart(view) {
+          scrolled = [];
           item = (itemAt(view.state.selection.$from)?.node.attrs.bid as string | undefined) ?? null;
           return false;
         },
         compositionend(view) {
           const bid = item;
           item = null;
-          // After ProseMirror has read the committed text from the page.
-          if (bid) pending = { bid, timer: setTimeout(() => run(view), 50) };
+          if (!bid) return false;
+          pending = { bid, timer: setTimeout(() => run(view), 50) };
+          // After ProseMirror has read the committed text from the page (a
+          // microtask its own handler, which runs after this one, queues),
+          // before the page is drawn; the timer is there if it is late.
+          queueMicrotask(() => queueMicrotask(() => run(view, false)));
           return false;
         },
         // A key pressed right away (Enter, say) goes to the repaired line.
@@ -235,7 +245,11 @@ function compositionRepair() {
           run(view);
           return false;
         },
-        beforeinput(view) {
+        beforeinput(view, event) {
+          // The commit starts by deleting the composed text.
+          if (item && (event as InputEvent).inputType === "deleteCompositionText" && !scrolled.length) {
+            for (let el = view.dom.parentElement; el; el = el.parentElement) if (el.scrollTop) scrolled.push([el, el.scrollTop]);
+          }
           run(view);
           return false;
         },
