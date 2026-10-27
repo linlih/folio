@@ -10,6 +10,7 @@
 //! edits, remote updates and imports all go through it (§3.1 invariant 1).
 
 pub mod backup;
+mod compact;
 mod schema;
 
 use std::collections::HashMap;
@@ -22,6 +23,7 @@ use rusqlite::{Connection, OptionalExtension, params};
 use serde::Serialize;
 
 pub use backup::{BackupInfo, CardVersion};
+pub use compact::Compacted;
 
 #[derive(Debug, thiserror::Error)]
 pub enum StoreError {

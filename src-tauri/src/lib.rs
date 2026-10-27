@@ -586,19 +586,56 @@ fn reveal_backups(app: tauri::AppHandle, state: tauri::State<AppState>) -> CmdRe
     app.opener().reveal_item_in_dir(&dir).map_err(|e| CommandError::Other(e.to_string()))
 }
 
-/// Makes the daily backup when one is due; checked at start and hourly.
+/// Makes the daily backup when one is due, then folds long update logs into
+/// snapshots; checked at start and hourly.
 fn auto_backup(app: tauri::AppHandle) {
     std::thread::spawn(move || loop {
         let state = app.state::<AppState>();
         let dir = backups_dir(&state);
-        match lock(&state).map(|s| s.backup_if_due(&dir, now_ms())) {
-            Ok(Ok(Some(info))) => tracing::info!(backup = %info.name, "automatic backup"),
-            Ok(Ok(None)) => {}
-            Ok(Err(e)) => tracing::error!(error = %e, "automatic backup failed"),
-            Err(e) => tracing::error!(error = %e, "automatic backup failed"),
+        let backed_up = match lock(&state).map(|s| s.backup_if_due(&dir, now_ms())) {
+            Ok(Ok(Some(info))) => {
+                tracing::info!(backup = %info.name, "automatic backup");
+                true
+            }
+            Ok(Ok(None)) => true,
+            Ok(Err(e)) => {
+                tracing::error!(error = %e, "automatic backup failed");
+                false
+            }
+            Err(e) => {
+                tracing::error!(error = %e, "automatic backup failed");
+                false
+            }
+        };
+        // Never compact without a recent backup to go back to.
+        if backed_up {
+            compact_logs(&state, &dir);
         }
         std::thread::sleep(std::time::Duration::from_secs(60 * 60));
     });
+}
+
+/// Folds each long update log, one document per lock so editing goes on.
+fn compact_logs(state: &AppState, dir: &std::path::Path) {
+    let ids = match lock(state).map(|s| s.docs_to_compact()) {
+        Ok(Ok(ids)) if !ids.is_empty() => ids,
+        Ok(Ok(_)) => return,
+        Ok(Err(e)) => return tracing::error!(error = %e, "listing documents to compact failed"),
+        Err(e) => return tracing::error!(error = %e, "listing documents to compact failed"),
+    };
+    match lock(state).map(|s| s.backup_before_first_compaction(dir, now_ms())) {
+        Ok(Ok(true)) => tracing::info!("backed up before the first compaction"),
+        Ok(Ok(false)) => {}
+        Ok(Err(e)) => return tracing::error!(error = %e, "backup before compaction failed"),
+        Err(e) => return tracing::error!(error = %e, "backup before compaction failed"),
+    }
+    for id in ids {
+        match lock(state).map(|mut s| s.compact_doc(&id)) {
+            Ok(Ok(_)) => {}
+            Ok(Err(e)) => tracing::error!(doc = %id, error = %e, "compaction failed"),
+            Err(e) => return tracing::error!(error = %e, "compaction failed"),
+        }
+    }
 }
 
 #[derive(Serialize)]
