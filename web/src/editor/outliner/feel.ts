@@ -156,24 +156,43 @@ export function continueAtEnd(editor: Editor, outline: boolean) {
   editor.view.focus();
 }
 
-/** The empty line the cursor is in shows a hint about `/`; an empty card
- *  shows its own placeholder on its first line instead. */
+/** True when the document has just this one line. */
+function onlyLine(doc: PMNode): boolean {
+  let lines = 0;
+  doc.descendants((node) => {
+    if (node.isTextblock) lines++;
+    return lines < 2 && !node.isTextblock;
+  });
+  return lines === 1;
+}
+
+/** The hint on an empty line: the editor's placeholder while the document
+ *  has one line, else the `/` hint on the cursor's line. Which line carries
+ *  it never depends on whether that line has text (the CSS shows it only on
+ *  an empty one): changing the line's attributes as its first character
+ *  arrives breaks an input method's composition in WebKit, leaving the
+ *  pinyin as text and the chosen characters on a new line. */
 function linePlaceholder(whole: string) {
   return new Plugin({
     key: new PluginKey("linePlaceholder"),
     props: {
       decorations(state) {
-        const { $head, empty } = state.selection;
         const doc = state.doc;
-        const docEmpty = doc.childCount === 1 && doc.textContent === "" && !!doc.firstChild && (doc.firstChild.isTextblock || doc.firstChild.textContent === "");
-        const line = $head.parent;
-        if (docEmpty && whole) {
-          const first = firstTextblock(doc);
-          if (first) return DecorationSet.create(doc, [Decoration.node(first.pos, first.pos + first.node.nodeSize, { class: "is-empty", "data-placeholder": whole })]);
+        const first = firstTextblock(doc);
+        if (whole && first && onlyLine(doc)) {
+          return DecorationSet.create(doc, [Decoration.node(first.pos, first.pos + first.node.nodeSize, { class: "line-placeholder", "data-placeholder": whole })]);
         }
-        if (!empty || !line.isTextblock || line.content.size > 0 || line.type.spec.code) return DecorationSet.empty;
+        const { $head } = state.selection;
+        const line = $head.parent;
+        if (!line.isTextblock || line.type.spec.code || $head.depth === 0) return DecorationSet.empty;
         const pos = $head.before();
-        return DecorationSet.create(doc, [Decoration.node(pos, pos + line.nodeSize, { class: "is-empty line-hint", "data-placeholder": i18n.t("editor.lineHint") })]);
+        return DecorationSet.create(doc, [Decoration.node(pos, pos + line.nodeSize, { class: "line-placeholder line-hint", "data-placeholder": i18n.t("editor.lineHint") })]);
+      },
+      // While composing, the first characters are already in the line but
+      // the browser still shows the empty line's break: hide the hint.
+      handleDOMEvents: {
+        compositionstart: (view) => void view.dom.classList.add("composing"),
+        compositionend: (view) => void view.dom.classList.remove("composing"),
       },
     },
   });

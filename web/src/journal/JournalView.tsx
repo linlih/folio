@@ -8,8 +8,9 @@ import type { Editor } from "@tiptap/core";
 import { CardEditor } from "../editor/CardEditor";
 import { belowText, continueAtEnd } from "../editor/outliner/feel";
 import { extractExtension } from "../editor/extract";
+import { openTag, TAG_STOP } from "../editor/tag";
+import { toSide, useShell } from "../shell/tabs";
 import { backend } from "../platform";
-import { useShell } from "../shell/tabs";
 import "./journal.css";
 
 const PAGE = 14;
@@ -264,11 +265,39 @@ function ReadOnlyDay({ text, onEdit, emptyLabel }: { text?: string; onEdit: () =
           const depth = line.length - line.replace(/^\t+/, "").length;
           return (
             <div key={i} className="journal-line" style={{ paddingLeft: `${1.1 + depth * 1.4}em` }}>
-              {line.slice(depth)}
+              <LineText text={line.slice(depth)} />
             </div>
           );
         })
       )}
     </div>
   );
+}
+
+/** Tags in the indexed text (`#name`) look and open as in the editor. */
+const TAG_IN_TEXT = new RegExp(`(^|\\s)#([^${TAG_STOP}]+)`, "g");
+
+function LineText({ text }: { text: string }) {
+  const parts: React.ReactNode[] = [];
+  let at = 0;
+  for (const m of text.matchAll(TAG_IN_TEXT)) {
+    const start = m.index + m[1].length;
+    parts.push(text.slice(at, start));
+    const name = m[2];
+    parts.push(
+      <span
+        key={start}
+        className="tag-pill"
+        onClick={(e) => {
+          e.stopPropagation();
+          openTag(name, toSide(e));
+        }}
+      >
+        #{name}
+      </span>,
+    );
+    at = start + 1 + name.length;
+  }
+  parts.push(text.slice(at));
+  return <>{parts}</>;
 }

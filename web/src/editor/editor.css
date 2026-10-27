@@ -114,7 +114,9 @@
 .tag-pill.ProseMirror-selectednode { outline: 1px solid var(--accent); }
 .card-link.ProseMirror-selectednode { background: color-mix(in srgb, var(--accent) 14%, transparent); border-radius: 2px; }
 
-.card-body .is-empty::before {
+/* Shown while the line is empty: only the break ProseMirror keeps in an
+   empty line (editor/outliner/feel.ts linePlaceholder). */
+.card-body:not(.composing) .line-placeholder:has(> br.ProseMirror-trailingBreak:only-child)::before {
   content: attr(data-placeholder);
   float: left;
   height: 0;
