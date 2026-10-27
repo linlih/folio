@@ -639,6 +639,51 @@ async fn export_markdown(
     Ok(Some(ExportResult { dir: dir.display().to_string(), cards: summary.cards, journals: summary.journals }))
 }
 
+/// Light, dark or the system's ("system"): the colors of the phone's system
+/// bars and keyboard follow the app's theme, which may differ from the
+/// system's. Nothing to do on desktop.
+#[tauri::command]
+fn set_appearance(window: tauri::WebviewWindow, theme: String) -> CmdResult<()> {
+    #[cfg(target_os = "ios")]
+    {
+        // UIUserInterfaceStyle: unspecified (follow the system), light, dark.
+        let style: isize = match theme.as_str() {
+            "light" => 1,
+            "dark" => 2,
+            _ => 0,
+        };
+        window.with_webview(move |webview| ios_window_style(webview.inner(), style)).map_err(|e| CommandError::Other(e.to_string()))?;
+    }
+    #[cfg(not(target_os = "ios"))]
+    let _ = (window, theme);
+    Ok(())
+}
+
+/// Sets the interface style of the window holding the web view; the status
+/// bar and the keyboard take it on.
+#[cfg(target_os = "ios")]
+fn ios_window_style(webview: *mut std::ffi::c_void, style: isize) {
+    use std::ffi::{c_char, c_void};
+    #[link(name = "objc")]
+    unsafe extern "C" {
+        fn sel_registerName(name: *const c_char) -> *mut c_void;
+        fn objc_msgSend();
+    }
+    // SAFETY: objc_msgSend called through the signatures of -[UIView window]
+    // and -[UIView setOverrideUserInterfaceStyle:]; runs on the main thread
+    // (with_webview).
+    unsafe {
+        let get: unsafe extern "C" fn(*mut c_void, *mut c_void) -> *mut c_void = std::mem::transmute(objc_msgSend as unsafe extern "C" fn());
+        let set: unsafe extern "C" fn(*mut c_void, *mut c_void, isize) = std::mem::transmute(objc_msgSend as unsafe extern "C" fn());
+        let window = get(webview, sel_registerName(c"window".as_ptr()));
+        if window.is_null() {
+            tracing::warn!("web view not in a window; the system bars keep the system's style");
+            return;
+        }
+        set(window, sel_registerName(c"setOverrideUserInterfaceStyle:".as_ptr()), style);
+    }
+}
+
 /// iOS puts a bar with previous, next and done above the keyboard of any
 /// web page; the page has its own toolbar there (web/src/shell/PhoneBars.tsx).
 /// The bar is the web view's input accessory view: its content view answers
@@ -849,6 +894,7 @@ pub fn run() {
             app_info,
             latest_release,
             open_release_download,
+            set_appearance,
             list_cards,
             create_card,
             doc_snapshot,

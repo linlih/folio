@@ -3,7 +3,7 @@
   /* Sidebar, panes, and the details panel when it is open. */
   grid-template-columns: var(--sidebar-width) minmax(0, 1fr) auto;
   height: 100%;
-  padding-top: var(--safe-top);
+  padding: var(--safe-top) var(--safe-right) 0 var(--safe-left);
 }
 /* Hidden sidebar: at once, not animated. Sliding the column reflowed
    every line of the open cards on each frame, which looked jittery. */
@@ -170,7 +170,7 @@ body.resizing { cursor: col-resize; user-select: none; }
 }
 
 /* Narrow windows: the sidebar gives way; mobile layout proper comes in M4. */
-@media (max-width: 720px) {
+@media (max-width: 720px), (max-height: 500px) and (hover: none) and (pointer: coarse) {
   .shell, .shell.sidebar-closed { grid-template-columns: minmax(0, 1fr); }
   .sidebar { display: none; }
   .page { padding: 24px 16px 64px; }

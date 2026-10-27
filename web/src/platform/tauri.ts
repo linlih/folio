@@ -56,6 +56,7 @@ export function tauriBackend(): Backend {
     revealLibrary: () => invoke<void>("reveal_library"),
     latestRelease: () => invoke<LatestRelease>("latest_release"),
     openReleaseDownload: (url) => invoke<void>("open_release_download", { url }),
+    setAppearance: (theme) => invoke<void>("set_appearance", { theme }),
     mcpStatus: () => invoke<McpStatus>("mcp_status"),
     setMcpEnabled: (enabled) => invoke<McpStatus>("set_mcp_enabled", { enabled }),
     regenerateMcpToken: () => invoke<McpStatus>("regenerate_mcp_token"),

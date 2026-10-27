@@ -224,6 +224,7 @@ export function memoryBackend(now: () => number = Date.now): Backend {
       throw new Error("not available in the browser");
     },
     openReleaseDownload: async () => {},
+    setAppearance: async () => {},
     // No server in the browser.
     mcpStatus: async () => null,
     setMcpEnabled: async () => {

@@ -1,8 +1,9 @@
 import { useSyncExternalStore } from "react";
 
 /** The phone layout (§0.2): one column, a bar at the top, the four
- *  entries at the bottom; no sidebar, tabs or split view. */
-export const PHONE_QUERY = "(max-width: 720px)";
+ *  entries at the bottom; no sidebar, tabs or split view. A phone turned
+ *  sideways is wider than that but short, and touched. */
+export const PHONE_QUERY = "(max-width: 720px), (max-height: 500px) and (hover: none) and (pointer: coarse)";
 /** A finger, not a mouse: no hover, so nothing may appear only on hover,
  *  and long-press stands in for the right click. */
 export const TOUCH_QUERY = "(hover: none) and (pointer: coarse)";

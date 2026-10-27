@@ -27,7 +27,7 @@
 .phone-capture {
   position: fixed;
   z-index: 40;
-  right: 16px;
+  right: calc(16px + var(--safe-right));
   bottom: calc(70px + var(--safe-bottom));
   display: grid;
   place-items: center;
@@ -54,14 +54,14 @@ body.phone-typing:has(.keyboard-bar) .shell { padding-bottom: 44px; }
   align-items: center;
   gap: 2px;
   height: 44px;
-  padding: 0 6px;
+  padding: 0 calc(6px + var(--safe-right)) 0 calc(6px + var(--safe-left));
   border-top: 1px solid var(--border);
   background: var(--surface);
 }
 .keyboard-bar .icon-button { width: 44px; height: 40px; color: var(--secondary); }
 .keyboard-bar-gap { flex: 1; }
 
-@media (max-width: 720px) {
+@media (max-width: 720px), (max-height: 500px) and (hover: none) and (pointer: coarse) {
   /* Room at the end of a page for the capture button. */
   :root .page { padding-bottom: 96px; }
   :root .page-header h1 { white-space: nowrap; }

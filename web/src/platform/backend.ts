@@ -78,6 +78,8 @@ export interface Backend {
    *  release, and opening its download. */
   latestRelease(): Promise<LatestRelease>;
   openReleaseDownload(url: string): Promise<void>;
+  /** The theme of the phone's system bars and keyboard: "system", "light" or "dark". */
+  setAppearance(theme: string): Promise<void>;
   /** The read-only MCP server for AI tools (§0.3); desktop only. */
   mcpStatus(): Promise<McpStatus | null>;
   setMcpEnabled(enabled: boolean): Promise<McpStatus>;

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Merged by Tauri into the generated iOS project (src-tauri/gen/apple).
+     iPhone stays upright: sideways, iOS 26 gives an app without scenes (as
+     Tauri's are) the upright safe areas, and the camera cutout covers the
+     page. iPad keeps every orientation. -->
+<plist version="1.0">
+<dict>
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+	</array>
+</dict>
+</plist>
