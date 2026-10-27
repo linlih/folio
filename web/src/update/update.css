@@ -27,3 +27,5 @@
 .update-actions { display: flex; justify-content: flex-end; gap: 8px; }
 /* On a phone, above the bottom bar. */
 .shell.phone ~ .update-prompt, .shell.phone .update-prompt { bottom: calc(72px + var(--safe-bottom)); }
+/* In settings, under the check row, where the dialog doesn't cover it. */
+.update-prompt.inline { position: static; width: auto; margin: 4px 0 8px; box-shadow: none; background: var(--surface); }

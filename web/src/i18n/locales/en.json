@@ -259,6 +259,7 @@
     "upgrade": "Before upgrade"
   },
   "dialog": {
+    "done": "Done",
     "close": "Close",
     "cancel": "Cancel"
   },

@@ -1,17 +1,20 @@
 import { Download, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { useShell } from "../shell/tabs";
 import { useUpdates } from "./updates";
 import "./update.css";
 
 /** A card at the bottom right when a new version is out: what changed,
- *  and update now, later or skip this version. */
-export function UpdatePrompt() {
+ *  and update now, later or skip this version. Settings shows it in place
+ *  instead, since the dialog would cover it. */
+export function UpdatePrompt({ inline = false }: { inline?: boolean }) {
   const { t } = useTranslation();
   const { found, prompt, status, progress, error, install, later, skip } = useUpdates();
-  if (!found || !prompt) return null;
+  const inSettings = useShell((s) => s.dialog?.kind === "settings");
+  if (!found || !prompt || inSettings !== inline) return null;
   const busy = status === "downloading" || status === "restarting";
   return (
-    <div className="update-prompt" role="dialog" aria-label={t("update.title", { version: found.version })}>
+    <div className={`update-prompt${inline ? " inline" : ""}`} role={inline ? "group" : "dialog"} aria-label={t("update.title", { version: found.version })}>
       <div className="update-head">
         <Download size={16} />
         <strong>{t("update.title", { version: found.version })}</strong>

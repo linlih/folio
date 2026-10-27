@@ -1,5 +1,5 @@
 import { Dialog } from "@base-ui/react/dialog";
-import { Archive, Bot, Cloud, Info, SlidersHorizontal, X } from "lucide-react";
+import { Archive, Bot, ChevronLeft, ChevronRight, Cloud, Info, SlidersHorizontal, X } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { docs } from "../app";
@@ -25,10 +25,12 @@ import {
 import { changeLanguage, isLanguage, LANGUAGE_SETTING, LANGUAGES } from "../i18n";
 import { McpPanel } from "../mcp/McpDialogs";
 import { backend } from "../platform";
+import { usePhone } from "../shell/phone";
 import { keyLabel } from "../shell/shortcuts";
 import { useShell, type SettingsSection } from "../shell/tabs";
 import { SyncPanel } from "../sync/SyncPanel";
 import { LibraryLocationRow } from "./LibraryLocationRow";
+import { UpdatePrompt } from "../update/UpdatePrompt";
 import { AUTO_SETTING, useUpdates } from "../update/updates";
 import "../shell/dialog.css";
 import "./settings.css";
@@ -51,51 +53,116 @@ const DESCRIPTION: Record<SettingsSection, string | null> = {
 };
 
 /** Settings in one window with its sections on the left, like Claude's
- *  (it replaced a menu of separate dialogs). */
-export function SettingsDialog({ section }: { section: SettingsSection }) {
-  const { t } = useTranslation();
+ *  (it replaced a menu of separate dialogs). On a phone it is a screen of
+ *  its own that works like the system's settings: a list of the sections,
+ *  each opening as a page with a back button (iOS and Android). */
+export function SettingsDialog({ section }: { section?: SettingsSection }) {
+  const phone = usePhone();
   const setDialog = useShell((s) => s.setDialog);
-  const go = (id: SettingsSection) => setDialog({ kind: "settings", section: id });
-  const description = DESCRIPTION[section];
   return (
     <Dialog.Root open onOpenChange={(open) => !open && setDialog(null)}>
       <Dialog.Portal>
         <Dialog.Backdrop className="dialog-backdrop" />
-        <Dialog.Popup className="dialog settings">
-          <nav className="settings-nav" aria-label={t("settings.title")}>
-            <Dialog.Title className="settings-heading">{t("settings.title")}</Dialog.Title>
-            {SECTIONS.map((s) => (
-              <button key={s.id} className="nav-item" aria-current={s.id === section ? "page" : undefined} onClick={() => go(s.id)}>
-                {s.icon}
-                <span>{t(`settings.sections.${s.id}`)}</span>
-              </button>
-            ))}
-          </nav>
-          <div className="settings-body">
-            <header className="dialog-header">
-              <h2 className="dialog-title">{t(`settings.sections.${section}`)}</h2>
-              <Dialog.Close className="icon-button" aria-label={t("dialog.close")}>
-                <X size={15} />
-              </Dialog.Close>
-            </header>
-            {description ? <Dialog.Description className="dialog-description">{t(description)}</Dialog.Description> : <div className="settings-gap" />}
-            <div className="settings-content">
-              {section === "general" && <GeneralPanel />}
-              {section === "sync" && <SyncPanel />}
-              {section === "backup" && (
-                <>
-                  <LibraryLocationRow />
-                  <ExportRow />
-                  <BackupsPanel />
-                </>
-              )}
-              {section === "ai" && <McpPanel />}
-              {section === "about" && <AboutPanel />}
-            </div>
-          </div>
+        <Dialog.Popup className={`dialog settings${phone ? " phone" : ""}`}>
+          {phone ? <PhoneSettings section={section ?? null} /> : <DesktopSettings section={section ?? "general"} />}
         </Dialog.Popup>
       </Dialog.Portal>
     </Dialog.Root>
+  );
+}
+
+const go = (section?: SettingsSection) => useShell.getState().setDialog({ kind: "settings", section });
+
+function DesktopSettings({ section }: { section: SettingsSection }) {
+  const { t } = useTranslation();
+  const description = DESCRIPTION[section];
+  return (
+    <>
+      <nav className="settings-nav" aria-label={t("settings.title")}>
+        <Dialog.Title className="settings-heading">{t("settings.title")}</Dialog.Title>
+        {SECTIONS.map((s) => (
+          <button key={s.id} className="nav-item" aria-current={s.id === section ? "page" : undefined} onClick={() => go(s.id)}>
+            {s.icon}
+            <span>{t(`settings.sections.${s.id}`)}</span>
+          </button>
+        ))}
+      </nav>
+      <div className="settings-body">
+        <header className="dialog-header">
+          <h2 className="dialog-title">{t(`settings.sections.${section}`)}</h2>
+          <Dialog.Close className="icon-button" aria-label={t("dialog.close")}>
+            <X size={15} />
+          </Dialog.Close>
+        </header>
+        {description ? <Dialog.Description className="dialog-description">{t(description)}</Dialog.Description> : <div className="settings-gap" />}
+        <div className="settings-content">
+          <SectionContent section={section} />
+        </div>
+      </div>
+    </>
+  );
+}
+
+/** A bar with the title in the middle, Back on the left and Done on the
+ *  right; under it the list of sections, or one section's page. */
+function PhoneSettings({ section }: { section: SettingsSection | null }) {
+  const { t } = useTranslation();
+  const description = section && DESCRIPTION[section];
+  return (
+    <>
+      <header className="settings-bar">
+        {section ? (
+          <button className="settings-back" onClick={() => go()}>
+            <ChevronLeft size={22} strokeWidth={2} />
+            <span>{t("settings.title")}</span>
+          </button>
+        ) : (
+          <span />
+        )}
+        <Dialog.Title className="settings-bar-title">{section ? t(`settings.sections.${section}`) : t("settings.title")}</Dialog.Title>
+        <Dialog.Close className="settings-done">{t("dialog.done")}</Dialog.Close>
+      </header>
+      <div className="settings-scroll">
+        {section ? (
+          <>
+            {description && <Dialog.Description className="settings-intro">{t(description)}</Dialog.Description>}
+            <div className="settings-content">
+              <SectionContent section={section} />
+            </div>
+          </>
+        ) : (
+          <ul className="settings-list">
+            {SECTIONS.map((s) => (
+              <li key={s.id}>
+                <button className="settings-list-item" onClick={() => go(s.id)}>
+                  <span className="settings-list-icon">{s.icon}</span>
+                  <span className="settings-list-label">{t(`settings.sections.${s.id}`)}</span>
+                  <ChevronRight size={18} className="settings-list-chevron" />
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </>
+  );
+}
+
+function SectionContent({ section }: { section: SettingsSection }) {
+  return (
+    <>
+      {section === "general" && <GeneralPanel />}
+      {section === "sync" && <SyncPanel />}
+      {section === "backup" && (
+        <>
+          <LibraryLocationRow />
+          <ExportRow />
+          <BackupsPanel />
+        </>
+      )}
+      {section === "ai" && <McpPanel />}
+      {section === "about" && <AboutPanel />}
+    </>
   );
 }
 
@@ -236,6 +303,7 @@ function UpdateRows() {
           {t("update.check")}
         </button>
       </Row>
+      <UpdatePrompt inline />
       {backend.kind === "tauri" && (
         <Row label={t("update.auto")} hint={t("update.autoHint")}>
           <Choice
@@ -259,6 +327,7 @@ function AboutPanel() {
   const { t } = useTranslation();
   const setNotice = useShell((s) => s.setNotice);
   const setDialog = useShell((s) => s.setDialog);
+  const phone = usePhone();
   const [info, setInfo] = useState<AppInfo | null>(null);
   useEffect(() => void backend.appInfo().then(setInfo, () => {}), []);
   async function exportDiagnostics() {
@@ -285,11 +354,14 @@ function AboutPanel() {
           {t("settings.diagnostics")}
         </button>
       </Row>
-      <Row label={t("shortcuts.title")}>
-        <button className="button" onClick={() => setDialog({ kind: "shortcuts" })}>
-          {t("settings.showShortcuts", { key: keyLabel("Mod+/") })}
-        </button>
-      </Row>
+      {/* A phone has no keyboard to use them with. */}
+      {!phone && (
+        <Row label={t("shortcuts.title")}>
+          <button className="button" onClick={() => setDialog({ kind: "shortcuts" })}>
+            {t("settings.showShortcuts", { key: keyLabel("Mod+/") })}
+          </button>
+        </Row>
+      )}
     </>
   );
 }

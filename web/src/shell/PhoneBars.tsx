@@ -60,7 +60,7 @@ export function PhoneTopBar({ pane }: { pane: Pane }) {
       {/* A whiteboard shows its own name, which can be edited there. */}
       <span className="phone-title">{root || tab.target.kind === "board" ? "" : label(tab)}</span>
       {root && (
-        <button className="icon-button" aria-label={t("settings.title")} title={t("settings.title")} onClick={() => setDialog({ kind: "settings", section: "general" })}>
+        <button className="icon-button" aria-label={t("settings.title")} title={t("settings.title")} onClick={() => setDialog({ kind: "settings" })}>
           <Settings size={18} />
         </button>
       )}

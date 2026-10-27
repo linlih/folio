@@ -97,7 +97,8 @@ export type TabDrop = { pane: string; index?: number } | { newPane: true };
 
 export type SettingsSection = "general" | "sync" | "backup" | "ai" | "about";
 
-export type ShellDialog = { kind: "settings"; section: SettingsSection } | { kind: "shortcuts" } | { kind: "mcpApproval"; id: string; client: string };
+/** Settings without a section: the list of sections on a phone, General on a desktop. */
+export type ShellDialog = { kind: "settings"; section?: SettingsSection } | { kind: "shortcuts" } | { kind: "mcpApproval"; id: string; client: string };
 
 const LIBRARY: Tab = { key: "library", target: { kind: "library" }, title: null };
 

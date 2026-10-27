@@ -259,6 +259,7 @@
     "upgrade": "升级前的备份"
   },
   "dialog": {
+    "done": "完成",
     "close": "关闭",
     "cancel": "取消"
   },
