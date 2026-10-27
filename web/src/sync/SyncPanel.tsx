@@ -6,7 +6,7 @@ import { CopyBlock } from "../mcp/McpDialogs";
 import { backend } from "../platform";
 import { useShell } from "../shell/tabs";
 import { DeviceList } from "./DeviceList";
-import { useSyncStatus } from "./status";
+import { errorText, useSyncStatus } from "./status";
 import "./sync.css";
 
 const MIN_PASSPHRASE = 8;
@@ -115,7 +115,7 @@ function Enabled({ status, onChange }: { status: SyncStatus; onChange: (s: SyncS
   const [confirmStop, setConfirmStop] = useState(false);
   const time = (ms: number) => new Intl.DateTimeFormat(undefined, { timeStyle: "medium" }).format(new Date(ms));
   const state = status.error
-    ? t("sync.stateError", { message: status.error })
+    ? t("sync.stateError", { message: errorText(t, status) })
     : status.syncing
       ? t("sync.stateSyncing")
       : status.lastSync
@@ -131,18 +131,18 @@ function Enabled({ status, onChange }: { status: SyncStatus; onChange: (s: SyncS
       </div>
       <div className="mcp-field">
         <span>{t("sync.state")}</span>
-        <span className={status.error ? "mcp-error" : "sync-state"}>{state}</span>
+        <span className={`sync-value ${status.error ? "mcp-error" : "sync-state"}`}>{state}</span>
         <button className="icon-button" title={t("sync.now")} aria-label={t("sync.now")} onClick={() => void backend.syncNow()}>
           <RefreshCw size={14} className={status.syncing ? "spin" : undefined} />
         </button>
       </div>
       <div className="mcp-field">
         <span>{t("sync.pending")}</span>
-        <span className="sync-state">{status.pending === 0 ? t("sync.pendingNone") : t("sync.pendingSome", { count: status.pending })}</span>
+        <span className="sync-value sync-state">{status.pending === 0 ? t("sync.pendingNone") : t("sync.pendingSome", { count: status.pending })}</span>
       </div>
       <CopyBlock label={t("sync.codeLabel")} text={status.code} />
       <p className="sync-hint">{t("sync.codeHint")}</p>
-      <DeviceList lastSync={status.lastSync} />
+      {status.errorKind !== "removed" && <DeviceList lastSync={status.lastSync} />}
       <div className="sync-actions">
         {confirmStop ? (
           <>

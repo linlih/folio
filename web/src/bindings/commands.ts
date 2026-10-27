@@ -126,6 +126,8 @@ export interface SyncStatus {
   /** Local changes not yet on the server. */
   pending: number;
   error: string | null;
+  /** What went wrong, to word it in the interface's language. */
+  errorKind: "network" | "unauthorized" | "removed" | "other" | null;
 }
 
 /** A device of the sync workspace (src-tauri/src/sync.rs). */

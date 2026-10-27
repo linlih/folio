@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { seen, STALE_DAYS } from "./devices";
+import { ordered, seen, STALE_DAYS } from "./devices";
 
 const at = (y: number, m: number, d: number, h = 12, min = 0) => new Date(y, m - 1, d, h, min).getTime();
 
@@ -23,5 +23,13 @@ describe("seen", () => {
   it("treats a clock ahead of ours as now", () => {
     const now = at(2026, 10, 28);
     expect(seen(now + 60_000, now)).toEqual({ kind: "now" });
+  });
+});
+
+describe("ordered", () => {
+  it("puts this device first, then the others as they joined, whenever they last synced", () => {
+    const d = (id: string, firstSeen: number, lastSeen: number, thisDevice = false) => ({ id, firstSeen, lastSeen, thisDevice });
+    const list = [d("c", 3, 100), d("a", 1, 5), d("me", 2, 1, true), d("b", 1, 50)];
+    expect(ordered(list).map((x) => x.id)).toEqual(["me", "a", "b", "c"]);
   });
 });

@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { SyncDevice } from "../bindings/commands";
 import { backend } from "../platform";
-import { seen, STALE_DAYS } from "./devices";
+import { ordered, seen, STALE_DAYS } from "./devices";
 
 /** Settings → Sync: the devices of the workspace, when each last synced,
  *  and this device's name (§5.3). Reloaded after each sync. */
@@ -17,7 +17,7 @@ export function DeviceList({ lastSync }: { lastSync: number | null }) {
     backend.syncDevices().then(
       (d) => {
         if (gone) return;
-        setDevices(d);
+        setDevices(ordered(d));
         setError(null);
       },
       (e) => !gone && setError(String(e)),
@@ -35,7 +35,7 @@ export function DeviceList({ lastSync }: { lastSync: number | null }) {
       {devices && (
         <ul className="sync-device-list">
           {devices.map((d) => (
-            <DeviceRow key={d.id} device={d} onChanged={setDevices} />
+            <DeviceRow key={d.id} device={d} onChanged={(d) => setDevices(ordered(d))} />
           ))}
         </ul>
       )}

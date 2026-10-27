@@ -2,6 +2,8 @@
 /* One column as wide as the panel: long values (the server address) are
    cut, not let to widen it past a phone screen. */
 .sync { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; overflow-y: auto; }
+/* A status value takes the rest of its row (not a label's fixed width). */
+.mcp-field > .sync-value { width: auto; flex: 1; min-width: 0; }
 .sync-hint { margin: 0; color: var(--secondary); font-size: 13px; line-height: 1.55; }
 .sync-note { margin: 0; color: var(--muted); font-size: 12.5px; }
 .sync-field { display: flex; align-items: center; gap: 8px; font-size: 13px; }
@@ -19,8 +21,10 @@
 }
 .sync-field input:focus { border-color: var(--accent); }
 .sync-state { flex: 1; color: var(--text); font-size: 13px; }
-.sync-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-top: 4px; }
-.sync-actions .sync-note { margin-right: auto; }
+.sync-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; margin-top: 4px; }
+/* The note takes its own line when the buttons leave it too little room. */
+.sync-actions .sync-note { margin-right: auto; flex: 1 1 14em; }
+.sync-actions .button { flex: none; white-space: nowrap; }
 
 /* The workspace's devices (sync/DeviceList.tsx). */
 .sync-devices { display: grid; gap: 6px; margin-top: 6px; }

@@ -4,7 +4,10 @@
 //! - `FOLIO_SERVER_TOKEN` (required): the token every device presents;
 //! - `FOLIO_SERVER_ADDR` (default `127.0.0.1:8787`; `0.0.0.0:8787` to serve
 //!   the network);
-//! - `FOLIO_SERVER_DB` (default `folio-server.db`): where updates are kept.
+//! - `FOLIO_SERVER_DB` (default `folio-server.db`): where updates are kept;
+//! - `FOLIO_SERVER_SNAPSHOT_UPDATES` (default 100): a document's log is
+//!   replaced by a snapshot from this many updates (lower it to try
+//!   compaction out).
 //!
 //! It stores only ciphertext and opaque document tags; the passphrase never
 //! leaves the devices.
@@ -45,10 +48,14 @@ async fn main() {
     };
     let addr = std::env::var("FOLIO_SERVER_ADDR").unwrap_or_else(|_| "127.0.0.1:8787".into());
     let db = PathBuf::from(std::env::var("FOLIO_SERVER_DB").unwrap_or_else(|_| "folio-server.db".into()));
-    let relay = Relay::open(&db).unwrap_or_else(|e| {
+    let mut relay = Relay::open(&db).unwrap_or_else(|e| {
         eprintln!("Cannot open {}: {e}", db.display());
         std::process::exit(1);
     });
+    if let Some(n) = std::env::var("FOLIO_SERVER_SNAPSHOT_UPDATES").ok().and_then(|n| n.parse::<i64>().ok()).filter(|n| *n > 0) {
+        relay = relay.with_snapshot_thresholds(n, folio_sync::relay::SNAPSHOT_MIN_BYTES);
+        tracing::info!(updates = n, "snapshot threshold");
+    }
     let listener = tokio::net::TcpListener::bind(&addr).await.unwrap_or_else(|e| {
         eprintln!("Cannot listen on {addr}: {e}");
         std::process::exit(1);

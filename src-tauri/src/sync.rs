@@ -19,6 +19,9 @@ use tauri::{Emitter, Manager};
 use crate::{lock, now_ms, AppState, CmdResult, CommandError};
 
 const SETTING: &str = "sync";
+/// This device's own name for itself, kept when sync stops so that joining
+/// again keeps it.
+const NAME_SETTING: &str = "sync.name";
 /// Pull this often even when the live channel is quiet (or down).
 const POLL: Duration = Duration::from_secs(30);
 /// Local edits are pushed this long after the last one.
@@ -111,6 +114,9 @@ pub struct SyncStatus {
     pub last_sync: Option<i64>,
     pub pending: i64,
     pub error: Option<String>,
+    /// What went wrong, for the interface to word it in its language:
+    /// "network", "unauthorized", "removed" or "other".
+    pub error_kind: Option<&'static str>,
 }
 
 struct Running {
@@ -122,6 +128,12 @@ struct Running {
 pub struct SyncState {
     running: Mutex<Option<Running>>,
     status: Arc<Mutex<SyncStatus>>,
+}
+
+/// The name this device had when it last synced; empty for the system's.
+fn remembered_name(state: &AppState) -> String {
+    let Ok(store) = lock(state) else { return String::new() };
+    store.local_setting(NAME_SETTING).ok().flatten().and_then(|v| v.as_str().map(str::to_owned)).unwrap_or_default()
 }
 
 fn load(state: &AppState) -> Option<SyncSettings> {
@@ -139,6 +151,15 @@ fn message(e: &SyncError) -> String {
         SyncError::Unauthorized => "the server refused the token".into(),
         SyncError::Removed => "another device removed this one from the sync space; stop syncing here and join again to go on".into(),
         e => e.to_string(),
+    }
+}
+
+fn kind(e: &SyncError) -> &'static str {
+    match e {
+        SyncError::Network(_) => "network",
+        SyncError::Unauthorized => "unauthorized",
+        SyncError::Removed => "removed",
+        _ => "other",
     }
 }
 
@@ -282,6 +303,7 @@ fn run(app: tauri::AppHandle, engine: Engine, http: Http, name: String, stop: Ar
                     st.last_sync = Some(now_ms());
                     st.pending = pending;
                     st.error = None;
+                    st.error_kind = None;
                 });
             }
             Err(e) => {
@@ -293,6 +315,7 @@ fn run(app: tauri::AppHandle, engine: Engine, http: Http, name: String, stop: Ar
                     st.syncing = false;
                     st.pending = pending;
                     st.error = Some(message(&e));
+                    st.error_kind = Some(kind(&e));
                 });
             }
         }
@@ -350,7 +373,8 @@ pub async fn sync_create(app: tauri::AppHandle, server: String, token: String, p
     })
     .await
     .map_err(other)??;
-    enable(&app, SyncSettings { server, token, workspace, device, key: key_b64, name: String::new() })
+    let name = remembered_name(&app.state::<AppState>());
+    enable(&app, SyncSettings { server, token, workspace, device, key: key_b64, name })
 }
 
 /// Another device: joins with the sync code and the passphrase.
@@ -365,7 +389,8 @@ pub async fn sync_join(app: tauri::AppHandle, code: String, passphrase: String) 
     })
     .await
     .map_err(other)??;
-    enable(&app, SyncSettings { server: code.server, token: code.token, workspace: code.workspace, device, key: crypto::b64(&key.0), name: String::new() })
+    let name = remembered_name(&app.state::<AppState>());
+    enable(&app, SyncSettings { server: code.server, token: code.token, workspace: code.workspace, device, key: crypto::b64(&key.0), name })
 }
 
 #[tauri::command]
@@ -379,8 +404,12 @@ pub fn sync_now(app: tauri::AppHandle) {
 pub fn sync_disable(app: tauri::AppHandle) -> CmdResult<SyncStatus> {
     stop(&app);
     let state = app.state::<AppState>();
+    let name = load(&state).map(|s| s.name);
     {
         let store = lock(&state)?;
+        if let Some(name) = name {
+            store.set_local_setting(NAME_SETTING, &serde_json::json!(name))?;
+        }
         store.set_local_setting(SETTING, &serde_json::Value::Null)?;
         // The next start is a new device: cursors and reports start over.
         folio_sync::client::forget_workspace(&store).map_err(|e| other(message(&e)))?;
@@ -389,7 +418,7 @@ pub fn sync_disable(app: tauri::AppHandle) -> CmdResult<SyncStatus> {
     Ok(current(&app))
 }
 
-/// The workspace's devices, most recently seen first (asks the server).
+/// The workspace's devices (asks the server).
 #[tauri::command]
 pub async fn sync_devices(app: tauri::AppHandle) -> CmdResult<Vec<SyncDevice>> {
     let settings = load(&app.state::<AppState>()).ok_or_else(|| other("sync is not set up"))?;

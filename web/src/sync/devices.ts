@@ -5,6 +5,15 @@ export const STALE_DAYS = 90;
 const MINUTE = 60_000;
 const DAY = 24 * 60 * MINUTE;
 
+/** The order the list shows: this device first, then the others in the
+ *  order they joined. Not by last sync, which changes with every sync and
+ *  would move a row under the finger. */
+export function ordered<D extends { thisDevice: boolean; firstSeen: number; id: string }>(devices: D[]): D[] {
+  return [...devices].sort(
+    (a, b) => Number(b.thisDevice) - Number(a.thisDevice) || a.firstSeen - b.firstSeen || a.id.localeCompare(b.id),
+  );
+}
+
 export type Seen = { kind: "now" } | { kind: "today" } | { kind: "days"; days: number; stale: boolean };
 
 /** When a device last synced, as the device list says it: just now, today,

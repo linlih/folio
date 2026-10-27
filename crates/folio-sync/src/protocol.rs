@@ -153,7 +153,9 @@ impl SyncCode {
 
     pub fn decode(code: &str) -> crate::Result<SyncCode> {
         let bad = || crate::SyncError::Protocol("this is not a sync code".into());
-        let code = code.trim();
+        // Forgiving of how a code gets typed or copied: a Chinese input
+        // method's full-width colon, and line breaks or spaces anywhere.
+        let code: String = code.chars().filter(|c| !c.is_whitespace()).map(|c| if c == '：' { ':' } else { c }).collect();
         let body = code.strip_prefix(CODE_PREFIX).ok_or_else(bad)?;
         let json = crate::crypto::unb64(body).map_err(|_| bad())?;
         serde_json::from_slice(&json).map_err(|_| bad())
@@ -168,6 +170,10 @@ mod tests {
     fn sync_code_round_trips() {
         let code = SyncCode { server: "http://192.168.1.5:8787".into(), token: "t".repeat(20), workspace: "abc".into() };
         assert_eq!(SyncCode::decode(&format!("  {}\n", code.encode())).unwrap(), code);
+        let encoded = code.encode();
+        let (head, tail) = encoded.split_at(40);
+        let typed = format!("{}\n{tail}", head.replacen(':', "：", 1));
+        assert_eq!(SyncCode::decode(&typed).unwrap(), code, "full-width colon, wrapped line");
         assert!(SyncCode::decode("folio-sync:???").is_err());
         assert!(SyncCode::decode("hello").is_err());
     }
