@@ -31,7 +31,7 @@ import { useShell, type SettingsSection } from "../shell/tabs";
 import { SyncPanel } from "../sync/SyncPanel";
 import { LibraryLocationRow } from "./LibraryLocationRow";
 import { UpdatePrompt } from "../update/UpdatePrompt";
-import { AUTO_SETTING, useUpdates } from "../update/updates";
+import { AUTO_SETTING, updateErrorKind, useUpdates } from "../update/updates";
 import "../shell/dialog.css";
 import "./settings.css";
 
@@ -286,7 +286,7 @@ function UpdateRows() {
     : status === "uptodate" ? t("update.uptodate")
     : status === "available" && found ? t("update.available", { version: found.version })
     : status === "unsupported" ? t("update.unsupported")
-    : status === "error" && error ? t("update.error", { message: error })
+    : status === "error" && error ? t(`update.errors.${updateErrorKind(error)}`)
     : t("update.hint");
   return (
     <>

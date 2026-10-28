@@ -1,7 +1,7 @@
 import { Download, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useShell } from "../shell/tabs";
-import { useUpdates } from "./updates";
+import { updateErrorKind, useUpdates } from "./updates";
 import "./update.css";
 
 /** A card at the bottom right when a new version is out: what changed,
@@ -31,7 +31,7 @@ export function UpdatePrompt({ inline = false }: { inline?: boolean }) {
         </div>
       )}
       {status === "ready" && allowing && <p className="update-hint">{t("update.allow")}</p>}
-      {error && (status === "error" || status === "ready") && <p className="update-error">{t("update.failed", { message: error })}</p>}
+      {error && (status === "error" || status === "ready") && <p className="update-error">{t(`update.errors.${updateErrorKind(error)}`)}</p>}
       <div className="update-actions">
         {status === "error" && found.how === "package" && (
           <button className="button" onClick={() => void openInBrowser()}>

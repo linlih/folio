@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { backend } from "../src/platform";
-import { isNewer, SKIPPED_SETTING, useUpdates } from "../src/update/updates";
+import { isNewer, SKIPPED_SETTING, updateErrorKind, useUpdates } from "../src/update/updates";
 
 // Updating saves what is typed first; no documents are open here.
 vi.mock("../src/app", () => ({ docs: () => ({ flushAll: async () => {} }) }));
@@ -18,6 +18,17 @@ describe("updates", () => {
     expect(isNewer("1.0.0", "1.0.0-beta.2")).toBe(true);
     expect(isNewer("1.0.0-beta.10", "1.0.0-beta.9")).toBe(true);
     expect(isNewer("0.1.0", "0.2.0")).toBe(false);
+  });
+
+  it("says what went wrong in plain words", () => {
+    // A release whose macOS build has not finished yet.
+    expect(updateErrorKind('None of the fallback platforms `["darwin-aarch64-app", "darwin-aarch64"]` were found in the response `platforms` object')).toBe("notReady");
+    expect(updateErrorKind("https://github.com/…/folio-android-arm64.apk: status code 404")).toBe("notReady");
+    expect(updateErrorKind("error sending request for url (https://github.com/…/latest.json)")).toBe("network");
+    expect(updateErrorKind("Could not fetch a valid release JSON from the remote")).toBe("network");
+    expect(updateErrorKind("Error: the download stopped early (1000 of 52000000 bytes)")).toBe("interrupted");
+    expect(updateErrorKind("The signature verification failed")).toBe("signature");
+    expect(updateErrorKind("something else")).toBe("other");
   });
 
   it("says a browser cannot update", async () => {

@@ -33,6 +33,21 @@ export function isNewer(candidate: string, current: string): boolean {
   return a.pre.localeCompare(b.pre, undefined, { numeric: true }) > 0;
 }
 
+export type UpdateErrorKind = "signature" | "interrupted" | "notReady" | "network" | "other";
+
+/** What went wrong, in words for anyone: the raw message (the updater's
+ *  or the server's) only goes to the log. */
+export function updateErrorKind(raw: string): UpdateErrorKind {
+  const m = raw.toLowerCase();
+  if (m.includes("signature")) return "signature";
+  if (/stopped early|unexpected eof|incomplete/.test(m)) return "interrupted";
+  // The release is out but not yet for this platform (its build is still
+  // running), or its file is not there yet.
+  if (/fallback platforms|platforms` object|404/.test(m)) return "notReady";
+  if (/network|connect|timed out|timeout|dns|sending request|could not fetch|failed to fetch|unreachable|tls|io error|offline/.test(m)) return "network";
+  return "other";
+}
+
 export interface FoundUpdate {
   version: string;
   notes: string;
@@ -143,6 +158,7 @@ export const useUpdates = create<UpdateState>((set, get) => ({
       const { relaunch } = await import("@tauri-apps/plugin-process");
       await relaunch();
     } catch (e) {
+      console.warn("update failed", e);
       set({ status: "error", error: String(e) });
     }
   },
@@ -191,6 +207,7 @@ async function installPackage(found: FoundUpdate, set: Set, get: () => UpdateSta
       document.addEventListener("visibilitychange", back);
     }
   } catch (e) {
+    console.warn("update failed", e);
     set({ status: get().apk ? "ready" : "error", error: String(e) });
   }
 }
