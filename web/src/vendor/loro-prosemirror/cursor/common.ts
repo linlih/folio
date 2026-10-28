@@ -344,6 +344,13 @@ function absolutePositionToCursor(
 
   const loroMap = doc.getMap(loroId as any) as unknown as LoroNode;
   const children = loroMap.get(CHILDREN_KEY);
+  // folio patch 10: in the tree layout only text blocks keep a children
+  // list; a block holding blocks (a list item around a selected image)
+  // has none. No text cursor there; throwing would drop the transaction
+  // (an image deleted on screen but not in the document).
+  if (!children) {
+    return undefined;
+  }
   if (children.length == 0) {
     // This is a new line, so we can use the list cursor instead
     return children.getCursor(0);

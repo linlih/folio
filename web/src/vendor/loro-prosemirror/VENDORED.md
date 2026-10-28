@@ -61,5 +61,11 @@
    the change. Converting with `quiet` reports such a miss, and the undo
    plugin keeps the selection from the last synced state. Test:
    `web/test/cursor-mapping.test.ts`.
+10. Selections on a block that holds blocks (`cursor/common.ts`). In layout
+   3 only text blocks keep a children list, so a selection whose parent is a
+   list item (a selected image, a file block) has no text cursor: it maps to
+   none instead of throwing, which dropped the transaction. Selecting an
+   image and deleting it removed it on screen but not in the document, so
+   the deletion never synced. Test: `web/test/asset-delete.test.ts`.
 
 Search for `folio patch` to find every change in the code.
