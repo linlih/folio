@@ -154,13 +154,27 @@ fn message(e: &SyncError) -> String {
     }
 }
 
+/// What kind of failure this is, for the interface to word it in its
+/// language (web/src/sync/status.ts knows these).
 fn kind(e: &SyncError) -> &'static str {
     match e {
         SyncError::Network(_) => "network",
         SyncError::Unauthorized => "unauthorized",
         SyncError::Removed => "removed",
+        SyncError::WrongPassphrase => "wrong-passphrase",
         _ => "other",
     }
+}
+
+/// A command's failure, tagged with its kind: "[network] cannot reach…".
+/// The interface shows its own wording for the kinds it knows, the English
+/// after the tag for the rest; logs stay readable either way.
+fn tagged(kind: &str, message: impl std::fmt::Display) -> CommandError {
+    CommandError::Other(format!("[{kind}] {message}"))
+}
+
+fn failed(e: &SyncError) -> CommandError {
+    tagged(kind(e), message(e))
 }
 
 fn code_of(s: &SyncSettings) -> String {
@@ -341,7 +355,7 @@ fn current(app: &tauri::AppHandle) -> SyncStatus {
 
 fn check_passphrase(p: &str) -> CmdResult<()> {
     if p.chars().count() < 8 {
-        return Err(other("the passphrase needs at least 8 characters"));
+        return Err(tagged("short-passphrase", "the passphrase needs at least 8 characters"));
     }
     Ok(())
 }
@@ -369,7 +383,7 @@ pub async fn sync_create(app: tauri::AppHandle, server: String, token: String, p
     let key_b64 = crypto::b64(&key.0);
     tauri::async_runtime::spawn_blocking(move || -> CmdResult<()> {
         let wrapped = crypto::wrap(&key, &passphrase, crypto::DEFAULT_COST).map_err(other)?;
-        http.put_key(&wrapped).map_err(|e| other(message(&e)))
+        http.put_key(&wrapped).map_err(|e| failed(&e))
     })
     .await
     .map_err(other)??;
@@ -380,12 +394,12 @@ pub async fn sync_create(app: tauri::AppHandle, server: String, token: String, p
 /// Another device: joins with the sync code and the passphrase.
 #[tauri::command]
 pub async fn sync_join(app: tauri::AppHandle, code: String, passphrase: String) -> CmdResult<SyncStatus> {
-    let code = SyncCode::decode(&code).map_err(|e| other(message(&e)))?;
+    let code = SyncCode::decode(&code).map_err(|_| tagged("bad-code", "this is not a sync code"))?;
     let device = crypto::random_bytes::<8>().iter().map(|b| format!("{b:02x}")).collect::<String>();
     let http = Http::new(&code.server, &code.token, &code.workspace, &device);
     let key = tauri::async_runtime::spawn_blocking(move || -> CmdResult<WorkspaceKey> {
-        let wrapped = http.get_key().map_err(|e| other(message(&e)))?.ok_or_else(|| other("the server has no such workspace"))?;
-        crypto::unwrap(&wrapped, &passphrase).map_err(|e| other(message(&e)))
+        let wrapped = http.get_key().map_err(|e| failed(&e))?.ok_or_else(|| tagged("no-workspace", "the server has no such workspace"))?;
+        crypto::unwrap(&wrapped, &passphrase).map_err(|e| failed(&e))
     })
     .await
     .map_err(other)??;
@@ -412,7 +426,7 @@ pub fn sync_disable(app: tauri::AppHandle) -> CmdResult<SyncStatus> {
         }
         store.set_local_setting(SETTING, &serde_json::Value::Null)?;
         // The next start is a new device: cursors and reports start over.
-        folio_sync::client::forget_workspace(&store).map_err(|e| other(message(&e)))?;
+        folio_sync::client::forget_workspace(&store).map_err(|e| failed(&e))?;
     }
     update(&app, |st| *st = SyncStatus::default());
     Ok(current(&app))
@@ -438,7 +452,7 @@ pub async fn sync_rename_device(app: tauri::AppHandle, name: String) -> CmdResul
     lock(&app.state::<AppState>())?.set_local_setting(SETTING, &serde_json::to_value(&settings).map_err(other)?)?;
     tauri::async_runtime::spawn_blocking(move || {
         let (engine, http) = connect(&settings)?;
-        engine.set_device_name(&http, &device_name(&settings)).map_err(|e| other(message(&e)))?;
+        engine.set_device_name(&http, &device_name(&settings)).map_err(|e| failed(&e))?;
         list_devices(&settings)
     })
     .await
@@ -452,7 +466,7 @@ pub async fn sync_remove_device(app: tauri::AppHandle, id: String) -> CmdResult<
     let settings = load(&app.state::<AppState>()).ok_or_else(|| other("sync is not set up"))?;
     tauri::async_runtime::spawn_blocking(move || {
         let (engine, http) = connect(&settings)?;
-        engine.remove_device(&http, &id).map_err(|e| other(message(&e)))?;
+        engine.remove_device(&http, &id).map_err(|e| failed(&e))?;
         tracing::warn!(device = %id, "removed a device from the sync space");
         list_devices(&settings)
     })
@@ -467,7 +481,7 @@ fn connect(s: &SyncSettings) -> CmdResult<(Engine, Http)> {
 
 fn list_devices(s: &SyncSettings) -> CmdResult<Vec<SyncDevice>> {
     let (engine, http) = connect(s)?;
-    let devices = engine.devices(&http).map_err(|e| other(message(&e)))?;
+    let devices = engine.devices(&http).map_err(|e| failed(&e))?;
     Ok(devices
         .into_iter()
         .map(|d| {
@@ -477,4 +491,17 @@ fn list_devices(s: &SyncSettings) -> CmdResult<Vec<SyncDevice>> {
             SyncDevice { id: d.id, name, this_device, first_seen: d.first_seen, last_seen: d.last_seen }
         })
         .collect())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn failures_carry_the_kind_the_interface_words() {
+        assert_eq!(failed(&SyncError::WrongPassphrase).to_string(), format!("[wrong-passphrase] {}", SyncError::WrongPassphrase));
+        assert!(failed(&SyncError::Network("refused".into())).to_string().starts_with("[network] cannot reach the server"));
+        assert!(failed(&SyncError::Unauthorized).to_string().starts_with("[unauthorized] "));
+        assert_eq!(tagged("bad-code", "this is not a sync code").to_string(), "[bad-code] this is not a sync code");
+    }
 }

@@ -6,10 +6,9 @@ import { CopyBlock } from "../mcp/McpDialogs";
 import { backend } from "../platform";
 import { useShell } from "../shell/tabs";
 import { DeviceList } from "./DeviceList";
-import { errorText, useSyncStatus } from "./status";
+import { commandErrorText, errorText, MIN_PASSPHRASE, useSyncStatus } from "./status";
 import "./sync.css";
 
-const MIN_PASSPHRASE = 8;
 
 /** Settings → Sync: set up this device (a new workspace, or join one with a
  *  sync code), then its state and the code for the next device (§5.3). */
@@ -47,7 +46,7 @@ function Setup({ onDone }: { onDone: (s: SyncStatus) => void }) {
     try {
       onDone(mode === "create" ? await backend.syncCreate(server, token, passphrase) : await backend.syncJoin(code, passphrase));
     } catch (e) {
-      setError(String(e));
+      setError(commandErrorText(t, e));
     } finally {
       setBusy(false);
     }

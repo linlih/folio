@@ -24,17 +24,43 @@ export function useSyncStatus(): [SyncStatus | null | undefined, (s: SyncStatus)
   return [status, setStatus];
 }
 
-/** The sync error in the interface's language; the host's own wording
- *  only for errors without a kind of their own. */
-export function errorText(t: TFunction, status: Pick<SyncStatus, "error" | "errorKind">): string {
-  switch (status.errorKind) {
+/** Minimum passphrase length; the host checks it too. */
+export const MIN_PASSPHRASE = 8;
+
+/** A sync failure in the interface's language, by its kind (the host's
+ *  `kind` in src-tauri/src/sync.rs); null for a kind without wording here. */
+function kindText(t: TFunction, kind: string | null): string | null {
+  switch (kind) {
     case "network":
       return t("sync.errorNetwork");
     case "unauthorized":
       return t("sync.errorUnauthorized");
     case "removed":
       return t("sync.errorRemoved");
+    case "wrong-passphrase":
+      return t("sync.errorPassphrase");
+    case "bad-code":
+      return t("sync.errorCode");
+    case "no-workspace":
+      return t("sync.errorNoWorkspace");
+    case "short-passphrase":
+      return t("sync.passphraseShort", { n: MIN_PASSPHRASE });
     default:
-      return status.error ?? "";
+      return null;
   }
+}
+
+/** The status line's error; the host's own wording only for errors
+ *  without a kind of their own. */
+export function errorText(t: TFunction, status: Pick<SyncStatus, "error" | "errorKind">): string {
+  return kindText(t, status.errorKind) ?? status.error ?? "";
+}
+
+/** A failed sync command ("[network] cannot reach…" from the host) in the
+ *  interface's language; untagged or unknown ones as the host put them. */
+export function commandErrorText(t: TFunction, e: unknown): string {
+  const raw = String(e);
+  const tag = /^\[([a-z-]+)\] ([\s\S]*)$/.exec(raw);
+  if (!tag) return raw;
+  return kindText(t, tag[1]) ?? tag[2];
 }

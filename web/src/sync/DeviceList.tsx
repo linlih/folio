@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import type { SyncDevice } from "../bindings/commands";
 import { backend } from "../platform";
 import { ordered, seen, STALE_DAYS } from "./devices";
+import { commandErrorText } from "./status";
 
 /** Settings → Sync: the devices of the workspace, when each last synced,
  *  and this device's name (§5.3). Reloaded after each sync. */
@@ -20,7 +21,7 @@ export function DeviceList({ lastSync }: { lastSync: number | null }) {
         setDevices(ordered(d));
         setError(null);
       },
-      (e) => !gone && setError(String(e)),
+      (e) => !gone && setError(commandErrorText(t, e)),
     );
     return () => {
       gone = true;
@@ -68,12 +69,12 @@ function DeviceRow({ device, onChanged }: { device: SyncDevice; onChanged: (d: S
         setError(null);
         onChanged(d);
       },
-      (e) => setError(String(e)),
+      (e) => setError(commandErrorText(t, e)),
     );
   }
 
   function remove() {
-    backend.syncRemoveDevice(device.id).then(onChanged, (e) => setError(String(e)));
+    backend.syncRemoveDevice(device.id).then(onChanged, (e) => setError(commandErrorText(t, e)));
   }
 
   return (
