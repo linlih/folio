@@ -139,54 +139,135 @@ function press(key: string, mods: { shift?: boolean; alt?: boolean; mod?: boolea
   );
 }
 
-/** Scrolls the focused editor's caret into its scroller. */
+/** The on-screen keyboard counts as up from this many pixels: less is an
+ *  attached keyboard's shortcut strip, or nothing. */
+const KEYBOARD_MIN = 100;
+/** Room kept below the caret while typing, above the keys bar. */
+const CARET_ROOM = 72;
+
+/** Where the caret is on screen: the end of the selection, or the line it
+ *  sits on when that has no box (an empty line). */
+function caretRect(): DOMRect | null {
+  const sel = document.getSelection();
+  if (!sel || sel.rangeCount === 0) return null;
+  const range = sel.getRangeAt(0).cloneRange();
+  range.collapse(false);
+  const rect = range.getClientRects()[0];
+  if (rect && (rect.height > 0 || rect.top > 0)) return rect;
+  const node = sel.focusNode;
+  const el = node instanceof HTMLElement ? node : node?.parentElement;
+  return el?.getBoundingClientRect() ?? null;
+}
+
+/** The element that scrolls `el` up and down. */
+function scrollerOf(el: Element | null): HTMLElement | null {
+  for (let p = el?.parentElement; p; p = p.parentElement) {
+    const y = getComputedStyle(p).overflowY;
+    if ((y === "auto" || y === "scroll") && p.scrollHeight > p.clientHeight) return p;
+  }
+  return null;
+}
+
+/** Keeps the caret of the focused editor in sight while typing: as the
+ *  line grows or wraps, while a word is being composed, and when the
+ *  keyboard comes up, with some room below it above the keys bar. Fields
+ *  just come into view. */
 function caretIntoView() {
   const sel = document.getSelection();
   const node = sel?.focusNode;
   const el = node instanceof HTMLElement ? node : node?.parentElement;
-  if (el?.closest(".ProseMirror, input, textarea")) el.scrollIntoView({ block: "nearest" });
+  if (!el) return;
+  if (!el.closest(".ProseMirror")) {
+    if (el.closest("input, textarea")) el.scrollIntoView({ block: "nearest" });
+    return;
+  }
+  const rect = caretRect();
+  const scroller = scrollerOf(el);
+  if (!rect || !scroller) return;
+  const box = scroller.getBoundingClientRect();
+  const vv = window.visualViewport;
+  const bar = document.querySelector(".keyboard-bar")?.getBoundingClientRect().top;
+  const bottom = Math.min(box.bottom, bar ?? Infinity, vv ? vv.offsetTop + vv.height : Infinity);
+  // Not more room than half of what shows (a small window).
+  const room = Math.min(CARET_ROOM, (bottom - box.top) / 2);
+  if (rect.bottom > bottom - room) scroller.scrollTop += rect.bottom - (bottom - room);
+  else if (rect.top < box.top + 8) scroller.scrollTop -= box.top + 8 - rect.top;
 }
 
-/** A row above the on-screen keyboard while an editor has the focus on a
+/** A row above the on-screen keyboard while it is up for an editor on a
  *  touch screen: outdent, indent, move the item, fold, and put the keyboard
- *  away. Taps on it do not take the focus, so the keyboard stays. */
+ *  away. Taps on it do not take the focus, so the keyboard stays. With the
+ *  keyboard down the bottom bar shows instead. */
 export function KeyboardBar() {
   const { t } = useTranslation();
   const [editing, setEditing] = useState(false);
   const [bottom, setBottom] = useState(0);
   useEffect(() => {
-    const check = () => {
-      const el = document.activeElement;
-      const on = el instanceof HTMLElement && el.isContentEditable && !!el.closest(".ProseMirror");
-      setEditing((was) => (was === on ? was : on));
-      document.body.classList.toggle("phone-typing", on || (el instanceof HTMLElement && !!el.closest("input, textarea")));
-    };
     const vv = window.visualViewport;
     const root = document.documentElement;
+    let covered = 0;
+    let settle: ReturnType<typeof setTimeout> | undefined;
+    // Typing means a field has the focus and the on-screen keyboard is up.
+    // With it put away (or a keyboard attached) the bottom bar is back,
+    // even while the editor keeps the focus.
+    const check = () => {
+      const el = document.activeElement;
+      const field = el instanceof HTMLElement && (el.isContentEditable || !!el.closest("input, textarea"));
+      const keyboard = covered >= KEYBOARD_MIN;
+      const on = keyboard && el instanceof HTMLElement && el.isContentEditable && !!el.closest(".ProseMirror");
+      setEditing((was) => (was === on ? was : on));
+      document.body.classList.toggle("phone-typing", keyboard && field);
+    };
     // The keyboard covers the bottom of the layout; the bar sits on it.
     // iOS does not shrink the page for the keyboard but scrolls all of it,
     // top bar included, out of the way: the shell takes the height left
     // instead, and the page stays where it is.
     const place = () => {
       if (!vv) return;
-      const covered = Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop));
+      const was = covered;
+      covered = Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop));
       setBottom(covered);
       root.style.setProperty("--keyboard", `${covered}px`);
       if (window.scrollY !== 0) window.scrollTo(0, 0);
-      // The line being typed on may now be under the keyboard.
-      if (covered > 0) caretIntoView();
+      check();
+      // The line being typed on may now be under the keyboard (after the
+      // shell has taken its new height, and again once iOS has done its
+      // own scrolling for the keyboard).
+      if (covered > was) {
+        requestAnimationFrame(caretIntoView);
+        clearTimeout(settle);
+        settle = setTimeout(caretIntoView, 400);
+      }
+    };
+    // As the caret moves while typing (selectionchange comes for each
+    // letter, and while a word is composed), it stays in sight.
+    let pending = 0;
+    // Not while a selection is being dragged out: that scrolls by itself.
+    const follow = () => {
+      if (covered < KEYBOARD_MIN || pending || !document.getSelection()?.isCollapsed) return;
+      pending = requestAnimationFrame(() => {
+        pending = 0;
+        caretIntoView();
+      });
     };
     // After focus has moved on (focusout comes before the new focusin).
     const later = () => setTimeout(check);
     document.addEventListener("focusin", check);
     document.addEventListener("focusout", later);
+    document.addEventListener("selectionchange", follow);
+    document.addEventListener("input", follow);
     // A focused field that is removed (a dialog closing) sends no focusout.
     const poll = setInterval(check, 400);
     vv?.addEventListener("resize", place);
     vv?.addEventListener("scroll", place);
+    place();
     return () => {
       document.removeEventListener("focusin", check);
       document.removeEventListener("focusout", later);
+      document.removeEventListener("selectionchange", follow);
+      document.removeEventListener("input", follow);
+      cancelAnimationFrame(pending);
+      clearTimeout(settle);
       clearInterval(poll);
       vv?.removeEventListener("resize", place);
       vv?.removeEventListener("scroll", place);
