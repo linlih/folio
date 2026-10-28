@@ -15,6 +15,10 @@ import app.tauri.plugin.JSObject
 import app.tauri.plugin.Plugin
 import java.io.File
 
+/** Its own class: the app already declares androidx's FileProvider, and
+ *  the manifest can hold each provider class only once. */
+class ApkFileProvider : FileProvider()
+
 @InvokeArg
 class InstallArgs {
     lateinit var path: String

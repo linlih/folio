@@ -4,7 +4,7 @@
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <application>
         <provider
-            android:name="androidx.core.content.FileProvider"
+            android:name="dev.folio.apk.ApkFileProvider"
             android:authorities="${applicationId}.folio.apk"
             android:exported="false"
             android:grantUriPermissions="true">
