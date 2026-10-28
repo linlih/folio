@@ -38,6 +38,9 @@ pub trait Transport {
     fn put_chunk(&self, id: &str, n: u32, sealed: &[u8]) -> Result<()>;
     fn finish_blob(&self, id: &str, chunks: u32) -> Result<()>;
     fn get_chunk(&self, id: &str, n: u32) -> Result<Vec<u8>>;
+    /// Reports the files this device uses (replacing its last report);
+    /// returns those the server does not have whole.
+    fn report_refs(&self, ids: &[String]) -> Result<Vec<String>>;
 }
 
 /// Updates sent per push.
@@ -125,7 +128,7 @@ fn open_envelope(bytes: &[u8]) -> Result<(DocKind, DocId, &[u8])> {
 /// joins again as a new device): cursors and reports start over. Its notes
 /// stay; joining queues their whole history again (`Store::queue_everything`).
 pub fn forget_workspace(store: &Store) -> Result<()> {
-    for key in [CURSOR, ACKS_CURSOR, ACKS_CHANGED] {
+    for key in [CURSOR, ACKS_CURSOR, ACKS_CHANGED, crate::files::REFS_REPORTED] {
         store.set_sync_value(key, &[])?;
     }
     store.clear_device_acks()?;

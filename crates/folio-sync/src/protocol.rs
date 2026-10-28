@@ -174,6 +174,16 @@ pub struct BlobDone {
 /// Most files asked about at once.
 pub const MAX_BLOB_IDS: usize = 500;
 
+/// The files a device uses, reported so the server can delete the rest.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct RefsResponse {
+    /// The reported files the server does not have whole.
+    pub missing: Vec<String>,
+}
+
+/// Most files in one report.
+pub const MAX_REF_IDS: usize = 500_000;
+
 /// Most updates a pull returns.
 pub const MAX_PULL: u32 = 1000;
 

@@ -479,6 +479,12 @@ fn run_files(app: tauri::AppHandle, engine: Engine, http: Http, stop: Arc<Atomic
                 }
             }
             outcome?;
+            // Which files this device still uses, so the server can delete
+            // the rest; any it lost go up again below. A server from before
+            // this does not know the request: files still sync.
+            if let Err(e) = engine.report_files(&state.store, &http as &dyn Transport) {
+                tracing::warn!(error = %e, "could not report the files in use");
+            }
             let sent = engine.upload_files(&state.store, &http as &dyn Transport, &stopped)?;
             if DOWNLOAD_ALL {
                 for (sha, mime) in &missing {

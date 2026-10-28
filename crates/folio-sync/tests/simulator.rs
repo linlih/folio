@@ -87,6 +87,9 @@ impl Transport for Direct<'_> {
     fn finish_blob(&self, id: &str, chunks: u32) -> folio_sync::Result<()> {
         self.relay.finish_blob(WS, &self.device, id, chunks)
     }
+    fn report_refs(&self, ids: &[String]) -> folio_sync::Result<Vec<String>> {
+        self.relay.report_refs(WS, &self.device, ids)
+    }
     fn get_chunk(&self, id: &str, n: u32) -> folio_sync::Result<Vec<u8>> {
         self.relay.get_chunk(WS, &self.device, id, n)
     }

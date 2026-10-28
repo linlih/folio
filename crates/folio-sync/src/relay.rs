@@ -16,6 +16,13 @@
 //! `blobs` and `blob_chunks`. A file can be downloaded once its uploader
 //! said every chunk is there; unfinished uploads expire after a week.
 //!
+//! Unused files (§6): each device reports the files it still uses (its
+//! latest report replaces the one before, in `blob_refs`). A whole file no
+//! device uses is marked `unused_since`; it is deleted once it has been
+//! unused for the grace period (30 days by default) and every device has
+//! reported since it was marked. A device that never reports keeps every
+//! file; removing a device stops it counting.
+//!
 //! Used by `folio-server` behind HTTP, and directly by the simulator.
 
 use std::path::{Path, PathBuf};
@@ -25,7 +32,7 @@ use rusqlite::{params, Connection, OptionalExtension};
 
 use crate::crypto::WrappedKey;
 use crate::crypto::{chunks_for, MAX_SEALED_CHUNK};
-use crate::protocol::{AcksResponse, BlobState, BlobsResponse, DeviceInfo, HeavyDoc, PullResponse, PulledAck, PulledItem, PushItem, MAX_BLOB_IDS, MAX_PULL};
+use crate::protocol::{AcksResponse, BlobState, BlobsResponse, DeviceInfo, HeavyDoc, PullResponse, PulledAck, PulledItem, PushItem, MAX_BLOB_IDS, MAX_PULL, MAX_REF_IDS};
 use crate::{Result, SyncError};
 
 const SCHEMA: &str = "
@@ -63,6 +70,11 @@ const SCHEMA: &str = "
     workspace TEXT NOT NULL, id TEXT NOT NULL, n INTEGER NOT NULL, size INTEGER NOT NULL,
     PRIMARY KEY (workspace, id, n)
   );
+  -- Each device's latest report of the files it uses.
+  CREATE TABLE IF NOT EXISTS blob_refs (
+    workspace TEXT NOT NULL, device TEXT NOT NULL, id TEXT NOT NULL,
+    PRIMARY KEY (workspace, device, id)
+  );
 ";
 
 /// Columns added after the first release, as (table, column, definition).
@@ -72,6 +84,10 @@ const ADDED_COLUMNS: &[(&str, &str, &str)] = &[
     ("updates", "kind", "TEXT NOT NULL DEFAULT 'update'"),
     // Set when another device removed this one from the workspace.
     ("devices", "removed_at", "INTEGER"),
+    // When the device last reported the files it uses.
+    ("devices", "refs_at", "INTEGER"),
+    // When the file was first seen used by no device.
+    ("blobs", "unused_since", "INTEGER"),
 ];
 
 /// A document's log is due for a snapshot from this many updates…
@@ -85,6 +101,9 @@ pub const MAX_FILE_BYTES: u64 = 100 * 1024 * 1024;
 /// Unfinished uploads older than this are deleted.
 pub const UNFINISHED_MS: i64 = 7 * 24 * 60 * 60 * 1000;
 
+/// Files no device uses are deleted after this long, by default.
+pub const UNUSED_GRACE_MS: i64 = 30 * 24 * 60 * 60 * 1000;
+
 pub struct Relay {
     conn: Mutex<Connection>,
     /// When a document's log is due for a snapshot: updates, bytes.
@@ -96,6 +115,8 @@ pub struct Relay {
     /// Largest file (plain bytes); room per workspace (stored bytes).
     max_file: u64,
     quota: Option<u64>,
+    /// How long a file no device uses is kept; None keeps it for good.
+    unused_grace: Option<i64>,
 }
 
 impl Drop for Relay {
@@ -144,7 +165,7 @@ impl Relay {
             }
         }
         conn.execute_batch("CREATE INDEX IF NOT EXISTS updates_by_doc ON updates(workspace, doc, seq);")?;
-        Ok(Relay { conn: Mutex::new(conn), snapshot_at: (SNAPSHOT_MIN_UPDATES, SNAPSHOT_MIN_BYTES), blob_dir, temporary, max_file: MAX_FILE_BYTES, quota: None })
+        Ok(Relay { conn: Mutex::new(conn), snapshot_at: (SNAPSHOT_MIN_UPDATES, SNAPSHOT_MIN_BYTES), blob_dir, temporary, max_file: MAX_FILE_BYTES, quota: None, unused_grace: Some(UNUSED_GRACE_MS) })
     }
 
     /// Other limits for files: the largest (plain bytes), and the room each
@@ -152,6 +173,13 @@ impl Relay {
     pub fn with_file_limits(mut self, max_file: u64, quota: Option<u64>) -> Relay {
         self.max_file = max_file;
         self.quota = quota;
+        self
+    }
+
+    /// How long a file no device uses is kept before it is deleted (None:
+    /// for good).
+    pub fn with_unused_grace(mut self, grace_ms: Option<i64>) -> Relay {
+        self.unused_grace = grace_ms;
         self
     }
 
@@ -287,6 +315,7 @@ impl Relay {
             return Err(SyncError::NotFound(format!("device {other}")));
         }
         tx.execute("DELETE FROM acks WHERE workspace = ?1 AND device = ?2", params![workspace, other])?;
+        tx.execute("DELETE FROM blob_refs WHERE workspace = ?1 AND device = ?2", params![workspace, other])?;
         tx.commit()?;
         Ok(())
     }
@@ -514,12 +543,77 @@ impl Relay {
             stmt.query_map([now - UNFINISHED_MS], |r| Ok((r.get(0)?, r.get(1)?)))?.collect::<std::result::Result<_, _>>()?
         };
         for (workspace, id) in &stale {
-            let conn = self.conn();
-            conn.execute("DELETE FROM blob_chunks WHERE workspace = ?1 AND id = ?2", params![workspace, id])?;
-            conn.execute("DELETE FROM blobs WHERE workspace = ?1 AND id = ?2 AND complete = 0", params![workspace, id])?;
-            let _ = std::fs::remove_dir_all(self.blob_dir.join(workspace).join(&id[..2]).join(id));
+            self.delete_blob(workspace, id)?;
         }
         Ok(stale.len())
+    }
+
+    /// Records the files `device` uses now, replacing its last report;
+    /// returns those of them the server does not have whole, for the
+    /// device to upload again if it has them.
+    pub fn report_refs(&self, workspace: &str, device: &str, ids: &[String]) -> Result<Vec<String>> {
+        if ids.len() > MAX_REF_IDS {
+            return Err(SyncError::Protocol(format!("at most {MAX_REF_IDS} files in a report")));
+        }
+        if let Some(bad) = ids.iter().find(|id| !is_blob_id(id)) {
+            return Err(SyncError::Protocol(format!("bad file id {bad}")));
+        }
+        let mut conn = self.conn();
+        self.require(&conn, workspace)?;
+        let now = now_ms();
+        let tx = conn.transaction()?;
+        Self::touch(&tx, workspace, device, now)?;
+        tx.execute("DELETE FROM blob_refs WHERE workspace = ?1 AND device = ?2", params![workspace, device])?;
+        let mut missing = Vec::new();
+        {
+            let mut add = tx.prepare_cached("INSERT OR IGNORE INTO blob_refs(workspace, device, id) VALUES (?1, ?2, ?3)")?;
+            let mut whole =
+                tx.prepare_cached("UPDATE blobs SET unused_since = NULL WHERE workspace = ?1 AND id = ?2 AND complete = 1 RETURNING 1")?;
+            for id in ids {
+                add.execute(params![workspace, device, id])?;
+                if whole.query_row(params![workspace, id], |_| Ok(())).optional()?.is_none() {
+                    missing.push(id.clone());
+                }
+            }
+        }
+        tx.execute("UPDATE devices SET refs_at = ?3 WHERE workspace = ?1 AND device = ?2", params![workspace, device, now])?;
+        tx.commit()?;
+        Ok(missing)
+    }
+
+    /// Marks whole files no device uses, unmarks those used again, and
+    /// deletes those unused for the grace period that every device has
+    /// reported without since; returns how many were deleted.
+    pub fn sweep_unused(&self, now: i64) -> Result<usize> {
+        const USED: &str = "EXISTS (SELECT 1 FROM blob_refs r JOIN devices d ON d.workspace = r.workspace AND d.device = r.device
+                             WHERE r.workspace = blobs.workspace AND r.id = blobs.id AND d.removed_at IS NULL)";
+        let doomed: Vec<(String, String)> = {
+            let conn = self.conn();
+            conn.execute(&format!("UPDATE blobs SET unused_since = NULL WHERE unused_since IS NOT NULL AND {USED}"), [])?;
+            conn.execute(&format!("UPDATE blobs SET unused_since = ?1 WHERE complete = 1 AND unused_since IS NULL AND NOT {USED}"), [now])?;
+            let Some(grace) = self.unused_grace else { return Ok(0) };
+            let mut stmt = conn.prepare(
+                "SELECT workspace, id FROM blobs b WHERE complete = 1 AND unused_since <= ?1
+                   AND NOT EXISTS (SELECT 1 FROM devices d WHERE d.workspace = b.workspace AND d.removed_at IS NULL
+                                     AND (d.refs_at IS NULL OR d.refs_at < b.unused_since))",
+            )?;
+            stmt.query_map([now - grace], |r| Ok((r.get(0)?, r.get(1)?)))?.collect::<std::result::Result<_, _>>()?
+        };
+        for (workspace, id) in &doomed {
+            self.delete_blob(workspace, id)?;
+        }
+        Ok(doomed.len())
+    }
+
+    /// Deletes a file's record, then its chunks.
+    fn delete_blob(&self, workspace: &str, id: &str) -> Result<()> {
+        {
+            let conn = self.conn();
+            conn.execute("DELETE FROM blob_chunks WHERE workspace = ?1 AND id = ?2", params![workspace, id])?;
+            conn.execute("DELETE FROM blobs WHERE workspace = ?1 AND id = ?2", params![workspace, id])?;
+        }
+        let _ = std::fs::remove_dir_all(self.blob_dir.join(workspace).join(&id[..2]).join(id));
+        Ok(())
     }
 
     pub fn head(&self, workspace: &str) -> Result<i64> {
@@ -570,6 +664,55 @@ mod tests {
         relay.check_device("ws", "b").unwrap();
         relay.remove_device("ws", "a", "b").unwrap();
         assert!(matches!(relay.get_chunk("ws", "b", id, 0), Err(SyncError::Removed)));
+    }
+
+    /// Files no device uses go after the grace period, and only once every
+    /// device has said so; a file used again, or a device that never
+    /// reports, keeps them.
+    #[test]
+    fn unused_files_are_deleted_once_every_device_agrees() {
+        let relay = Relay::open_in_memory().unwrap();
+        relay.create_workspace("ws", &crate::crypto::wrap(&crate::crypto::WorkspaceKey::generate(), "p", (1024, 1, 1)).unwrap()).unwrap();
+        let (x, y, z) = ("a".repeat(32), "b".repeat(32), "c".repeat(32));
+        for id in [&x, &y] {
+            relay.put_chunk("ws", "a", id, 0, &[1; 10]).unwrap();
+            relay.finish_blob("ws", "a", id, 1).unwrap();
+        }
+        relay.check_device("ws", "b").unwrap();
+        relay.check_device("ws", "c").unwrap();
+        let later = |t: i64| t + UNUSED_GRACE_MS + 1;
+        let ids = |v: &[&String]| v.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+
+        assert_eq!(relay.report_refs("ws", "a", &ids(&[&x, &z])).unwrap(), vec![z.clone()], "the server lacks z");
+        assert!(matches!(relay.report_refs("ws", "a", &["../x".into()]), Err(SyncError::Protocol(_))));
+        let t0 = now_ms();
+        assert_eq!(relay.sweep_unused(t0).unwrap(), 0, "y is marked, not deleted");
+        relay.report_refs("ws", "b", &[]).unwrap();
+        assert_eq!(relay.sweep_unused(later(t0)).unwrap(), 0, "a reported before y was marked; c never did");
+        relay.report_refs("ws", "a", &ids(&[&x])).unwrap();
+        assert_eq!(relay.sweep_unused(later(t0)).unwrap(), 0, "c never reported");
+        relay.remove_device("ws", "a", "c").unwrap();
+        assert_eq!(relay.sweep_unused(t0 + UNUSED_GRACE_MS - 1).unwrap(), 0, "not 30 days yet");
+        assert_eq!(relay.sweep_unused(later(t0)).unwrap(), 1, "y goes");
+        assert!(!relay.chunk_path("ws", &y, 0).exists());
+        assert_eq!(relay.blobs("ws", "a", &ids(&[&x, &y])).unwrap().blobs.len(), 1, "x stays");
+
+        // x falls out of use, then a card uses it again before it goes.
+        relay.report_refs("ws", "a", &[]).unwrap();
+        let t1 = now_ms();
+        relay.sweep_unused(t1).unwrap();
+        assert_eq!(relay.report_refs("ws", "a", &ids(&[&x])).unwrap(), Vec::<String>::new());
+        relay.report_refs("ws", "b", &[]).unwrap();
+        assert_eq!(relay.sweep_unused(later(t1)).unwrap(), 0, "used again");
+
+        // Kept for good when the grace is off.
+        let relay = relay.with_unused_grace(None);
+        relay.report_refs("ws", "a", &[]).unwrap();
+        relay.sweep_unused(t1).unwrap();
+        relay.report_refs("ws", "a", &[]).unwrap();
+        relay.report_refs("ws", "b", &[]).unwrap();
+        assert_eq!(relay.sweep_unused(later(t1)).unwrap(), 0);
+        assert!(relay.chunk_path("ws", &x, 0).exists());
     }
 
     /// A server database from before snapshots and removal gets the new

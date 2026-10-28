@@ -3,9 +3,16 @@
 <!-- Merged by Tauri into the generated iOS project (src-tauri/gen/apple).
      iPhone stays upright: sideways, iOS 26 gives an app without scenes (as
      Tauri's are) the upright safe areas, and the camera cutout covers the
-     page. iPad keeps every orientation. -->
+     page. iPad keeps every orientation.
+     The app speaks English and Chinese, so the system's own menus (Paste,
+     Copy) follow the phone's language rather than staying in English. -->
 <plist version="1.0">
 <dict>
+	<key>CFBundleLocalizations</key>
+	<array>
+		<string>en</string>
+		<string>zh-Hans</string>
+	</array>
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>

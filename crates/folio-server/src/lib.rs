@@ -13,7 +13,7 @@ use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use folio_sync::crypto::WrappedKey;
-use folio_sync::protocol::{BlobDone, BlobIds, BlobsResponse, DeviceName, DevicesResponse, HeavyResponse, Live, PushRequest, PushResponse, SnapshotRequest, SnapshotResponse, DEVICE_HEADER, MAX_PULL};
+use folio_sync::protocol::{BlobDone, BlobIds, BlobsResponse, DeviceName, DevicesResponse, HeavyResponse, Live, PushRequest, PushResponse, RefsResponse, SnapshotRequest, SnapshotResponse, DEVICE_HEADER, MAX_PULL};
 use folio_sync::relay::Relay;
 use folio_sync::SyncError;
 use serde::Deserialize;
@@ -52,6 +52,7 @@ pub fn router(server: Arc<Server>) -> Router {
         .route("/v1/w/{ws}/snapshot", post(push_snapshot))
         .route("/v1/w/{ws}/acks", get(pull_acks).post(push_acks))
         .route("/v1/w/{ws}/blobs/have", post(blobs_have))
+        .route("/v1/w/{ws}/blobs/refs", axum::routing::put(blob_refs))
         .route("/v1/w/{ws}/blobs/{id}/done", post(blob_done))
         .route("/v1/w/{ws}/blobs/{id}/{n}", get(get_chunk).put(put_chunk))
         .route("/health", get(|| async { "ok" }))
@@ -219,6 +220,13 @@ async fn blobs_have(State(s): State<Arc<Server>>, Path(ws): Path<String>, header
     Ok(Json(blocking(move || s.relay.blobs(&ws, &device, &req.ids)).await?))
 }
 
+async fn blob_refs(State(s): State<Arc<Server>>, Path(ws): Path<String>, headers: HeaderMap, Json(req): Json<BlobIds>) -> Result<Json<RefsResponse>, Failure> {
+    let device = authorize(&s, &headers)?;
+    check_workspace(&ws)?;
+    let missing = blocking(move || s.relay.report_refs(&ws, &device, &req.ids)).await?;
+    Ok(Json(RefsResponse { missing }))
+}
+
 async fn put_chunk(
     State(s): State<Arc<Server>>,
     Path((ws, id, n)): Path<(String, String, u32)>,
@@ -254,7 +262,8 @@ async fn get_chunk(State(s): State<Arc<Server>>, Path((ws, id, n)): Path<(String
     Ok(([(axum::http::header::CONTENT_TYPE, "application/octet-stream")], bytes).into_response())
 }
 
-/// Hourly: deletes uploads left unfinished for a week.
+/// Hourly: deletes uploads left unfinished for a week, and files no device
+/// has used for the grace period (`Relay::sweep_unused`).
 pub async fn housekeeping(server: Arc<Server>) {
     let mut every = tokio::time::interval(std::time::Duration::from_secs(60 * 60));
     loop {
@@ -265,6 +274,12 @@ pub async fn housekeeping(server: Arc<Server>) {
             Ok(0) => {}
             Ok(n) => tracing::info!(files = n, "deleted unfinished uploads"),
             Err(Failure(_, e)) => tracing::warn!(error = %e, "deleting unfinished uploads failed"),
+        }
+        let s = server.clone();
+        match blocking(move || s.relay.sweep_unused(now)).await {
+            Ok(0) => {}
+            Ok(n) => tracing::info!(files = n, "deleted files no device uses"),
+            Err(Failure(_, e)) => tracing::warn!(error = %e, "deleting unused files failed"),
         }
     }
 }

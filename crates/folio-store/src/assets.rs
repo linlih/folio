@@ -185,6 +185,24 @@ impl Store {
         Ok(())
     }
 
+    /// The server lost the file (or deleted it as unused while a card here
+    /// still used it): it goes up again.
+    pub fn set_asset_not_uploaded(&self, sha256: &str) -> Result<()> {
+        self.conn.execute("UPDATE assets SET uploaded = 0 WHERE sha256 = ?1 AND local = 1", [sha256])?;
+        Ok(())
+    }
+
+    /// The files this device still uses, for the server to keep: those its
+    /// cards use, whether here or not, and those added here and not yet
+    /// let go. In hash order.
+    pub fn used_assets(&self) -> Result<Vec<String>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT sha256 FROM idx.asset_refs UNION SELECT sha256 FROM assets WHERE local = 1 AND orphan_since IS NULL ORDER BY 1",
+        )?;
+        let rows = stmt.query_map([], |r| r.get::<_, String>(0))?;
+        Ok(rows.collect::<std::result::Result<Vec<_>, _>>()?.into_iter().filter(|sha| is_hash(sha)).collect())
+    }
+
     /// Every file goes up again (this device joined another sync space).
     pub fn forget_uploads(&self) -> Result<()> {
         self.conn.execute("UPDATE assets SET uploaded = 0", [])?;

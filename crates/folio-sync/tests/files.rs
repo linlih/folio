@@ -84,6 +84,9 @@ impl Transport for Direct<'_> {
     fn finish_blob(&self, id: &str, chunks: u32) -> folio_sync::Result<()> {
         self.relay.finish_blob(WS, &self.device, id, chunks)
     }
+    fn report_refs(&self, ids: &[String]) -> folio_sync::Result<Vec<String>> {
+        self.relay.report_refs(WS, &self.device, ids)
+    }
     fn get_chunk(&self, id: &str, n: u32) -> folio_sync::Result<Vec<u8>> {
         let mut bytes = self.relay.get_chunk(WS, &self.device, id, n)?;
         if self.tamper {
@@ -217,4 +220,30 @@ fn wrong_bytes_from_the_server_are_not_kept() {
     // Another workspace's key opens nothing either.
     let stranger = Engine::new(WS, Keys::derive(&WorkspaceKey::generate()));
     assert_eq!(stranger.download_file(&b, &direct(&relay, "b"), &sha, None).unwrap(), Fetched::NotOnServer, "its ids differ");
+}
+
+#[test]
+fn a_file_in_use_that_the_server_lost_goes_up_again() {
+    let (relay, engine, keys) = setup();
+    let (_da, a) = store();
+    let ta = direct(&relay, "a");
+    let sha = add_file(&a, &content(1000, 5));
+    card_with(&a, &sha);
+    engine.upload_files(&a, &ta, &|| false).unwrap();
+    assert_eq!(engine.report_files(&a, &ta).unwrap(), Some(0));
+    assert_eq!(engine.report_files(&a, &ta).unwrap(), None, "nothing new to report");
+
+    // The server deletes it (as if no device had used it for 30 days).
+    relay.report_refs(WS, "a", &[]).unwrap();
+    let t = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis() as i64;
+    relay.sweep_unused(t).unwrap();
+    relay.report_refs(WS, "a", &[]).unwrap();
+    assert_eq!(relay.sweep_unused(t + folio_sync::relay::UNUSED_GRACE_MS + 1).unwrap(), 1);
+    assert!(relay.blobs(WS, "a", &[keys.blob_id(&sha)]).unwrap().blobs.is_empty());
+
+    // The next report (forced here by forgetting the last) finds it gone.
+    a.lock().unwrap().set_sync_value(folio_sync::files::REFS_REPORTED, &[]).unwrap();
+    assert_eq!(engine.report_files(&a, &ta).unwrap(), Some(1));
+    assert_eq!(engine.upload_files(&a, &ta, &|| false).unwrap(), 1);
+    assert_eq!(relay.blobs(WS, "a", &[keys.blob_id(&sha)]).unwrap().blobs.len(), 1);
 }

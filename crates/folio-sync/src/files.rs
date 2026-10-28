@@ -5,6 +5,10 @@
 //! Files have their own queue, apart from documents: a sync of edits never
 //! waits for a file. The store lock is held only to read or record state;
 //! files are read and written outside it (stored files never change).
+//!
+//! The device also tells the server which files it still uses (§6), so the
+//! server can delete the rest; a file the server lost or deleted while a
+//! card here uses it goes up again.
 
 use std::collections::HashMap;
 use std::io::Read;
@@ -15,7 +19,16 @@ use folio_store::{AssetInfo, Incoming, Store};
 use crate::client::{lock, now_ms, Engine, Transport};
 use crate::crypto::{chunks_for, CHUNK};
 use crate::protocol::{BlobState, MAX_BLOB_IDS};
+use sha2::{Digest, Sha256};
 use crate::{Result, SyncError};
+
+/// `sync_state` key: what was last reported of the files in use (a digest
+/// of the ids, then when, little-endian ms).
+pub const REFS_REPORTED: &str = "sync.files.reported";
+
+/// The files in use are reported again this often even when unchanged, so
+/// the server knows the device is still there.
+pub const REPORT_EVERY_MS: i64 = 6 * 60 * 60 * 1000;
 
 /// What became of a download.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -113,6 +126,50 @@ impl Engine {
         let info = lock(store).add_downloaded_asset(incoming, sha256, mime, now_ms())?;
         tracing::info!(asset = %sha256, size = info.size, "downloaded a file");
         Ok(Fetched::Done(info))
+    }
+
+    /// Tells the server the files this device uses, when they changed since
+    /// the last report or that was long ago. Returns how many of them the
+    /// server lacked and were queued to go up again, or None when there was
+    /// nothing to report.
+    pub fn report_files(&self, store: &Mutex<Store>, t: &dyn Transport) -> Result<Option<usize>> {
+        let shas = lock(store).used_assets()?;
+        let mut ids: Vec<(String, &String)> = shas.iter().map(|sha| (self.keys.blob_id(sha), sha)).collect();
+        ids.sort();
+        let mut digest = Sha256::new();
+        for (id, _) in &ids {
+            digest.update(id.as_bytes());
+            digest.update(b"\n");
+        }
+        let digest = digest.finalize();
+        let now = now_ms();
+        if let Some(last) = lock(store).sync_value(REFS_REPORTED)? {
+            if last.len() == 40 && last[..32] == digest[..] {
+                let at = i64::from_le_bytes(last[32..].try_into().expect("8 bytes"));
+                if now - at < REPORT_EVERY_MS && at <= now {
+                    return Ok(None);
+                }
+            }
+        }
+        let missing = t.report_refs(&ids.iter().map(|(id, _)| id.clone()).collect::<Vec<_>>())?;
+        let by_id: HashMap<&str, &String> = ids.iter().map(|(id, sha)| (id.as_str(), *sha)).collect();
+        let s = lock(store);
+        let mut requeued = 0;
+        for id in &missing {
+            if let Some(sha) = by_id.get(id.as_str()) {
+                if s.asset_file(sha)?.is_some() {
+                    s.set_asset_not_uploaded(sha)?;
+                    requeued += 1;
+                }
+            }
+        }
+        let mut value = digest.to_vec();
+        value.extend_from_slice(&now.to_le_bytes());
+        s.set_sync_value(REFS_REPORTED, &value)?;
+        if requeued > 0 {
+            tracing::info!(files = requeued, "the server lacks files in use here; uploading them again");
+        }
+        Ok(Some(requeued))
     }
 
     /// The bytes the workspace's files take on the server.

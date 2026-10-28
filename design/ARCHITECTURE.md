@@ -407,7 +407,7 @@ CREATE TABLE index_meta (doc_id TEXT PRIMARY KEY, indexed_vv BLOB, gen INT);
 
 **本地部分已实现（2026-10-28，细节见 `design/attachments.md`）**：图片与文件块（`image` 加 `asset/name/mime/size`，新的 `file` 块）；粘贴、拖入、`/` 菜单“图片”“文件”；分块写入 `assets/.incoming/` 再按哈希改名；`folio-asset` 协议（支持 Range）；Apple 设备上 HEIC 转 JPEG；单文件上限 100 MB；`idx.asset_refs` 记引用，无引用 30 天后清理（`assets.orphan_since`，迁移 3）；导出 Markdown 时复制到 `assets/`。
 
-**同步已实现（2026-10-28）**：文件按 1 MiB 分块加密（XChaCha20-Poly1305，块号与是否最后一块绑定在附加数据里，最后一块补齐到 64 KiB 的倍数），服务器上的 id 是文件哈希的 HMAC；存在同步服务器自己的 `<数据库>.blobs/` 目录（没有用 S3 兼容存储），断点续传；下载后校验哈希。独立的 `sync-files` 线程，不拖慢文档同步。电脑下载全部文件，手机只下载用到的（加载不出来的图片、点开的文件、卡片菜单“下载本卡片的全部附件”）。服务器端清理未做（§5.6 第 6 条）。
+**同步已实现（2026-10-28）**：文件按 1 MiB 分块加密（XChaCha20-Poly1305，块号与是否最后一块绑定在附加数据里，最后一块补齐到 64 KiB 的倍数），服务器上的 id 是文件哈希的 HMAC；存在同步服务器自己的 `<数据库>.blobs/` 目录（没有用 S3 兼容存储），断点续传；下载后校验哈希。独立的 `sync-files` 线程，不拖慢文档同步。电脑下载全部文件，手机只下载用到的（加载不出来的图片、点开的文件、卡片菜单“下载本卡片的全部附件”）。服务器上没有设备再用的文件，所有设备都确认后 30 天删除（`FOLIO_SERVER_UNUSED_FILE_DAYS`，0 不删；见 attachments.md §6）。
 
 待细化（预留的设计空间）：
 - 大文件分块加密与断点续传；服务器上的存储键用带密钥的哈希，避免泄露内容哈希。
@@ -514,7 +514,7 @@ CREATE TABLE index_meta (doc_id TEXT PRIMARY KEY, indexed_vv BLOB, gen INT);
   - **设备列表与移除**：服务端记录每台设备的加密名称和最后一次请求的时间，设置里列出；超过 90 天未同步的标出来，用户可以移除其他设备（`DELETE devices/{id}`）。被移除的设备之后的请求一律 410，需要停止同步再重新加入（新的设备 id）；因为各处都有完整历史，它重新加入时上传的全部历史能直接合并回来。移除不更换口令和密钥（见 5.6 第 5 条）。
   - 模拟器覆盖：随机上传快照、随机移除设备并重新加入、最后加入一台全新设备，全部收敛。
 - **收敛校验**（学 Logseq ADR 0006）：同步空闲时，客户端上报每个文档的 `vv` 哈希；与服务端记录的其他设备的最新 vv 对比，不一致则对该文档发起全量交换（双方互发 `export(updates_since(peer_vv))`）。
-- **附件**：按 sha256 内容寻址，分块加密后经单独的接口上传，服务器存成文件；卡片里只存哈希（存储见 4.6，同步设计见 `design/attachments.md` §5，2026-10-28 已实现，接口为 `POST blobs/have`、`PUT/GET blobs/{id}/{n}`、`POST blobs/{id}/done`）。
+- **附件**：按 sha256 内容寻址，分块加密后经单独的接口上传，服务器存成文件；卡片里只存哈希（存储见 4.6，同步设计见 `design/attachments.md` §5，2026-10-28 已实现，接口为 `POST blobs/have`、`PUT/GET blobs/{id}/{n}`、`POST blobs/{id}/done`、`PUT blobs/refs`）。
 - **E2EE**：工作区主密钥用用户口令（Argon2id）派生的 KEK 包裹后存服务端；新设备输入口令解开。所有 blob 用 XChaCha20-Poly1305 加密，`doc_id` 也可做 HMAC 混淆。
 - **第一版实现（M3，2026-10）**：`crates/folio-sync`（协议、加密、服务端存储 `relay`、客户端引擎 `client`、HTTP/WebSocket 传输）+ `crates/folio-server`（axum）。与上面草图的差别：日志按**工作区**一条，`seq` 与游标都是工作区级的（一次拉取覆盖所有文档）；`doc_id` 用 HMAC 混淆成标签，文档种类和真实 id 封在密文信封里，服务端只看到“某工作区、某标签、某设备的一段密文”。接口：`PUT/GET /v1/w/{ws}/key`（包裹后的主密钥）、`POST push`、`GET pull?after=`、`GET live`（WebSocket，只通知新的 head）、`PUT device`（加密的设备名）、`GET devices`、`POST/GET acks`（加密的版本报告）；所有请求带服务器令牌（启动时的 `FOLIO_SERVER_TOKEN`）和设备 id。新设备凭“同步码”（服务器地址 + 令牌 + 工作区 id）加口令加入；口令不在同步码里。设备开启同步时把每个文档的完整历史放进 outbox 一次，之前写入的内容（迁移、恢复、导入）不会漏传。工作区主密钥暂存本机设置，之后移到系统钥匙串。尚未做：收敛校验、跨设备永久删除（附件已于 2026-10-28 加入）。
 - **无服务器模式（可选，后期）**：同样的协议也可以落到 WebDAV / iCloud Drive / S3：每台设备只写自己的 `ops-<device>/` 目录（单写者），其他设备读取 → 天然无冲突（tine BACKLOG 中提到的思路，在 CRDT 下变得简单）。

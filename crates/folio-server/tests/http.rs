@@ -212,6 +212,8 @@ fn files_over_http() {
     assert_eq!(info.size, bytes.len() as u64);
     assert_eq!(std::fs::read(b.lock().unwrap().asset_file(&sha).unwrap().unwrap().0).unwrap(), bytes);
     assert!(engine.server_file_bytes(&tb).unwrap() > bytes.len() as i64);
+    // A reports the files it uses; the server has them all.
+    assert_eq!(engine.report_files(&a, &ta).unwrap(), Some(0));
 
     // Over 2 MB: refused as too large; over the room left: as full.
     let big: Vec<u8> = vec![7; 2 * CHUNK + 1];

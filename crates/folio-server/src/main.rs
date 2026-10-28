@@ -10,7 +10,9 @@
 //!   compaction out);
 //! - `FOLIO_SERVER_MAX_FILE_MB` (default 100): the largest image or
 //!   attachment;
-//! - `FOLIO_SERVER_QUOTA_MB` (default none): room for files per sync space.
+//! - `FOLIO_SERVER_QUOTA_MB` (default none): room for files per sync space;
+//! - `FOLIO_SERVER_UNUSED_FILE_DAYS` (default 30): a file no device uses any
+//!   more is deleted after this many days; 0 keeps such files for good.
 //!
 //! Files are kept in `<FOLIO_SERVER_DB>.blobs/` beside the database.
 //!
@@ -65,6 +67,22 @@ async fn main() {
     let max_file = mb("FOLIO_SERVER_MAX_FILE_MB").unwrap_or(folio_sync::relay::MAX_FILE_BYTES);
     let quota = mb("FOLIO_SERVER_QUOTA_MB");
     relay = relay.with_file_limits(max_file, quota);
+    let days = match std::env::var("FOLIO_SERVER_UNUSED_FILE_DAYS") {
+        Err(_) => Some(30),
+        Ok(v) => match v.trim().parse::<i64>() {
+            Ok(0) => None,
+            Ok(n) if n > 0 => Some(n),
+            _ => {
+                eprintln!("FOLIO_SERVER_UNUSED_FILE_DAYS must be a number of days (0 keeps unused files for good).");
+                std::process::exit(2);
+            }
+        },
+    };
+    relay = relay.with_unused_grace(days.map(|d| d * 24 * 60 * 60 * 1000));
+    match days {
+        Some(d) => tracing::info!(days = d, "files no device uses are deleted after"),
+        None => tracing::info!("files no device uses are kept"),
+    }
     let listener = tokio::net::TcpListener::bind(&addr).await.unwrap_or_else(|e| {
         eprintln!("Cannot listen on {addr}: {e}");
         std::process::exit(1);
