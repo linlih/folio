@@ -33,6 +33,11 @@ jobs:
           token=$(sudo sed -n 's/^FOLIO_SERVER_TOKEN=//p' /opt/folio-sync/etc/folio-sync.env)
           echo "$token" > /tmp/token-before
           test "$(curl -fsSk https://folio-a.localhost/health)" = ok
+          # The live channel is only for workspaces that exist.
+          curl -fsSk -X PUT -H "Authorization: Bearer $token" -H "X-Folio-Device: ci" \
+            -H "Content-Type: application/json" \
+            -d '{"salt":"","nonce":"","sealed":"","m_cost":0,"t_cost":0,"p_cost":0}' \
+            https://folio-a.localhost/v1/w/ci-test/key
           code=$(curl -sk -o /dev/null -w '%{http_code}' --http1.1 --max-time 5 \
             -H "Connection: Upgrade" -H "Upgrade: websocket" -H "Sec-WebSocket-Version: 13" \
             -H "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==" \
