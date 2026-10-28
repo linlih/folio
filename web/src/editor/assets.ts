@@ -6,15 +6,15 @@
 
 import { Extension, Node, mergeAttributes } from "@tiptap/core";
 import Image from "@tiptap/extension-image";
-import type { Node as PMNode, Schema } from "@tiptap/pm/model";
-import { Plugin, PluginKey, TextSelection } from "@tiptap/pm/state";
+import { Fragment, type Node as PMNode, type Schema } from "@tiptap/pm/model";
+import { Plugin, PluginKey, TextSelection, type Transaction } from "@tiptap/pm/state";
 import type { EditorView } from "@tiptap/pm/view";
 import type { AssetEvent, AssetInfo } from "../bindings/commands";
 import i18n from "../i18n";
 import { backend } from "../platform";
 import { useShell } from "../shell/tabs";
-import { ImageView, clampScale } from "./imageView";
-import { insertAfterLine } from "./outliner/tree";
+import { ImageView, clampScale, imageLinePlugin } from "./imageView";
+import { insertAfterLine, insertItems, itemAt, itemAtPos } from "./outliner/tree";
 
 /** The largest file a card can hold (same as folio_store::assets). */
 export const MAX_FILE_BYTES = 100 * 1024 * 1024;
@@ -54,6 +54,9 @@ export const CardImage = Image.extend({
       },
       ...fileAttributes,
     };
+  },
+  addProseMirrorPlugins() {
+    return [...(this.parent?.() ?? []), imageLinePlugin()];
   },
   addNodeView() {
     return (props) => new ImageView(props.node, props.view, props.getPos as () => number | undefined, props.HTMLAttributes);
@@ -328,6 +331,22 @@ export async function nodeFor(schema: Schema, info: AssetInfo): Promise<PMNode> 
   return schema.nodes.file.create(attrs);
 }
 
+/** Puts added files after the current line. Added on an empty outline
+ *  line, the files take that item (the line is out of sight, imageView.ts)
+ *  and writing goes on in a new item below, as after Enter. */
+export function placeFiles(tr: Transaction, nodes: PMNode[]): Transaction {
+  const { $head, empty } = tr.selection;
+  const item = itemAt($head);
+  const takesItem = !!item && empty && $head.parent === item.node.firstChild && $head.parent.content.size === 0;
+  insertAfterLine(tr, nodes);
+  if (!item || !takesItem) return tr;
+  const now = itemAtPos(tr.doc, item.pos);
+  if (!now) return tr;
+  const { listItem, paragraph } = tr.doc.type.schema.nodes;
+  const at = insertItems(tr, Fragment.from(listItem.create(null, paragraph.create())), { kind: "after", item: now });
+  return tr.setSelection(TextSelection.create(tr.doc, at + 2));
+}
+
 /** Adds the files to the library, then puts them after the current block
  *  in their order. Files too large are left out with a message. */
 export async function addFiles(view: EditorView, files: File[]): Promise<void> {
@@ -346,7 +365,7 @@ export async function addFiles(view: EditorView, files: File[]): Promise<void> {
   }
   if (!nodes.length || view.isDestroyed) return;
   if (files.some((f) => f.size > 5 * 1024 * 1024)) notify(null);
-  view.dispatch(insertAfterLine(view.state.tr, nodes).scrollIntoView());
+  view.dispatch(placeFiles(view.state.tr, nodes).scrollIntoView());
   view.focus();
 }
 

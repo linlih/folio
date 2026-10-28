@@ -218,6 +218,10 @@
 .card-body .image-frame.resizing .image-handle { opacity: 1; }
 .card-body .image-frame.resizing { user-select: none; }
 .card-body[contenteditable="false"] .image-handle { display: none; }
+/* An empty line an image follows (imageView.ts): out of sight until the
+   cursor is in it; the item's bullet sits beside the picture's top. */
+.card-body .image-line { height: 0; overflow: hidden; }
+.card-body .image-line + .image-frame { margin-top: 0; }
 /* A finger sizes images in the viewer. */
 @media (hover: none) and (pointer: coarse) {
   .card-body .image-handle { display: none; }

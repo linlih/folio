@@ -117,3 +117,41 @@ describe("the viewer", () => {
     expect(imagePos(a.editor)).toBe(-1);
   });
 });
+
+describe("an image added on an empty line", () => {
+  async function journal(html: string) {
+    const doc = device(1n);
+    initCard(doc, "journal", "", 1);
+    const { editor } = await bind(doc);
+    editor.commands.setContent(html);
+    await settle();
+    return editor;
+  }
+  const add = (editor: Ed) => addFiles(editor.view, [new File(["png"], "shot.png", { type: "image/png" })]).then(settle);
+  const lines = (editor: Ed) => [...editor.view.dom.querySelectorAll("li > p")].map((p) => (p.classList.contains("image-line") ? "hidden" : p.textContent || "empty"));
+
+  it("takes the item: the line is out of sight and writing goes on below", async () => {
+    const editor = await journal("<ul><li><p></p></li></ul>");
+    editor.commands.setTextSelection(3);
+    await add(editor);
+    const items = editor.getJSON().content![0].content!;
+    expect(items.map((i) => i.content!.map((c) => c.type))).toEqual([["paragraph", "image"], ["paragraph"]]);
+    expect(lines(editor)).toEqual(["hidden", "empty"]);
+    expect(editor.state.selection.$head.parent).toBe(editor.state.doc.firstChild!.child(1).firstChild);
+    // The line shows while the cursor is in it, for a caption.
+    editor.commands.setTextSelection(3);
+    expect(lines(editor)).toEqual(["empty", "empty"]);
+    editor.commands.insertContent("caption");
+    editor.commands.setTextSelection(editor.state.doc.content.size - 3);
+    expect(lines(editor)).toEqual(["caption", "empty"]);
+  });
+
+  it("after text goes under that text, the cursor staying", async () => {
+    const editor = await journal("<ul><li><p>first</p></li></ul>");
+    cursorAfter(editor, "first");
+    await add(editor);
+    expect(editor.getJSON().content![0].content!.length).toBe(1);
+    expect(lines(editor)).toEqual(["first"]);
+    expect(editor.state.selection.$head.parent.textContent).toBe("first");
+  });
+});

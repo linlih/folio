@@ -4,10 +4,37 @@
 // a tap with a finger. A phone has no corner to drag; the viewer offers sizes.
 
 import type { Node as PMNode } from "@tiptap/pm/model";
-import type { EditorView, NodeView } from "@tiptap/pm/view";
+import { Plugin, PluginKey, type EditorState } from "@tiptap/pm/state";
+import { Decoration, DecorationSet, type EditorView, type NodeView } from "@tiptap/pm/view";
 import i18n from "../i18n";
 import { isTouch } from "../shell/phone";
 import { openImage } from "./imageViewer";
+import { isItem } from "./outliner/tree";
+
+/** The empty lines an image follows directly in an outline item (every item
+ *  starts with a line, so an image put on an empty line comes after it). Not
+ *  shown while the cursor is elsewhere: the image is the item, its bullet
+ *  beside the picture, as in Logseq; the line is there to write a caption. */
+function imageLines(state: EditorState): DecorationSet {
+  const decorations: Decoration[] = [];
+  const { $head, empty } = state.selection;
+  const caretLine = empty && $head.parent.isTextblock ? $head.before() : -1;
+  state.doc.descendants((node, pos) => {
+    if (!isItem(node)) return true;
+    const line = node.firstChild;
+    if (line?.isTextblock && line.content.size === 0 && node.childCount > 1 && node.child(1).type.name === "image" && pos + 1 !== caretLine) {
+      decorations.push(Decoration.node(pos + 1, pos + 1 + line.nodeSize, { class: "image-line" }));
+    }
+    return true;
+  });
+  return DecorationSet.create(state.doc, decorations);
+}
+
+export const imageLinePlugin = () =>
+  new Plugin({
+    key: new PluginKey("imageLine"),
+    props: { decorations: imageLines },
+  });
 
 /** The narrowest an image can be made, in percent of its column. */
 export const MIN_SCALE = 10;
