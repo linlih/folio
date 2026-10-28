@@ -318,10 +318,18 @@ fn start(app: &tauri::AppHandle, settings: SyncSettings) {
 fn listen(app: tauri::AppHandle, http: Http, stop: Arc<AtomicBool>, wake: mpsc::Sender<()>) {
     let mut backoff = BACKOFF;
     while !stop.load(Ordering::SeqCst) {
+        // The server speaks first on a connection that works; one that did
+        // is tried again soon, however long earlier attempts waited (a
+        // phone drops it each time it sleeps).
+        let mut heard = false;
         let result = http.listen(|_head| {
+            heard = true;
             update(&app, |st| st.live = true);
             let _ = wake.send(());
         });
+        if heard {
+            backoff = BACKOFF;
+        }
         update(&app, |st| st.live = false);
         if stop.load(Ordering::SeqCst) {
             return;
