@@ -42,6 +42,9 @@ const STORE_MIGRATIONS: &[&str] = &[
     // `updated_at` (a clock, which can go back): what sync reports go by.
     "ALTER TABLE docs ADD COLUMN changed INTEGER NOT NULL DEFAULT 0;
      CREATE INDEX docs_by_changed ON docs(changed);",
+    // 3: when a file stopped being used by any card; it is deleted a while
+    // later (design/attachments.md §6).
+    "ALTER TABLE assets ADD COLUMN orphan_since INTEGER;",
 ];
 
 /// Whether `store.db` has steps to run (and is not new).
@@ -51,7 +54,7 @@ pub fn has_pending_migrations(conn: &Connection) -> rusqlite::Result<bool> {
 }
 
 /// Bump whenever `INDEX_TABLES` changes.
-const INDEX_VERSION: i64 = 6;
+const INDEX_VERSION: i64 = 7;
 
 const INDEX_TABLES: &str = "
   CREATE TABLE idx.cards (
@@ -81,6 +84,9 @@ const INDEX_TABLES: &str = "
   CREATE TABLE idx.card_topics (card_id TEXT, topic TEXT);
   CREATE INDEX idx.card_topics_by_topic ON card_topics(topic);
   CREATE INDEX idx.card_topics_by_card ON card_topics(card_id);
+  -- Files (assets) the cards use, by hash.
+  CREATE TABLE idx.asset_refs (sha256 TEXT, doc_id TEXT, PRIMARY KEY (sha256, doc_id));
+  CREATE INDEX idx.asset_refs_by_doc ON asset_refs(doc_id);
   -- Full text of titles (bid '') and blocks. Trigram works for Chinese
   -- without word splitting; queries under 3 characters use LIKE instead.
   CREATE VIRTUAL TABLE idx.fts USING fts5(card_id UNINDEXED, bid UNINDEXED, text, tokenize = 'trigram');
@@ -103,7 +109,7 @@ pub fn migrate(conn: &Connection) -> rusqlite::Result<bool> {
     conn.execute_batch(&format!(
         "DROP TABLE IF EXISTS idx.cards; DROP TABLE IF EXISTS idx.blocks; DROP TABLE IF EXISTS idx.links;
          DROP TABLE IF EXISTS idx.refs; DROP TABLE IF EXISTS idx.fts; DROP TABLE IF EXISTS idx.tags;
-         DROP TABLE IF EXISTS idx.card_topics;
+         DROP TABLE IF EXISTS idx.card_topics; DROP TABLE IF EXISTS idx.asset_refs;
          {INDEX_TABLES} PRAGMA idx.user_version = {INDEX_VERSION};"
     ))?;
     Ok(true)

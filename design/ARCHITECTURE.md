@@ -344,7 +344,8 @@ CREATE TABLE assets (                 -- 文件按内容寻址，文件本体放
   original_name TEXT, created_at INTEGER,
   meta JSON,                          -- 宽高、时长、页数等，按类型不同；预留扩展
   uploaded INTEGER DEFAULT 0,         -- 是否已上传到对象存储
-  local INTEGER DEFAULT 1             -- 本机是否有原文件（手机按需下载时为 0）
+  local INTEGER DEFAULT 1,            -- 本机是否有原文件（手机按需下载时为 0）
+  orphan_since INTEGER                -- 何时起没有卡片用它（迁移 3）；满 30 天删除
 );
 CREATE TABLE sync_state (key TEXT PRIMARY KEY, value BLOB);  -- 游标、本设备 peer_id（前端/Rust 各一个）、密钥指纹
 CREATE TABLE device_acks (            -- 各设备已确认的版本（从服务端同步而来），决定压缩点
@@ -367,6 +368,7 @@ CREATE INDEX blocks_by_bid ON blocks(bid);                 -- 块引用按 bid �
 CREATE TABLE links  (src_card TEXT, src_bid TEXT, dst_card TEXT, dst_bid TEXT, kind TEXT);
 CREATE TABLE card_tags (card_id TEXT, tag_id TEXT, props JSON);
 CREATE TABLE board_items (board_id TEXT, card_id TEXT);      -- “这张卡在哪些白板上”
+CREATE TABLE asset_refs (sha256 TEXT, doc_id TEXT);          -- 哪些卡片用到哪个文件（含回收站）
 CREATE VIRTUAL TABLE fts USING fts5(card_id UNINDEXED, bid UNINDEXED, text,
                                     tokenize = 'trigram');
 CREATE TABLE index_meta (doc_id TEXT PRIMARY KEY, indexed_vv BLOB, gen INT);
@@ -402,6 +404,8 @@ CREATE TABLE index_meta (doc_id TEXT PRIMARY KEY, indexed_vv BLOB, gen INT);
 4. **前端经自定义协议读取**：`folio-asset://<哈希>`，由 Rust 读磁盘，支持按字节范围读取（音频拖动进度、大 PDF 翻页即读）。
 5. **从文件派生的内容都可重建**：缩略图放缓存目录；PDF 抽取的文字、语音转写的文字进入 `index.db`，供全文搜索和 AI 检索（0.3）。
 6. **文件单独同步**，不走 CRDT 增量通道：加密后上传到 S3 兼容的对象存储（5.3）。
+
+**本地部分已实现（2026-10-28，细节见 `design/attachments.md`）**：图片与文件块（`image` 加 `asset/name/mime/size`，新的 `file` 块）；粘贴、拖入、`/` 菜单“图片”“文件”；分块写入 `assets/.incoming/` 再按哈希改名；`folio-asset` 协议（支持 Range）；Apple 设备上 HEIC 转 JPEG；单文件上限 100 MB；`idx.asset_refs` 记引用，无引用 30 天后清理（`assets.orphan_since`，迁移 3）；导出 Markdown 时复制到 `assets/`。同步未做。
 
 待细化（预留的设计空间）：
 - 大文件分块加密与断点续传；服务器上的存储键用带密钥的哈希，避免泄露内容哈希。
@@ -508,7 +512,7 @@ CREATE TABLE index_meta (doc_id TEXT PRIMARY KEY, indexed_vv BLOB, gen INT);
   - **设备列表与移除**：服务端记录每台设备的加密名称和最后一次请求的时间，设置里列出；超过 90 天未同步的标出来，用户可以移除其他设备（`DELETE devices/{id}`）。被移除的设备之后的请求一律 410，需要停止同步再重新加入（新的设备 id）；因为各处都有完整历史，它重新加入时上传的全部历史能直接合并回来。移除不更换口令和密钥（见 5.6 第 5 条）。
   - 模拟器覆盖：随机上传快照、随机移除设备并重新加入、最后加入一台全新设备，全部收敛。
 - **收敛校验**（学 Logseq ADR 0006）：同步空闲时，客户端上报每个文档的 `vv` 哈希；与服务端记录的其他设备的最新 vv 对比，不一致则对该文档发起全量交换（双方互发 `export(updates_since(peer_vv))`）。
-- **附件**：按 sha256 内容寻址，加密后单独上传到对象存储；卡片里只存哈希（存储与派生内容见 4.6）。
+- **附件**：按 sha256 内容寻址，分块加密后经单独的接口上传，服务器存成文件；卡片里只存哈希（存储见 4.6，同步设计见 `design/attachments.md` §5，尚未实现）。
 - **E2EE**：工作区主密钥用用户口令（Argon2id）派生的 KEK 包裹后存服务端；新设备输入口令解开。所有 blob 用 XChaCha20-Poly1305 加密，`doc_id` 也可做 HMAC 混淆。
 - **第一版实现（M3，2026-10）**：`crates/folio-sync`（协议、加密、服务端存储 `relay`、客户端引擎 `client`、HTTP/WebSocket 传输）+ `crates/folio-server`（axum）。与上面草图的差别：日志按**工作区**一条，`seq` 与游标都是工作区级的（一次拉取覆盖所有文档）；`doc_id` 用 HMAC 混淆成标签，文档种类和真实 id 封在密文信封里，服务端只看到“某工作区、某标签、某设备的一段密文”。接口：`PUT/GET /v1/w/{ws}/key`（包裹后的主密钥）、`POST push`、`GET pull?after=`、`GET live`（WebSocket，只通知新的 head）、`PUT device`（加密的设备名）、`GET devices`、`POST/GET acks`（加密的版本报告）；所有请求带服务器令牌（启动时的 `FOLIO_SERVER_TOKEN`）和设备 id。新设备凭“同步码”（服务器地址 + 令牌 + 工作区 id）加口令加入；口令不在同步码里。设备开启同步时把每个文档的完整历史放进 outbox 一次，之前写入的内容（迁移、恢复、导入）不会漏传。工作区主密钥暂存本机设置，之后移到系统钥匙串。尚未做：收敛校验、附件、跨设备永久删除。
 - **无服务器模式（可选，后期）**：同样的协议也可以落到 WebDAV / iCloud Drive / S3：每台设备只写自己的 `ops-<device>/` 目录（单写者），其他设备读取 → 天然无冲突（tine BACKLOG 中提到的思路，在 CRDT 下变得简单）。

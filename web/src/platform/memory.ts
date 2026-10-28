@@ -20,6 +20,8 @@ export function memoryBackend(now: () => number = Date.now): Backend {
   const docs = new Map<string, { doc: LoroDoc; updatedAt: number }>();
   const settings = new Map<string, unknown>();
   const backups: { info: BackupInfo; docs: Map<string, Uint8Array> }[] = [];
+  /** Added files: hash → object URL. */
+  const assets = new Map<string, string>();
 
   const hostDoc = () => {
     const doc = new LoroDoc();
@@ -254,6 +256,19 @@ export function memoryBackend(now: () => number = Date.now): Backend {
     },
     syncRemoveDevice: async () => {
       throw new Error("not available in the browser");
+    },
+    addAsset: async (file) => {
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", bytes));
+      const sha256 = [...digest].map((b) => b.toString(16).padStart(2, "0")).join("");
+      const mime = file.type || "application/octet-stream";
+      if (!assets.has(sha256)) assets.set(sha256, URL.createObjectURL(new Blob([bytes], { type: mime })));
+      return { sha256, name: file.name, mime, size: bytes.byteLength };
+    },
+    assetUrl: (sha256) => assets.get(sha256) ?? "",
+    openAsset: async (sha256) => {
+      const url = assets.get(sha256);
+      if (url) window.open(url, "_blank");
     },
   };
 }

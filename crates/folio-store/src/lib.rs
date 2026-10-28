@@ -9,6 +9,7 @@
 //! `Store::apply_update` is the single write path for document content: local
 //! edits, remote updates and imports all go through it (§3.1 invariant 1).
 
+pub mod assets;
 pub mod backup;
 mod compact;
 mod schema;
@@ -22,6 +23,7 @@ use folio_core::{DocId, DocKind};
 use rusqlite::{Connection, OptionalExtension, params};
 use serde::Serialize;
 
+pub use assets::{AssetInfo, Incoming, Swept};
 pub use backup::{BackupInfo, CardVersion};
 pub use compact::Compacted;
 
@@ -39,6 +41,8 @@ pub enum StoreError {
     Json(#[from] serde_json::Error),
     #[error("{0}")]
     Io(#[from] std::io::Error),
+    #[error("the file is larger than {} MB", .0 / 1024 / 1024)]
+    TooLarge(u64),
 }
 
 pub type Result<T> = std::result::Result<T, StoreError>;
@@ -885,8 +889,12 @@ impl Store {
         let x = folio_core::index::extract(self.doc_mut(id, DocKind::Card)?);
         let topics = card::card_topics(self.doc_mut(id, DocKind::Card)?);
         let tx = self.conn.unchecked_transaction()?;
-        for table in ["blocks", "links", "refs", "fts", "tags", "card_topics"] {
-            let column = if matches!(table, "blocks" | "fts" | "tags" | "card_topics") { "card_id" } else { "from_card" };
+        for table in ["blocks", "links", "refs", "fts", "tags", "card_topics", "asset_refs"] {
+            let column = match table {
+                "blocks" | "fts" | "tags" | "card_topics" => "card_id",
+                "asset_refs" => "doc_id",
+                _ => "from_card",
+            };
             tx.execute(&format!("DELETE FROM idx.{table} WHERE {column} = ?1"), [id.as_str()])?;
         }
         tx.execute("INSERT INTO idx.fts(card_id, bid, text) VALUES (?1, '', ?2)", params![id.as_str(), s.title])?;
@@ -913,6 +921,9 @@ impl Store {
         }
         for topic in &topics {
             tx.execute("INSERT INTO idx.card_topics(card_id, topic) VALUES (?1, ?2)", params![id.as_str(), topic])?;
+        }
+        for sha256 in &x.assets {
+            tx.execute("INSERT OR IGNORE INTO idx.asset_refs(sha256, doc_id) VALUES (?1, ?2)", params![sha256, id.as_str()])?;
         }
         tx.commit()?;
         Ok(())
@@ -970,11 +981,22 @@ mod tests {
             let mut s = Store::open(dir.path()).unwrap();
             let a = s.create_card(CardKind::Note, "A", 1).unwrap();
             let b = s.create_card(CardKind::Note, "B", 2).unwrap();
-            // Back to layout 1, as a library from before the counter.
-            s.conn.execute_batch("DROP INDEX docs_by_changed; ALTER TABLE docs DROP COLUMN changed; PRAGMA user_version = 1;").unwrap();
+            // Back to layout 1, as a library from before the counter and
+            // before files had an unused mark.
+            s.conn
+                .execute_batch(
+                    "DROP INDEX docs_by_changed; ALTER TABLE docs DROP COLUMN changed;
+                     ALTER TABLE assets DROP COLUMN orphan_since;
+                     INSERT INTO assets(sha256, mime, size, local) VALUES ('kept', 'image/png', 3, 1);
+                     PRAGMA user_version = 1;",
+                )
+                .unwrap();
             (a, b)
         };
         let mut s = Store::open(dir.path()).unwrap();
+        let kept: (String, i64, Option<i64>) =
+            s.conn.query_row("SELECT mime, size, orphan_since FROM assets WHERE sha256 = 'kept'", [], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?))).unwrap();
+        assert_eq!(kept, ("image/png".to_owned(), 3, None), "rows are kept through migration 3");
         let backups = backup::list_backups(&backup::backups_dir(dir.path())).unwrap();
         assert_eq!(backups.iter().filter(|b| b.reason.as_deref() == Some("upgrade")).count(), 1);
         let ids = |s: &Store, after| s.docs_changed_after(after).unwrap().into_iter().map(|(id, _, n)| (id, n)).collect::<Vec<_>>();

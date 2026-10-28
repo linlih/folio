@@ -1,6 +1,7 @@
 //! Tauri shell. Commands are thin wrappers over `folio-store`; all rules live in
 //! the crates (design/ARCHITECTURE.md §3.1, tine ADR 0003).
 
+mod assets;
 mod diagnostics;
 mod library;
 mod mcp;
@@ -306,13 +307,14 @@ fn tagged(state: tauri::State<AppState>, tag: String, limit: Option<u32>) -> Cmd
 
 /// One card (or journal day) as Markdown, with links resolved to what cards
 /// and blocks say now; `with_title` puts the title first as a heading.
-fn render_card(store: &mut Store, id: &DocId, with_title: bool) -> CmdResult<String> {
+/// A card as Markdown; `file` gives the link for each image or attachment.
+fn render_card(store: &mut Store, id: &DocId, with_title: bool, file: &dyn Fn(&str, &str) -> Option<String>) -> CmdResult<String> {
     let doc = store.doc_copy(id)?;
     let title = folio_core::card::summarize(&doc).title;
     let store = &*store;
     let card_title = |cid: &str| store.titles(&[cid.to_owned()]).ok().and_then(|t| t.into_iter().next()).map(|(_, t)| t);
     let block_text = |bid: &str| store.block_texts(&[bid.to_owned()]).ok().and_then(|b| b.into_iter().next()).map(|b| b.text);
-    let body = folio_io::body_markdown(&doc, &folio_io::Links { card_title: &card_title, block_text: &block_text });
+    let body = folio_io::body_markdown(&doc, &folio_io::Links { card_title: &card_title, block_text: &block_text, file });
     let heading = if !title.is_empty() { title } else { id.as_str().strip_prefix("journal:").unwrap_or_default().to_owned() };
     Ok(if with_title && !heading.is_empty() { format!("# {heading}\n\n{body}") } else { body })
 }
@@ -320,21 +322,31 @@ fn render_card(store: &mut Store, id: &DocId, with_title: bool) -> CmdResult<Str
 /// For "Copy as Markdown": the card with its title as a heading.
 #[tauri::command]
 fn card_markdown(state: tauri::State<AppState>, id: String) -> CmdResult<String> {
-    render_card(&mut *lock(&state)?, &DocId::parse(&id)?, true)
+    render_card(&mut *lock(&state)?, &DocId::parse(&id)?, true, &|_, _| None)
 }
 
 /// Saves one card as a Markdown file, asking where (`file_name` suggested);
-/// the file is as the whole-library export writes it. None when cancelled.
+/// the file is as the whole-library export writes it, its images and
+/// attachments in `assets/` beside it. None when cancelled.
 #[tauri::command]
 async fn export_card(app: tauri::AppHandle, state: tauri::State<'_, AppState>, id: String, file_name: String) -> CmdResult<Option<String>> {
     use tauri_plugin_dialog::DialogExt;
     let id = DocId::parse(&id)?;
-    let body = render_card(&mut *lock(&state)?, &id, false)?;
     let name = format!("{}.md", folio_io::file_stem(&file_name));
     let Some(picked) = app.dialog().file().set_file_name(&name).add_filter("Markdown", &["md"]).blocking_save_file() else {
         return Ok(None);
     };
     let path = picked.into_path().map_err(|e| CommandError::Other(e.to_string()))?;
+    let body = {
+        let mut store = lock(&state)?;
+        let files = store.assets_dir();
+        let source = |sha256: &str| folio_store::assets::stored_file(&files, sha256);
+        let assets = path.parent().map(|p| p.join("assets")).unwrap_or_else(|| PathBuf::from("assets"));
+        let copies = folio_io::FileCopies::new(assets, "assets/", &source);
+        let body = render_card(&mut store, &id, false, &|sha256, name| copies.link(sha256, name))?;
+        copies.finish().map_err(|e| CommandError::Other(e.to_string()))?;
+        body
+    };
     std::fs::write(&path, body).map_err(|e| CommandError::Other(e.to_string()))?;
     tracing::info!(card = %id, "exported one card");
     Ok(Some(path.display().to_string()))
@@ -587,7 +599,7 @@ fn reveal_backups(app: tauri::AppHandle, state: tauri::State<AppState>) -> CmdRe
 }
 
 /// Makes the daily backup when one is due, then folds long update logs into
-/// snapshots; checked at start and hourly.
+/// snapshots, and sweeps unused files; checked at start and hourly.
 fn auto_backup(app: tauri::AppHandle) {
     std::thread::spawn(move || loop {
         let state = app.state::<AppState>();
@@ -611,6 +623,7 @@ fn auto_backup(app: tauri::AppHandle) {
         if backed_up {
             compact_logs(&state, &dir);
         }
+        assets::sweep(&state);
         std::thread::sleep(std::time::Duration::from_secs(60 * 60));
     });
 }
@@ -668,10 +681,12 @@ async fn export_markdown(
             cards.push(folio_io::ExportCard { id: row.id.clone(), title: row.title, journal_date, doc: store.doc_copy(&id)? });
         }
         let blocks = store.all_block_texts()?;
-        folio_io::export_markdown(&dir, &cards, &|bid| blocks.get(bid).cloned(), &untitled)
+        let store = &*store;
+        let asset_file = |sha256: &str| store.asset_file(sha256).ok().flatten().map(|(path, _)| path);
+        folio_io::export_markdown(&dir, &cards, &|bid| blocks.get(bid).cloned(), &asset_file, &untitled)
             .map_err(|e| CommandError::Other(e.to_string()))?
     };
-    tracing::info!(cards = summary.cards, journals = summary.journals, "exported markdown");
+    tracing::info!(cards = summary.cards, journals = summary.journals, files = summary.files, "exported markdown");
     let _ = app.opener().reveal_item_in_dir(&dir);
     Ok(Some(ExportResult { dir: dir.display().to_string(), cards: summary.cards, journals: summary.journals }))
 }
@@ -859,6 +874,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
+        .register_asynchronous_uri_scheme_protocol("folio-asset", assets::protocol)
         .setup(|app| {
             // FOLIO_DATA_DIR runs a second copy on its own library, e.g. to try
             // sync between two copies on one computer (scripts/sync-dev.sh).
@@ -907,6 +923,7 @@ pub fn run() {
             app.manage(AppState { store: Mutex::new(store), data_dir: Mutex::new(data_dir), app_dir, missing, log_dir, _log_guard: guard });
             app.manage(mcp::McpState::default());
             app.manage(sync::SyncState::default());
+            app.manage(assets::AssetState::default());
             auto_backup(app.handle().clone());
             mcp::start_if_enabled(app.handle());
             sync::start_if_enabled(app.handle());
@@ -982,6 +999,11 @@ pub fn run() {
             sync::sync_devices,
             sync::sync_rename_device,
             sync::sync_remove_device,
+            assets::asset_begin,
+            assets::asset_write,
+            assets::asset_cancel,
+            assets::asset_finish,
+            assets::asset_open,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Folio");

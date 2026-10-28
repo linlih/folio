@@ -17,11 +17,32 @@ pub struct Links<'a> {
     pub card_title: &'a dyn Fn(&str) -> Option<String>,
     /// A block's current text.
     pub block_text: &'a dyn Fn(&str) -> Option<String>,
+    /// Where an image or attachment (hash, name) is linked from, already
+    /// URL-safe; None writes its name alone.
+    pub file: &'a dyn Fn(&str, &str) -> Option<String>,
 }
 
 impl Links<'_> {
     /// Links shown as their stored text (tests, no index at hand).
-    pub const STORED: Links<'static> = Links { card_title: &|_| None, block_text: &|_| None };
+    pub const STORED: Links<'static> = Links { card_title: &|_| None, block_text: &|_| None, file: &|_, _| None };
+}
+
+/// A path as a Markdown link target: characters that would end or confuse
+/// the link are percent-encoded.
+pub fn link_target(path: &str) -> String {
+    let mut out = String::with_capacity(path.len());
+    for c in path.chars() {
+        match c {
+            ' ' => out.push_str("%20"),
+            '%' => out.push_str("%25"),
+            '(' => out.push_str("%28"),
+            ')' => out.push_str("%29"),
+            '<' => out.push_str("%3C"),
+            '>' => out.push_str("%3E"),
+            c => out.push(c),
+        }
+    }
+    out
 }
 
 /// One child of a node: a nested node, or a run of text.
@@ -185,7 +206,7 @@ fn inline_markdown(node: &LoroMap, links: &Links) -> String {
                 }
                 "hardBreak" => out.push_str("<br>"),
                 "inlineMath" => out.push_str(&format!("${}$", attr_str(&n, "latex").unwrap_or_default())),
-                "image" => out.push_str(&image(&n)),
+                "image" => out.push_str(&image(&n, links)),
                 _ => out.push_str(&inline_markdown(&n, links)),
             },
         }
@@ -193,10 +214,24 @@ fn inline_markdown(node: &LoroMap, links: &Links) -> String {
     out
 }
 
-fn image(node: &LoroMap) -> String {
-    let src = attr_str(node, "src").unwrap_or_default();
+/// An image: its web address, or the library file it shows.
+fn image(node: &LoroMap, links: &Links) -> String {
     let alt = attr_str(node, "alt").unwrap_or_default();
-    format!("![{}]({src})", escape(&alt))
+    match attr_str(node, "asset") {
+        Some(sha256) => {
+            let name = attr_str(node, "name").unwrap_or_default();
+            let target = (links.file)(&sha256, &name).unwrap_or_else(|| link_target(&name));
+            format!("![{}]({target})", escape(if alt.is_empty() { &name } else { &alt }))
+        }
+        None => format!("![{}]({})", escape(&alt), attr_str(node, "src").unwrap_or_default()),
+    }
+}
+
+/// An attachment: a link to the file.
+fn file(node: &LoroMap, links: &Links) -> String {
+    let name = attr_str(node, "name").unwrap_or_default();
+    let target = attr_str(node, "asset").and_then(|sha256| (links.file)(&sha256, &name)).unwrap_or_else(|| link_target(&name));
+    format!("[{}]({target})", escape(&name))
 }
 
 /// Plain text of a code block (marks don't apply inside code).
@@ -265,7 +300,8 @@ fn blocks(tree: &LoroTree, nodes: &[Block], links: &Links, out: &mut Vec<String>
                 out.push(quoted.join("\n"));
             }
             "horizontalRule" => out.push("---".to_owned()),
-            "image" => out.push(image(node)),
+            "image" => out.push(image(node, links)),
+            "file" => out.push(file(node, links)),
             "blockMath" => out.push(format!("$$\n{}\n$$", attr_str(node, "latex").unwrap_or_default())),
             k if LISTS.contains(&k) => out.push(list(tree, *id, node, links)),
             _ => {

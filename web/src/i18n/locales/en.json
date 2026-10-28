@@ -166,7 +166,9 @@
     "ref": "Card reference",
     "link": "Link",
     "linkAsk": "Link address",
-    "image": "Image link",
+    "image": "Image",
+    "imageUrl": "Image from the web",
+    "file": "File",
     "imageAsk": "Image address",
     "underline": "Underline",
     "code": "Code block",
@@ -376,6 +378,14 @@
     "title": "Something went wrong",
     "text": "Notes are saved as you type; reloading loses nothing. If this keeps happening, send the details below to the developer.",
     "reload": "Reload"
+  },
+  "assets": {
+    "open": "Open with another app",
+    "untitled": "Untitled file",
+    "openFailed": "Could not open the file: {{error}}",
+    "tooLarge": "“{{name}}” is larger than {{mb}} MB and was not added.",
+    "adding": "Adding “{{name}}”…",
+    "failed": "Could not add “{{name}}”: {{error}}"
   },
   "sync": {
     "title": "Sync",

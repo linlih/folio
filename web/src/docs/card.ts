@@ -125,7 +125,7 @@ function inlineText(n: Exclude<Json, string>): string | null {
 }
 const LISTS = new Set(["bulletList", "orderedList", "taskList"]);
 /** Leaf blocks that count as content even without text. */
-const CONTENT_LEAVES = new Set(["image", "horizontalRule", "cardLink"]);
+const CONTENT_LEAVES = new Set(["image", "file", "horizontalRule", "cardLink"]);
 
 /** One line per text block; tabs mark depth below the outermost list. Same
  *  output as `folio_core::card::summarize(..).text`. */

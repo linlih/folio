@@ -4,7 +4,7 @@
 // item's `pos` is the position just before it.
 
 import { Fragment, type Node as PMNode, type NodeType, type ResolvedPos } from "@tiptap/pm/model";
-import type { Transaction } from "@tiptap/pm/state";
+import { TextSelection, type Transaction } from "@tiptap/pm/state";
 
 export const ITEM_TYPES = new Set(["listItem", "taskItem"]);
 export const LIST_TYPES = new Set(["bulletList", "orderedList", "taskList"]);
@@ -232,4 +232,23 @@ export function moveItems(tr: Transaction, items: Item[], place: Place): number 
     tr.setNodeAttribute(target.pos, "collapsed", false);
   }
   return newPos;
+}
+
+/** Inserts block-level nodes at the selection: inside the current item,
+ *  after its line; outside lists, after the current block (in place of it
+ *  when it is an empty top-level paragraph). */
+export function insertAfterLine(tr: Transaction, node: PMNode | PMNode[], focusInside = false): Transaction {
+  const nodes = Array.isArray(node) ? node : [node];
+  const item = itemAt(tr.selection.$head);
+  const { $head } = tr.selection;
+  let at: number;
+  if (item) at = item.pos + 1 + item.node.firstChild!.nodeSize;
+  else {
+    const empty = $head.depth === 1 && $head.parent.content.size === 0;
+    at = empty ? $head.before() : $head.after(1);
+    if (empty) tr.delete(at, at + $head.parent.nodeSize);
+  }
+  tr.insert(at, nodes);
+  if (focusInside) tr.setSelection(TextSelection.create(tr.doc, at + 1));
+  return tr;
 }

@@ -1,4 +1,4 @@
-import type { BackupInfo, McpStatus, SyncDevice, SyncStatus, TagInfo, TopicCount, CardText } from "../bindings/commands";
+import type { AssetInfo, BackupInfo, McpStatus, SyncDevice, SyncStatus, TagInfo, TopicCount, CardText } from "../bindings/commands";
 import type { LatestRelease, LibraryLocation, PickedFolder } from "../bindings/commands";
 import type { AppInfo, Backlink, BlockText, CardRow, DocKind, JournalDay, SearchHit } from "../bindings/commands";
 
@@ -100,6 +100,13 @@ export interface Backend {
   syncRenameDevice(name: string): Promise<SyncDevice[]>;
   /** Removes another device from the workspace. */
   syncRemoveDevice(id: string): Promise<SyncDevice[]>;
+  /** Adds a file to the library (design/attachments.md §3); the same
+   *  content is stored once. HEIC photos come back as JPEG. */
+  addAsset(file: File): Promise<AssetInfo>;
+  /** Where the web view reads a file the library holds. */
+  assetUrl(sha256: string): string;
+  /** Opens a file with the system's app for it. */
+  openAsset(sha256: string, name: string): Promise<void>;
 }
 
 export interface ExportResult {

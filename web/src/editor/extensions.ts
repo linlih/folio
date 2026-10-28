@@ -1,8 +1,8 @@
 import type { AnyExtension } from "@tiptap/core";
-import Image from "@tiptap/extension-image";
 import { BulletList, ListItem, OrderedList, TaskItem, TaskList } from "@tiptap/extension-list";
 import { Mathematics } from "@tiptap/extension-mathematics";
 import StarterKit from "@tiptap/starter-kit";
+import { CardImage, FileBlock, FileInput } from "./assets";
 import { BlockId, type RemoteTxPredicate } from "./blockId";
 import { CardLink } from "./cardLink";
 import { CodeBlock, CodeBlockKeys } from "./codeBlock";
@@ -66,7 +66,9 @@ export function baseExtensions(isRemote: RemoteTxPredicate, placeholder = "", mo
     // Code with a language and syntax highlighting.
     CodeBlock,
     CodeBlockKeys,
-    Image.configure({ inline: false }),
+    // Images and attachments (design/attachments.md).
+    CardImage,
+    FileBlock,
     Mathematics.configure({ katexOptions: { throwOnError: false } }),
     MathEditing,
     OutlineTasks,
@@ -77,6 +79,8 @@ export function baseExtensions(isRemote: RemoteTxPredicate, placeholder = "", mo
     InputFeel.configure({ placeholder, outline: mode === "outline" }),
     KeepFocusKeys,
     Autopair,
+    // Before the outline's paste: files on the clipboard are files.
+    FileInput,
     OutlinePaste,
     Suggestions,
     DragHandle,

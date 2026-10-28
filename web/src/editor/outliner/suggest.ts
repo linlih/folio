@@ -11,10 +11,11 @@ import { addDays, journalId, localDate } from "../../docs/ids";
 import i18n from "../../i18n";
 import { cardName } from "../../card/reveal";
 import { backend } from "../../platform";
+import { addFiles, pickFiles } from "../assets";
 import { askText, caretAnchor } from "./popover";
 import { PRIORITIES, PRIORITY_ICON, STATUSES, STATUS_ICON, type Priority } from "./statusIcons";
 import { makeTask } from "./tasks";
-import { childList, itemAt, itemAtPos, listOf, type Item } from "./tree";
+import { childList, insertAfterLine, itemAt, itemAtPos, listOf, type Item } from "./tree";
 import { TAG_STOP } from "../tag";
 
 interface Choice {
@@ -148,20 +149,8 @@ function ensureItem(tr: Transaction, outline: boolean): Item | null {
 
 /** Inserts a block-level node: inside the current block, after its line;
  *  outside lists, after the current paragraph (in place of it if empty). */
-export function insertBlock(editor: Editor, range: Range, node: PMNode, focusInside = false) {
-  const tr = clear(editor, range);
-  const item = itemAt(tr.selection.$head);
-  const { $head } = tr.selection;
-  let at: number;
-  if (item) at = item.pos + 1 + item.node.firstChild!.nodeSize;
-  else {
-    const empty = $head.depth === 1 && $head.parent.content.size === 0;
-    at = empty ? $head.before() : $head.after(1);
-    if (empty) tr.delete(at, at + $head.parent.nodeSize);
-  }
-  tr.insert(at, node);
-  if (focusInside) tr.setSelection(TextSelection.create(tr.doc, at + 1));
-  editor.view.dispatch(tr.scrollIntoView());
+export function insertBlock(editor: Editor, range: Range, node: PMNode | PMNode[], focusInside = false) {
+  editor.view.dispatch(insertAfterLine(clear(editor, range), node, focusInside).scrollIntoView());
 }
 
 /** Turns the current line into a heading, or back into normal text. */
@@ -224,6 +213,7 @@ const ICON = {
   ref: svg(`<path d="M7 4H4v12h3M13 4h3v12h-3"/>`),
   link: svg(`<path d="M8.5 11.5l3-3M7 9.5l-1.8 1.8a2.5 2.5 0 003.5 3.5L10.5 13M13 10.5l1.8-1.8a2.5 2.5 0 00-3.5-3.5L9.5 7"/>`),
   image: svg(`<rect x="3" y="4" width="14" height="12" rx="2"/><circle cx="7.5" cy="8.5" r="1.3"/><path d="M4 14l4-4 3 3 2-2 3 3"/>`),
+  file: svg(`<path d="M11.5 3H6a1.5 1.5 0 00-1.5 1.5v11A1.5 1.5 0 006 17h8a1.5 1.5 0 001.5-1.5V7z"/><path d="M11.5 3v4h4"/>`),
   underline: svg(`<path d="M6 4v5a4 4 0 008 0V4M5 16h10"/>`),
   code: svg(`<path d="M7.5 6L4 10l3.5 4M12.5 6L16 10l-3.5 4"/>`),
   quote: svg(`<path d="M5 6h4v4c0 2-1 3-3 4M11 6h4v4c0 2-1 3-3 4"/>`),
@@ -255,7 +245,23 @@ function slashChoices(): Choice[] {
       },
     },
     {
-      id: "image", group: g("format"), label: t("slash.image"), icon: ICON.image, keywords: "image picture photo img",
+      id: "image", group: g("format"), label: t("slash.image"), icon: ICON.image, keywords: "image picture photo img tupian",
+      run: async (editor, range) => {
+        editor.view.dispatch(clear(editor, range));
+        const files = await pickFiles("image/*");
+        if (files.length) await addFiles(editor.view, files);
+      },
+    },
+    {
+      id: "file", group: g("format"), label: t("slash.file"), icon: ICON.file, keywords: "file attachment pdf upload fujian",
+      run: async (editor, range) => {
+        editor.view.dispatch(clear(editor, range));
+        const files = await pickFiles("");
+        if (files.length) await addFiles(editor.view, files);
+      },
+    },
+    {
+      id: "imageUrl", group: g("format"), label: t("slash.imageUrl"), icon: ICON.image, keywords: "image url link web",
       run: async (editor, range) => {
         const url = (await ask(editor, range, { label: t("slash.imageAsk"), type: "url", placeholder: "https://" }))?.trim();
         if (url) insertBlock(editor, here(editor), editor.schema.nodes.image.create({ src: url }));

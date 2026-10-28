@@ -166,7 +166,9 @@
     "ref": "卡片引用",
     "link": "链接",
     "linkAsk": "链接地址",
-    "image": "图片链接",
+    "image": "图片",
+    "imageUrl": "网络图片",
+    "file": "文件",
     "imageAsk": "图片地址",
     "underline": "下划线",
     "code": "代码块",
@@ -376,6 +378,14 @@
     "title": "界面出错了",
     "text": "笔记在输入时已经保存，重新加载不会丢内容。如果反复出现，请把下面的信息发给开发者。",
     "reload": "重新加载"
+  },
+  "assets": {
+    "open": "用其他应用打开",
+    "untitled": "未命名文件",
+    "openFailed": "打不开这个文件：{{error}}",
+    "tooLarge": "“{{name}}”超过 {{mb}} MB，没有添加。",
+    "adding": "正在添加“{{name}}”…",
+    "failed": "没能添加“{{name}}”：{{error}}"
   },
   "sync": {
     "title": "同步",

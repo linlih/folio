@@ -34,6 +34,8 @@ pub struct Extract {
     pub refs: Vec<(String, String)>,
     /// (block id holding the tag, tag name as written)
     pub tags: Vec<(String, String)>,
+    /// Hashes of the files (images, attachments) the body uses, once each.
+    pub assets: Vec<String>,
 }
 
 fn name(node: &LoroValue) -> &str {
@@ -149,11 +151,26 @@ fn walk(nodes: &[LoroValue], parent: Option<&str>, out: &mut Extract) {
     }
 }
 
-/// Blocks, links and references of a card body.
+/// The files image and file blocks point at, wherever they sit.
+fn collect_assets(node: &LoroValue, out: &mut Vec<String>) {
+    if matches!(name(node), "image" | "file") {
+        if let Some(sha256) = attr(node, "asset") {
+            if !out.contains(&sha256) {
+                out.push(sha256);
+            }
+        }
+    }
+    for child in children(node) {
+        collect_assets(&child, out);
+    }
+}
+
+/// Blocks, links, references and files of a card body.
 pub fn extract(doc: &LoroDoc) -> Extract {
     let mut out = Extract::default();
     let root = crate::body::body_value(doc);
     walk(&children(&root), None, &mut out);
+    collect_assets(&root, &mut out.assets);
     out
 }
 
@@ -197,5 +214,23 @@ mod tests {
         assert_eq!(x.links, vec![("p1".to_owned(), "c2".to_owned())]);
         assert_eq!(x.refs, vec![("i1".to_owned(), "p1".to_owned())]);
         assert_eq!(x.tags, vec![("i2".to_owned(), "会议".to_owned())]);
+        assert!(x.assets.is_empty());
+    }
+
+    #[test]
+    fn files_anywhere_in_the_body() {
+        let doc = LoroDoc::new();
+        init_card(&doc, CardKind::Note, "", 1).unwrap();
+        let a = "a".repeat(64);
+        let b = "b".repeat(64);
+        add_block(&doc, None, "image", &[("asset", LoroValue::from(a.as_str()))]).unwrap();
+        add_block(&doc, None, "image", &[("src", LoroValue::from("https://example.com/x.png"))]).unwrap();
+        let list = add_block(&doc, None, "bulletList", &[]).unwrap();
+        let item = add_block(&doc, Some(list), "listItem", &[("bid", LoroValue::from("i1"))]).unwrap();
+        add_block(&doc, Some(item), "paragraph", &[]).unwrap();
+        add_block(&doc, Some(item), "file", &[("asset", LoroValue::from(b.as_str()))]).unwrap();
+        add_block(&doc, Some(item), "image", &[("asset", LoroValue::from(a.as_str()))]).unwrap();
+        doc.commit();
+        assert_eq!(extract(&doc).assets, vec![a, b]);
     }
 }

@@ -14,6 +14,7 @@ export const BLOCK_TYPES = [
   "taskItem",
   "horizontalRule",
   "image",
+  "file",
   "blockMath",
 ] as const;
 

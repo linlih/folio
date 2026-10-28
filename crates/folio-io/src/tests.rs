@@ -39,7 +39,7 @@ fn main() {}
 fn a_card_written_in_the_editor_as_markdown() {
     let titles = |id: &str| (id == "card-2").then(|| "Renamed card".to_owned());
     let blocks = |bid: &str| (bid == "blk-9").then(|| "a referenced block".to_owned());
-    assert_eq!(body_markdown(&rich(), &Links { card_title: &titles, block_text: &blocks }), RICH);
+    assert_eq!(body_markdown(&rich(), &Links { card_title: &titles, block_text: &blocks, file: &|_, _| None }), RICH);
 }
 
 #[test]
@@ -79,10 +79,62 @@ fn exports_cards_and_journals_with_links_to_file_names() {
         ExportCard { id: "rich".into(), title: "Rich".into(), journal_date: None, doc: rich() },
         ExportCard { id: "j".into(), title: String::new(), journal_date: Some("2026-10-24".into()), doc: journal },
     ];
-    let summary = export_markdown(dir.path(), &cards, &|_| None, "Untitled").unwrap();
-    assert_eq!(summary, ExportSummary { cards: 2, journals: 1 });
+    let summary = export_markdown(dir.path(), &cards, &|_| None, &|_| None, "Untitled").unwrap();
+    assert_eq!(summary, ExportSummary { cards: 2, journals: 1, files: 0 });
     let rich_md = std::fs::read_to_string(dir.path().join("cards/Rich.md")).unwrap();
     assert!(rich_md.contains("[[Other card]]"), "{rich_md}");
     assert!(dir.path().join("cards/Other card.md").exists());
     assert!(dir.path().join("journals/2026-10-24.md").exists());
+}
+
+/// A card with two images of the same file, a web image, an attachment
+/// named like the image, and an attachment this device does not have.
+fn card_with_files(shot: &str, doc_file: &str, missing: &str) -> LoroDoc {
+    use folio_core::body::add_block;
+    use loro::LoroValue;
+    let doc = LoroDoc::new();
+    init_card(&doc, CardKind::Note, "Files", 1).unwrap();
+    let file = |name: &str, sha: &str| vec![("asset", LoroValue::from(sha)), ("name", LoroValue::from(name))];
+    add_block(&doc, None, "image", &file("My shot.png", shot)).unwrap();
+    add_block(&doc, None, "image", &[("src", LoroValue::from("https://example.com/a.png")), ("alt", LoroValue::from("web"))]).unwrap();
+    let list = add_block(&doc, None, "bulletList", &[]).unwrap();
+    let item = add_block(&doc, Some(list), "listItem", &[]).unwrap();
+    add_block(&doc, Some(item), "paragraph", &[]).unwrap();
+    add_block(&doc, Some(item), "image", &file("My shot.png", shot)).unwrap();
+    add_block(&doc, None, "file", &file("my shot.PNG", doc_file)).unwrap();
+    add_block(&doc, None, "file", &file("gone (1).pdf", missing)).unwrap();
+    doc.commit();
+    doc
+}
+
+#[test]
+fn images_and_attachments_are_copied_once_and_linked() {
+    let src = tempfile::tempdir().unwrap();
+    let out = tempfile::tempdir().unwrap();
+    let (shot, other, missing) = ("a".repeat(64), "b".repeat(64), "c".repeat(64));
+    std::fs::write(src.path().join(&shot), b"png").unwrap();
+    std::fs::write(src.path().join(&other), b"other").unwrap();
+    let source = |sha: &str| Some(src.path().join(sha)).filter(|p| p.is_file());
+    let cards = vec![ExportCard { id: "f".into(), title: "Files".into(), journal_date: None, doc: card_with_files(&shot, &other, &missing) }];
+    let summary = export_markdown(out.path(), &cards, &|_| None, &source, "Untitled").unwrap();
+    assert_eq!(summary.files, 2);
+    let md = std::fs::read_to_string(out.path().join("cards/Files.md")).unwrap();
+    // The same file twice: one copy, one name.
+    assert_eq!(md.matches("![My shot.png](../assets/My%20shot.png)").count(), 2, "{md}");
+    assert!(md.contains("![web](https://example.com/a.png)"), "{md}");
+    // Another file with the same name but for case gets its own.
+    assert!(md.contains("[my shot.PNG](../assets/my%20shot%20%282%29.PNG)"), "{md}");
+    // Not on this device: linked by name, nothing copied.
+    assert!(md.contains("[gone (1).pdf](gone%20%281%29.pdf)"), "{md}");
+    let mut copied: Vec<_> = std::fs::read_dir(out.path().join("assets")).unwrap().map(|e| e.unwrap().file_name().into_string().unwrap()).collect();
+    copied.sort();
+    assert_eq!(copied, ["My shot.png", "my shot (2).PNG"]);
+    assert_eq!(std::fs::read(out.path().join("assets/my shot (2).PNG")).unwrap(), b"other");
+}
+
+#[test]
+fn without_a_place_for_files_they_are_named() {
+    let md = body_markdown(&card_with_files(&"a".repeat(64), &"b".repeat(64), &"c".repeat(64)), &Links::STORED);
+    assert!(md.starts_with("![My shot.png](My%20shot.png)"), "{md}");
+    assert!(md.contains("[my shot.PNG](my%20shot.PNG)"), "{md}");
 }

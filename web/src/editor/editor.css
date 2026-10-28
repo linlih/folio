@@ -202,6 +202,25 @@
 /* Images and formulas */
 .card-body img { display: block; max-width: 100%; height: auto; margin: 0.4em 0; border-radius: var(--radius); }
 .card-body img.ProseMirror-selectednode { outline: 2px solid var(--accent); }
+/* A library file keeps its shape (width / height) while it loads; a grey
+   box when this device does not have it. */
+.card-body img[data-asset] { background: var(--hover); }
+
+/* Attachments: one line, the name opens the file */
+.card-body .file-block {
+  display: flex; align-items: center; gap: 0.5em; width: fit-content; max-width: 100%;
+  margin: 0.3em 0; padding: 0.35em 0.75em; border: 1px solid var(--border); border-radius: var(--radius);
+  background: var(--surface, transparent); line-height: 1.4;
+}
+.card-body .file-block.ProseMirror-selectednode { outline: 2px solid var(--accent); }
+.card-body .file-icon {
+  flex: none; width: 1.1em; height: 1.1em; background: var(--secondary);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%23000' stroke-width='1.6' stroke-linejoin='round'%3E%3Cpath d='M11.5 3H6a1.5 1.5 0 00-1.5 1.5v11A1.5 1.5 0 006 17h8a1.5 1.5 0 001.5-1.5V7z'/%3E%3Cpath d='M11.5 3v4h4'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%23000' stroke-width='1.6' stroke-linejoin='round'%3E%3Cpath d='M11.5 3H6a1.5 1.5 0 00-1.5 1.5v11A1.5 1.5 0 006 17h8a1.5 1.5 0 001.5-1.5V7z'/%3E%3Cpath d='M11.5 3v4h4'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+.card-body .file-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--accent); cursor: pointer; }
+.card-body .file-name:hover { text-decoration: underline; }
+.card-body .file-size { flex: none; color: var(--muted); font-size: 0.85em; }
 .card-body [data-type="block-math"] { margin: 0.4em 0; padding: 0.4em 0; overflow-x: auto; cursor: pointer; border-radius: var(--radius); }
 .card-body [data-type="block-math"]:hover, .card-body [data-type="inline-math"]:hover { background: var(--hover); }
 .card-body [data-type="inline-math"] { cursor: pointer; }

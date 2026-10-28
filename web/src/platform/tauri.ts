@@ -1,5 +1,5 @@
-import { invoke } from "@tauri-apps/api/core";
-import type { AppInfo, BackupInfo, Backlink, BlockText, CardRow, JournalDay, McpStatus, SearchHit, SyncDevice, SyncStatus, TagInfo, TopicCount, CardText } from "../bindings/commands";
+import { convertFileSrc, invoke } from "@tauri-apps/api/core";
+import type { AppInfo, AssetInfo, BackupInfo, Backlink, BlockText, CardRow, JournalDay, McpStatus, SearchHit, SyncDevice, SyncStatus, TagInfo, TopicCount, CardText } from "../bindings/commands";
 import type { Backend, ExportResult } from "./backend";
 import type { LatestRelease, LibraryLocation, PickedFolder } from "../bindings/commands";
 
@@ -70,5 +70,22 @@ export function tauriBackend(): Backend {
     syncDevices: () => invoke<SyncDevice[]>("sync_devices"),
     syncRenameDevice: (name) => invoke<SyncDevice[]>("sync_rename_device", { name }),
     syncRemoveDevice: (id) => invoke<SyncDevice[]>("sync_remove_device", { id }),
+    // In pieces: a whole photo as one Android JSON body would be slow.
+    addAsset: async (file) => {
+      const id = await invoke<string>("asset_begin");
+      try {
+        const piece = ANDROID ? 1 << 20 : 4 << 20;
+        for (let at = 0; at < file.size; at += piece) {
+          const bytes = new Uint8Array(await file.slice(at, at + piece).arrayBuffer());
+          await invoke<void>("asset_write", ANDROID ? Array.from(bytes) : bytes, { headers: { "x-asset-id": id } });
+        }
+        return await invoke<AssetInfo>("asset_finish", { id, name: file.name, mime: file.type });
+      } catch (e) {
+        void invoke("asset_cancel", { id }).catch(() => {});
+        throw e;
+      }
+    },
+    assetUrl: (sha256) => convertFileSrc(sha256, "folio-asset"),
+    openAsset: (sha256, name) => invoke<void>("asset_open", { sha256, name }),
   };
 }

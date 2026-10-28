@@ -166,3 +166,11 @@ export interface TopicCount {
   id: string;
   cards: number;
 }
+
+/** A file added to the library (folio_store::AssetInfo). */
+export interface AssetInfo {
+  sha256: string;
+  name: string;
+  mime: string;
+  size: number;
+}
