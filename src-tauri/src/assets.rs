@@ -66,7 +66,14 @@ pub fn asset_cancel(assets: tauri::State<AssetState>, id: String) {
 /// Stores the finished file. HEIC photos become JPEG on Apple systems: the
 /// other systems' web views cannot show HEIC (design/attachments.md §3.5).
 #[tauri::command]
-pub fn asset_finish(state: tauri::State<AppState>, assets: tauri::State<AssetState>, id: String, name: String, mime: String) -> CmdResult<AssetInfo> {
+pub fn asset_finish(
+    app: tauri::AppHandle,
+    state: tauri::State<AppState>,
+    assets: tauri::State<AssetState>,
+    id: String,
+    name: String,
+    mime: String,
+) -> CmdResult<AssetInfo> {
     let file = incoming(&assets).remove(&id).ok_or_else(|| other("no such incoming file"))?;
     let (file, name, mime) = match heic::convert(&file, &name, &mime) {
         Some(Ok((jpeg, name))) => {
@@ -82,6 +89,8 @@ pub fn asset_finish(state: tauri::State<AppState>, assets: tauri::State<AssetSta
     let mime = if mime.is_empty() { "application/octet-stream".to_owned() } else { mime };
     let info = lock(&state)?.add_asset(file, &name, &mime, now_ms())?;
     tracing::info!(asset = %info.sha256, size = info.size, mime = %info.mime, "added a file");
+    // Up soon, once the card that uses it is saved.
+    crate::sync::poke_files(&app);
     Ok(info)
 }
 
@@ -91,7 +100,7 @@ pub fn asset_finish(state: tauri::State<AppState>, assets: tauri::State<AssetSta
 #[tauri::command]
 pub fn asset_open(app: tauri::AppHandle, state: tauri::State<AppState>, sha256: String, name: String) -> CmdResult<()> {
     use tauri_plugin_opener::OpenerExt;
-    let (path, _) = lock(&state)?.asset_file(&sha256)?.ok_or_else(|| other("this file is not on this device"))?;
+    let (path, _) = lock(&state)?.asset_file(&sha256)?.ok_or_else(|| other("[not-here] this file is not on this device"))?;
     let dir = std::env::temp_dir().join("folio-open").join(&sha256[..16]);
     std::fs::create_dir_all(&dir).map_err(other)?;
     let stem = folio_io::file_stem(&name);
@@ -100,6 +109,19 @@ pub fn asset_open(app: tauri::AppHandle, state: tauri::State<AppState>, sha256: 
         std::fs::copy(&path, &target).map_err(other)?;
     }
     app.opener().open_path(target.to_string_lossy(), None::<&str>).map_err(other)
+}
+
+/// Which of these files this device has.
+#[tauri::command]
+pub fn asset_have(state: tauri::State<AppState>, sha256s: Vec<String>) -> CmdResult<Vec<String>> {
+    let store = lock(&state)?;
+    let mut here = Vec::new();
+    for sha in sha256s {
+        if store.asset_file(&sha)?.is_some() {
+            here.push(sha);
+        }
+    }
+    Ok(here)
 }
 
 /// Hourly, with the backup check: marks files no card uses and deletes

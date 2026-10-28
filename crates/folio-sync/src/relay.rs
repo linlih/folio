@@ -11,15 +11,21 @@
 //! snapshot instead of what it replaced. Full snapshots import into any
 //! replica, so nothing is ever lost by deleting what they cover.
 //!
+//! Files (design/attachments.md §5.1): sealed chunks in a folder beside the
+//! database (`<db>.blobs/<workspace>/<id prefix>/<id>/<n>`), recorded in
+//! `blobs` and `blob_chunks`. A file can be downloaded once its uploader
+//! said every chunk is there; unfinished uploads expire after a week.
+//!
 //! Used by `folio-server` behind HTTP, and directly by the simulator.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
 use rusqlite::{params, Connection, OptionalExtension};
 
 use crate::crypto::WrappedKey;
-use crate::protocol::{AcksResponse, DeviceInfo, HeavyDoc, PullResponse, PulledAck, PulledItem, PushItem, MAX_PULL};
+use crate::crypto::{chunks_for, MAX_SEALED_CHUNK};
+use crate::protocol::{AcksResponse, BlobState, BlobsResponse, DeviceInfo, HeavyDoc, PullResponse, PulledAck, PulledItem, PushItem, MAX_BLOB_IDS, MAX_PULL};
 use crate::{Result, SyncError};
 
 const SCHEMA: &str = "
@@ -46,6 +52,17 @@ const SCHEMA: &str = "
     UNIQUE (workspace, device, doc)
   );
   CREATE INDEX IF NOT EXISTS acks_by_workspace ON acks(workspace, seq);
+  -- Files: one row each, whole once 'complete'; the chunks received.
+  CREATE TABLE IF NOT EXISTS blobs (
+    workspace TEXT NOT NULL, id TEXT NOT NULL, chunks INTEGER,
+    size INTEGER NOT NULL DEFAULT 0, complete INTEGER NOT NULL DEFAULT 0,
+    device TEXT NOT NULL, created_at INTEGER NOT NULL,
+    PRIMARY KEY (workspace, id)
+  );
+  CREATE TABLE IF NOT EXISTS blob_chunks (
+    workspace TEXT NOT NULL, id TEXT NOT NULL, n INTEGER NOT NULL, size INTEGER NOT NULL,
+    PRIMARY KEY (workspace, id, n)
+  );
 ";
 
 /// Columns added after the first release, as (table, column, definition).
@@ -62,10 +79,39 @@ pub const SNAPSHOT_MIN_UPDATES: i64 = 100;
 /// …or this many bytes.
 pub const SNAPSHOT_MIN_BYTES: i64 = 256 * 1024;
 
+/// The largest file accepted, in plain bytes (as the app's own limit).
+pub const MAX_FILE_BYTES: u64 = 100 * 1024 * 1024;
+
+/// Unfinished uploads older than this are deleted.
+pub const UNFINISHED_MS: i64 = 7 * 24 * 60 * 60 * 1000;
+
 pub struct Relay {
     conn: Mutex<Connection>,
     /// When a document's log is due for a snapshot: updates, bytes.
     snapshot_at: (i64, i64),
+    /// Where file chunks are kept.
+    blob_dir: PathBuf,
+    /// A folder of its own for an in-memory relay, removed with it.
+    temporary: bool,
+    /// Largest file (plain bytes); room per workspace (stored bytes).
+    max_file: u64,
+    quota: Option<u64>,
+}
+
+impl Drop for Relay {
+    fn drop(&mut self) {
+        if self.temporary {
+            let _ = std::fs::remove_dir_all(&self.blob_dir);
+        }
+    }
+}
+
+fn is_blob_id(id: &str) -> bool {
+    id.len() == 32 && id.bytes().all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f'))
+}
+
+fn io(e: std::io::Error) -> SyncError {
+    SyncError::Storage(e.to_string())
 }
 
 fn now_ms() -> i64 {
@@ -73,17 +119,22 @@ fn now_ms() -> i64 {
 }
 
 impl Relay {
+    /// Opens the database at `path`; files go in `<path>.blobs` beside it.
     pub fn open(path: &Path) -> Result<Relay> {
         let conn = Connection::open(path)?;
         conn.execute_batch("PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL;")?;
-        Self::with(conn)
+        let mut dir = path.as_os_str().to_owned();
+        dir.push(".blobs");
+        Self::with(conn, PathBuf::from(dir), false)
     }
 
+    /// A relay that keeps nothing: its files go in a temporary folder.
     pub fn open_in_memory() -> Result<Relay> {
-        Self::with(Connection::open_in_memory()?)
+        let name = format!("folio-relay-{}", crate::crypto::random_bytes::<8>().iter().map(|b| format!("{b:02x}")).collect::<String>());
+        Self::with(Connection::open_in_memory()?, std::env::temp_dir().join(name), true)
     }
 
-    fn with(conn: Connection) -> Result<Relay> {
+    fn with(conn: Connection, blob_dir: PathBuf, temporary: bool) -> Result<Relay> {
         conn.execute_batch(SCHEMA)?;
         for (table, column, definition) in ADDED_COLUMNS {
             let exists: bool =
@@ -93,7 +144,15 @@ impl Relay {
             }
         }
         conn.execute_batch("CREATE INDEX IF NOT EXISTS updates_by_doc ON updates(workspace, doc, seq);")?;
-        Ok(Relay { conn: Mutex::new(conn), snapshot_at: (SNAPSHOT_MIN_UPDATES, SNAPSHOT_MIN_BYTES) })
+        Ok(Relay { conn: Mutex::new(conn), snapshot_at: (SNAPSHOT_MIN_UPDATES, SNAPSHOT_MIN_BYTES), blob_dir, temporary, max_file: MAX_FILE_BYTES, quota: None })
+    }
+
+    /// Other limits for files: the largest (plain bytes), and the room each
+    /// workspace has (stored bytes; None for no limit).
+    pub fn with_file_limits(mut self, max_file: u64, quota: Option<u64>) -> Relay {
+        self.max_file = max_file;
+        self.quota = quota;
+        self
     }
 
     /// Other thresholds for `heavy_docs` (tests reach them sooner).
@@ -324,6 +383,145 @@ impl Relay {
         Ok(seq)
     }
 
+    fn chunk_path(&self, workspace: &str, id: &str, n: u32) -> PathBuf {
+        self.blob_dir.join(workspace).join(&id[..2]).join(id).join(n.to_string())
+    }
+
+    fn check_blob(id: &str) -> Result<()> {
+        if is_blob_id(id) { Ok(()) } else { Err(SyncError::Protocol("bad file id".into())) }
+    }
+
+    /// Which of `ids` the server has, whole or in part; and how many bytes
+    /// the workspace's whole files take.
+    pub fn blobs(&self, workspace: &str, device: &str, ids: &[String]) -> Result<BlobsResponse> {
+        if ids.len() > MAX_BLOB_IDS {
+            return Err(SyncError::Protocol(format!("at most {MAX_BLOB_IDS} files at once")));
+        }
+        let conn = self.conn();
+        self.require(&conn, workspace)?;
+        Self::touch(&conn, workspace, device, now_ms())?;
+        let mut blobs = Vec::new();
+        for id in ids {
+            let row: Option<(bool, Option<u32>)> = conn
+                .query_row("SELECT complete, chunks FROM blobs WHERE workspace = ?1 AND id = ?2", params![workspace, id], |r| Ok((r.get(0)?, r.get(1)?)))
+                .optional()?;
+            let Some((complete, chunks)) = row else { continue };
+            let have = if complete {
+                Vec::new()
+            } else {
+                let mut stmt = conn.prepare_cached("SELECT n FROM blob_chunks WHERE workspace = ?1 AND id = ?2 ORDER BY n")?;
+                stmt.query_map(params![workspace, id], |r| r.get(0))?.collect::<std::result::Result<Vec<u32>, _>>()?
+            };
+            blobs.push(BlobState { id: id.clone(), complete, chunks: if complete { chunks.unwrap_or(0) } else { have.len() as u32 }, have });
+        }
+        let total_bytes = conn.query_row("SELECT COALESCE(SUM(size), 0) FROM blobs WHERE workspace = ?1 AND complete = 1", [workspace], |r| r.get(0))?;
+        Ok(BlobsResponse { blobs, total_bytes })
+    }
+
+    /// Stores chunk `n` of a file. A chunk of a file already whole is
+    /// ignored; one sent again replaces the first.
+    pub fn put_chunk(&self, workspace: &str, device: &str, id: &str, n: u32, bytes: &[u8]) -> Result<()> {
+        Self::check_blob(id)?;
+        if bytes.len() > MAX_SEALED_CHUNK {
+            return Err(SyncError::TooLarge(format!("a chunk has at most {MAX_SEALED_CHUNK} bytes")));
+        }
+        if n >= chunks_for(self.max_file) {
+            return Err(SyncError::TooLarge(format!("files on this server have at most {} MB", self.max_file / 1024 / 1024)));
+        }
+        let conn = self.conn();
+        self.require(&conn, workspace)?;
+        Self::touch(&conn, workspace, device, now_ms())?;
+        let complete: Option<bool> =
+            conn.query_row("SELECT complete FROM blobs WHERE workspace = ?1 AND id = ?2", params![workspace, id], |r| r.get(0)).optional()?;
+        if complete == Some(true) {
+            return Ok(());
+        }
+        if let Some(quota) = self.quota {
+            let used: i64 = conn.query_row("SELECT COALESCE(SUM(size), 0) FROM blob_chunks WHERE workspace = ?1", [workspace], |r| r.get(0))?;
+            if used as u64 + bytes.len() as u64 > quota {
+                return Err(SyncError::Full(format!("this sync space has room for {} MB of files", quota / 1024 / 1024)));
+            }
+        }
+        let path = self.chunk_path(workspace, id, n);
+        std::fs::create_dir_all(path.parent().expect("a folder")).map_err(io)?;
+        let partial = path.with_extension("part");
+        std::fs::write(&partial, bytes).map_err(io)?;
+        std::fs::rename(&partial, &path).map_err(io)?;
+        conn.execute(
+            "INSERT OR IGNORE INTO blobs(workspace, id, device, created_at) VALUES (?1, ?2, ?3, ?4)",
+            params![workspace, id, device, now_ms()],
+        )?;
+        conn.execute(
+            "INSERT OR REPLACE INTO blob_chunks(workspace, id, n, size) VALUES (?1, ?2, ?3, ?4)",
+            params![workspace, id, n, bytes.len() as i64],
+        )?;
+        Ok(())
+    }
+
+    /// Marks a file whole: chunks 0 to `chunks - 1` must all be there.
+    pub fn finish_blob(&self, workspace: &str, device: &str, id: &str, chunks: u32) -> Result<()> {
+        Self::check_blob(id)?;
+        let conn = self.conn();
+        self.require(&conn, workspace)?;
+        Self::touch(&conn, workspace, device, now_ms())?;
+        let complete: Option<bool> =
+            conn.query_row("SELECT complete FROM blobs WHERE workspace = ?1 AND id = ?2", params![workspace, id], |r| r.get(0)).optional()?;
+        match complete {
+            Some(true) => return Ok(()),
+            Some(false) => {}
+            None => return Err(SyncError::NotFound(format!("file {id}"))),
+        }
+        let (count, size): (u32, i64) = conn.query_row(
+            "SELECT count(*), COALESCE(SUM(size), 0) FROM blob_chunks WHERE workspace = ?1 AND id = ?2 AND n < ?3",
+            params![workspace, id, chunks],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )?;
+        if chunks == 0 || count != chunks {
+            return Err(SyncError::Conflict(format!("file {id} has {count} of {chunks} chunks")));
+        }
+        conn.execute("DELETE FROM blob_chunks WHERE workspace = ?1 AND id = ?2 AND n >= ?3", params![workspace, id, chunks])?;
+        conn.execute(
+            "UPDATE blobs SET complete = 1, chunks = ?3, size = ?4 WHERE workspace = ?1 AND id = ?2",
+            params![workspace, id, chunks, size],
+        )?;
+        Ok(())
+    }
+
+    /// Chunk `n` of a whole file.
+    pub fn get_chunk(&self, workspace: &str, device: &str, id: &str, n: u32) -> Result<Vec<u8>> {
+        Self::check_blob(id)?;
+        {
+            let conn = self.conn();
+            self.require(&conn, workspace)?;
+            Self::touch(&conn, workspace, device, now_ms())?;
+            let whole: bool = conn
+                .query_row("SELECT complete = 1 AND ?3 < chunks FROM blobs WHERE workspace = ?1 AND id = ?2", params![workspace, id, n], |r| r.get(0))
+                .optional()?
+                .unwrap_or(false);
+            if !whole {
+                return Err(SyncError::NotFound(format!("file {id} chunk {n}")));
+            }
+        }
+        std::fs::read(self.chunk_path(workspace, id, n)).map_err(io)
+    }
+
+    /// Deletes uploads left unfinished since before `now - UNFINISHED_MS`;
+    /// returns how many.
+    pub fn expire_unfinished(&self, now: i64) -> Result<usize> {
+        let stale: Vec<(String, String)> = {
+            let conn = self.conn();
+            let mut stmt = conn.prepare("SELECT workspace, id FROM blobs WHERE complete = 0 AND created_at < ?1")?;
+            stmt.query_map([now - UNFINISHED_MS], |r| Ok((r.get(0)?, r.get(1)?)))?.collect::<std::result::Result<_, _>>()?
+        };
+        for (workspace, id) in &stale {
+            let conn = self.conn();
+            conn.execute("DELETE FROM blob_chunks WHERE workspace = ?1 AND id = ?2", params![workspace, id])?;
+            conn.execute("DELETE FROM blobs WHERE workspace = ?1 AND id = ?2 AND complete = 0", params![workspace, id])?;
+            let _ = std::fs::remove_dir_all(self.blob_dir.join(workspace).join(&id[..2]).join(id));
+        }
+        Ok(stale.len())
+    }
+
     pub fn head(&self, workspace: &str) -> Result<i64> {
         Self::head_of(&self.conn(), workspace)
     }
@@ -336,6 +534,43 @@ impl Relay {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Files: chunks in any order, whole only when all are there, limits,
+    /// and unfinished uploads expire.
+    #[test]
+    fn file_chunks_and_limits() {
+        let relay = Relay::open_in_memory().unwrap().with_file_limits(3 * crate::crypto::CHUNK as u64, Some(400));
+        relay.create_workspace("ws", &crate::crypto::wrap(&crate::crypto::WorkspaceKey::generate(), "p", (1024, 1, 1)).unwrap()).unwrap();
+        let id = "0123456789abcdef0123456789abcdef";
+        assert!(matches!(relay.put_chunk("ws", "a", "../../etc", 0, b"x"), Err(SyncError::Protocol(_))));
+        assert!(matches!(relay.put_chunk("ws", "a", id, 3, b"x"), Err(SyncError::TooLarge(_))), "a fourth chunk is over 3 MB");
+        assert!(matches!(relay.finish_blob("ws", "a", id, 2), Err(SyncError::NotFound(_))));
+        relay.put_chunk("ws", "a", id, 1, &[1; 100]).unwrap();
+        assert!(matches!(relay.finish_blob("ws", "a", id, 2), Err(SyncError::Conflict(_))), "chunk 0 is missing");
+        assert!(matches!(relay.get_chunk("ws", "b", id, 1), Err(SyncError::NotFound(_))), "not whole yet");
+        let state = &relay.blobs("ws", "b", &[id.into(), "f".repeat(32)]).unwrap().blobs;
+        assert_eq!(state, &[BlobState { id: id.into(), complete: false, chunks: 1, have: vec![1] }]);
+        relay.put_chunk("ws", "a", id, 0, &[0; 100]).unwrap();
+        relay.put_chunk("ws", "a", id, 0, &[0; 150]).unwrap();
+        relay.finish_blob("ws", "a", id, 2).unwrap();
+        relay.finish_blob("ws", "a", id, 2).unwrap();
+        assert_eq!(relay.get_chunk("ws", "b", id, 0).unwrap(), vec![0; 150], "sent again: the second one");
+        let r = relay.blobs("ws", "b", &[id.into()]).unwrap();
+        assert_eq!((r.blobs[0].complete, r.blobs[0].chunks, r.total_bytes), (true, 2, 250));
+        // Room for 400 bytes: 250 used.
+        let other = "f".repeat(32);
+        assert!(matches!(relay.put_chunk("ws", "a", &other, 0, &[2; 200]), Err(SyncError::Full(_))));
+        relay.put_chunk("ws", "a", &other, 0, &[2; 100]).unwrap();
+        assert_eq!(relay.expire_unfinished(now_ms()).unwrap(), 0, "not a week old");
+        assert_eq!(relay.expire_unfinished(now_ms() + UNFINISHED_MS + 1).unwrap(), 1);
+        assert!(relay.blobs("ws", "a", &[other.clone()]).unwrap().blobs.is_empty());
+        assert!(!relay.chunk_path("ws", &other, 0).exists());
+        assert!(relay.chunk_path("ws", id, 0).exists(), "whole files stay");
+        // A removed device gets nothing.
+        relay.check_device("ws", "b").unwrap();
+        relay.remove_device("ws", "a", "b").unwrap();
+        assert!(matches!(relay.get_chunk("ws", "b", id, 0), Err(SyncError::Removed)));
+    }
 
     /// A server database from before snapshots and removal gets the new
     /// columns and keeps its log.

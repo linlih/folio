@@ -87,5 +87,22 @@ export function tauriBackend(): Backend {
     },
     assetUrl: (sha256) => convertFileSrc(sha256, "folio-asset"),
     openAsset: (sha256, name) => invoke<void>("asset_open", { sha256, name }),
+    assetsHere: (sha256s) => invoke<string[]>("asset_have", { sha256s }),
+    fetchAssets: (sha256s) => invoke<void>("asset_fetch", { sha256s }),
+    onAssetEvent: (listener) => {
+      let gone = false;
+      const unlisten: (() => void)[] = [];
+      void import("@tauri-apps/api/event").then(({ listen }) => {
+        const keep = (u: () => void) => (gone ? u() : unlisten.push(u));
+        void listen<string>("asset-ready", (e) => listener({ sha256: e.payload, ready: true })).then(keep);
+        void listen<{ sha256: string; reason: "elsewhere" | "damaged" | "offline" | "no-sync" }>("asset-missing", (e) =>
+          listener({ sha256: e.payload.sha256, ready: false, reason: e.payload.reason }),
+        ).then(keep);
+      });
+      return () => {
+        gone = true;
+        unlisten.forEach((u) => u());
+      };
+    },
   };
 }

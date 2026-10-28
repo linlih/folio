@@ -1,5 +1,5 @@
 import { LoroDoc } from "loro-crdt";
-import type { BackupInfo, Backlink, CardRow, JournalDay, SearchHit } from "../bindings/commands";
+import type { AssetEvent, BackupInfo, Backlink, CardRow, JournalDay, SearchHit } from "../bindings/commands";
 import { bodyLines, initCard, preview, readCardTopics, readMeta, setDeleted, setPinned } from "../docs/card";
 import { isJournalId, journalDate, uuidv7 } from "../docs/ids";
 import { extractIndex } from "../docs/index";
@@ -22,6 +22,7 @@ export function memoryBackend(now: () => number = Date.now): Backend {
   const backups: { info: BackupInfo; docs: Map<string, Uint8Array> }[] = [];
   /** Added files: hash → object URL. */
   const assets = new Map<string, string>();
+  const assetListeners = new Set<(e: AssetEvent) => void>();
 
   const hostDoc = () => {
     const doc = new LoroDoc();
@@ -268,7 +269,19 @@ export function memoryBackend(now: () => number = Date.now): Backend {
     assetUrl: (sha256) => assets.get(sha256) ?? "",
     openAsset: async (sha256) => {
       const url = assets.get(sha256);
-      if (url) window.open(url, "_blank");
+      if (!url) throw new Error("[not-here] this file is not on this device");
+      window.open(url, "_blank");
+    },
+    assetsHere: async (sha256s) => sha256s.filter((s) => assets.has(s)),
+    // Nothing syncs here: a file not added in this session never comes.
+    fetchAssets: async (sha256s) => {
+      for (const sha256 of sha256s) {
+        for (const l of assetListeners) l(assets.has(sha256) ? { sha256, ready: true } : { sha256, ready: false, reason: "no-sync" });
+      }
+    },
+    onAssetEvent: (listener) => {
+      assetListeners.add(listener);
+      return () => assetListeners.delete(listener);
     },
   };
 }

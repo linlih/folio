@@ -1,4 +1,4 @@
-import type { AssetInfo, BackupInfo, McpStatus, SyncDevice, SyncStatus, TagInfo, TopicCount, CardText } from "../bindings/commands";
+import type { AssetEvent, AssetInfo, BackupInfo, McpStatus, SyncDevice, SyncStatus, TagInfo, TopicCount, CardText } from "../bindings/commands";
 import type { LatestRelease, LibraryLocation, PickedFolder } from "../bindings/commands";
 import type { AppInfo, Backlink, BlockText, CardRow, DocKind, JournalDay, SearchHit } from "../bindings/commands";
 
@@ -105,8 +105,16 @@ export interface Backend {
   addAsset(file: File): Promise<AssetInfo>;
   /** Where the web view reads a file the library holds. */
   assetUrl(sha256: string): string;
-  /** Opens a file with the system's app for it. */
+  /** Opens a file with the system's app for it. Fails with "[not-here]"
+   *  when this device does not have it. */
   openAsset(sha256: string, name: string): Promise<void>;
+  /** Which of these files this device has. */
+  assetsHere(sha256s: string[]): Promise<string[]>;
+  /** Asks for files this device does not have (design/attachments.md §5.4);
+   *  each comes as an `onAssetEvent` ready, or not with the reason. */
+  fetchAssets(sha256s: string[]): Promise<void>;
+  /** Listens for files arriving or found missing; returns the unlisten. */
+  onAssetEvent(listener: (e: AssetEvent) => void): () => void;
 }
 
 export interface ExportResult {

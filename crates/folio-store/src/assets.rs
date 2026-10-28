@@ -109,6 +109,11 @@ impl Incoming {
         self.size
     }
 
+    /// The hash of the bytes written so far.
+    pub fn sha256(&self) -> String {
+        hex(&self.hasher.clone().finalize())
+    }
+
     /// Where the bytes are so far, to read them back (HEIC conversion).
     pub fn path(&self) -> &Path {
         &self.path
@@ -162,6 +167,52 @@ impl Store {
             Some(m) if path.is_file() => Some((path, m.unwrap_or_else(|| "application/octet-stream".into()))),
             _ => None,
         })
+    }
+
+    /// Files this device has that the server may not (design/attachments.md
+    /// §5.3): hash and size, smallest first. Files no card uses wait.
+    pub fn assets_to_upload(&self) -> Result<Vec<(String, u64)>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT sha256, size FROM assets WHERE local = 1 AND uploaded = 0 AND orphan_since IS NULL ORDER BY size, sha256",
+        )?;
+        let rows = stmt.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, Option<i64>>(1)?.unwrap_or(0) as u64)))?;
+        Ok(rows.collect::<std::result::Result<Vec<_>, _>>()?.into_iter().filter(|(sha, _)| is_hash(sha)).collect())
+    }
+
+    /// The server has the file.
+    pub fn set_asset_uploaded(&self, sha256: &str) -> Result<()> {
+        self.conn.execute("UPDATE assets SET uploaded = 1 WHERE sha256 = ?1", [sha256])?;
+        Ok(())
+    }
+
+    /// Every file goes up again (this device joined another sync space).
+    pub fn forget_uploads(&self) -> Result<()> {
+        self.conn.execute("UPDATE assets SET uploaded = 0", [])?;
+        Ok(())
+    }
+
+    /// Files cards use that this device does not have: hash and the type
+    /// the cards record, in hash order.
+    pub fn missing_assets(&self) -> Result<Vec<(String, Option<String>)>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT r.sha256, MAX(r.mime) FROM idx.asset_refs r
+             WHERE NOT EXISTS (SELECT 1 FROM assets a WHERE a.sha256 = r.sha256 AND a.local = 1)
+             GROUP BY r.sha256 ORDER BY r.sha256",
+        )?;
+        let rows = stmt.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, Option<String>>(1)?)))?;
+        Ok(rows.collect::<std::result::Result<Vec<_>, _>>()?.into_iter().filter(|(sha, _)| is_hash(sha)).collect())
+    }
+
+    /// Stores a file downloaded from the server, if its content is what
+    /// the hash says; otherwise discards it.
+    pub fn add_downloaded_asset(&mut self, incoming: Incoming, sha256: &str, mime: &str, now_ms: i64) -> Result<AssetInfo> {
+        if incoming.sha256() != sha256 {
+            incoming.discard();
+            return Err(StoreError::Damaged(format!("file {sha256}: the content does not match its hash")));
+        }
+        let info = self.add_asset(incoming, "", mime, now_ms)?;
+        self.set_asset_uploaded(sha256)?;
+        Ok(info)
     }
 
     /// Marks files no card uses, clears the mark on files used again, and

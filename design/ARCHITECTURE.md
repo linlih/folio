@@ -405,7 +405,9 @@ CREATE TABLE index_meta (doc_id TEXT PRIMARY KEY, indexed_vv BLOB, gen INT);
 5. **从文件派生的内容都可重建**：缩略图放缓存目录；PDF 抽取的文字、语音转写的文字进入 `index.db`，供全文搜索和 AI 检索（0.3）。
 6. **文件单独同步**，不走 CRDT 增量通道：加密后上传到 S3 兼容的对象存储（5.3）。
 
-**本地部分已实现（2026-10-28，细节见 `design/attachments.md`）**：图片与文件块（`image` 加 `asset/name/mime/size`，新的 `file` 块）；粘贴、拖入、`/` 菜单“图片”“文件”；分块写入 `assets/.incoming/` 再按哈希改名；`folio-asset` 协议（支持 Range）；Apple 设备上 HEIC 转 JPEG；单文件上限 100 MB；`idx.asset_refs` 记引用，无引用 30 天后清理（`assets.orphan_since`，迁移 3）；导出 Markdown 时复制到 `assets/`。同步未做。
+**本地部分已实现（2026-10-28，细节见 `design/attachments.md`）**：图片与文件块（`image` 加 `asset/name/mime/size`，新的 `file` 块）；粘贴、拖入、`/` 菜单“图片”“文件”；分块写入 `assets/.incoming/` 再按哈希改名；`folio-asset` 协议（支持 Range）；Apple 设备上 HEIC 转 JPEG；单文件上限 100 MB；`idx.asset_refs` 记引用，无引用 30 天后清理（`assets.orphan_since`，迁移 3）；导出 Markdown 时复制到 `assets/`。
+
+**同步已实现（2026-10-28）**：文件按 1 MiB 分块加密（XChaCha20-Poly1305，块号与是否最后一块绑定在附加数据里，最后一块补齐到 64 KiB 的倍数），服务器上的 id 是文件哈希的 HMAC；存在同步服务器自己的 `<数据库>.blobs/` 目录（没有用 S3 兼容存储），断点续传；下载后校验哈希。独立的 `sync-files` 线程，不拖慢文档同步。电脑下载全部文件，手机只下载用到的（加载不出来的图片、点开的文件、卡片菜单“下载本卡片的全部附件”）。服务器端清理未做（§5.6 第 6 条）。
 
 待细化（预留的设计空间）：
 - 大文件分块加密与断点续传；服务器上的存储键用带密钥的哈希，避免泄露内容哈希。
@@ -512,9 +514,9 @@ CREATE TABLE index_meta (doc_id TEXT PRIMARY KEY, indexed_vv BLOB, gen INT);
   - **设备列表与移除**：服务端记录每台设备的加密名称和最后一次请求的时间，设置里列出；超过 90 天未同步的标出来，用户可以移除其他设备（`DELETE devices/{id}`）。被移除的设备之后的请求一律 410，需要停止同步再重新加入（新的设备 id）；因为各处都有完整历史，它重新加入时上传的全部历史能直接合并回来。移除不更换口令和密钥（见 5.6 第 5 条）。
   - 模拟器覆盖：随机上传快照、随机移除设备并重新加入、最后加入一台全新设备，全部收敛。
 - **收敛校验**（学 Logseq ADR 0006）：同步空闲时，客户端上报每个文档的 `vv` 哈希；与服务端记录的其他设备的最新 vv 对比，不一致则对该文档发起全量交换（双方互发 `export(updates_since(peer_vv))`）。
-- **附件**：按 sha256 内容寻址，分块加密后经单独的接口上传，服务器存成文件；卡片里只存哈希（存储见 4.6，同步设计见 `design/attachments.md` §5，尚未实现）。
+- **附件**：按 sha256 内容寻址，分块加密后经单独的接口上传，服务器存成文件；卡片里只存哈希（存储见 4.6，同步设计见 `design/attachments.md` §5，2026-10-28 已实现，接口为 `POST blobs/have`、`PUT/GET blobs/{id}/{n}`、`POST blobs/{id}/done`）。
 - **E2EE**：工作区主密钥用用户口令（Argon2id）派生的 KEK 包裹后存服务端；新设备输入口令解开。所有 blob 用 XChaCha20-Poly1305 加密，`doc_id` 也可做 HMAC 混淆。
-- **第一版实现（M3，2026-10）**：`crates/folio-sync`（协议、加密、服务端存储 `relay`、客户端引擎 `client`、HTTP/WebSocket 传输）+ `crates/folio-server`（axum）。与上面草图的差别：日志按**工作区**一条，`seq` 与游标都是工作区级的（一次拉取覆盖所有文档）；`doc_id` 用 HMAC 混淆成标签，文档种类和真实 id 封在密文信封里，服务端只看到“某工作区、某标签、某设备的一段密文”。接口：`PUT/GET /v1/w/{ws}/key`（包裹后的主密钥）、`POST push`、`GET pull?after=`、`GET live`（WebSocket，只通知新的 head）、`PUT device`（加密的设备名）、`GET devices`、`POST/GET acks`（加密的版本报告）；所有请求带服务器令牌（启动时的 `FOLIO_SERVER_TOKEN`）和设备 id。新设备凭“同步码”（服务器地址 + 令牌 + 工作区 id）加口令加入；口令不在同步码里。设备开启同步时把每个文档的完整历史放进 outbox 一次，之前写入的内容（迁移、恢复、导入）不会漏传。工作区主密钥暂存本机设置，之后移到系统钥匙串。尚未做：收敛校验、附件、跨设备永久删除。
+- **第一版实现（M3，2026-10）**：`crates/folio-sync`（协议、加密、服务端存储 `relay`、客户端引擎 `client`、HTTP/WebSocket 传输）+ `crates/folio-server`（axum）。与上面草图的差别：日志按**工作区**一条，`seq` 与游标都是工作区级的（一次拉取覆盖所有文档）；`doc_id` 用 HMAC 混淆成标签，文档种类和真实 id 封在密文信封里，服务端只看到“某工作区、某标签、某设备的一段密文”。接口：`PUT/GET /v1/w/{ws}/key`（包裹后的主密钥）、`POST push`、`GET pull?after=`、`GET live`（WebSocket，只通知新的 head）、`PUT device`（加密的设备名）、`GET devices`、`POST/GET acks`（加密的版本报告）；所有请求带服务器令牌（启动时的 `FOLIO_SERVER_TOKEN`）和设备 id。新设备凭“同步码”（服务器地址 + 令牌 + 工作区 id）加口令加入；口令不在同步码里。设备开启同步时把每个文档的完整历史放进 outbox 一次，之前写入的内容（迁移、恢复、导入）不会漏传。工作区主密钥暂存本机设置，之后移到系统钥匙串。尚未做：收敛校验、跨设备永久删除（附件已于 2026-10-28 加入）。
 - **无服务器模式（可选，后期）**：同样的协议也可以落到 WebDAV / iCloud Drive / S3：每台设备只写自己的 `ops-<device>/` 目录（单写者），其他设备读取 → 天然无冲突（tine BACKLOG 中提到的思路，在 CRDT 下变得简单）。
 
 **部署（2026-10-26）**：`scripts/install-server.sh`，在装有 systemd 的 Linux 上以 root 运行，参数只要域名。下载 Release 里的静态二进制（`folio-server-{x86_64,aarch64}-linux`，musl，附 sha256 校验）。全部文件在 `/opt/folio-sync`：`bin/`（程序、管理命令 `folio-sync`、安装脚本副本）、`etc/folio-sync.env`（令牌和设置，root 所有、0640；令牌只生成一次，重跑沿用）、`data/`（数据库）、`logs/folio-sync.log`（systemd 240+ 写文件，logrotate 每天轮转、保留 14 天；更老的 systemd 留在 journal）、`VERSION`。系统用户与 systemd 服务都叫 `folio-sync`，只监听 `127.0.0.1:8787`，带沙箱选项（只能写 `data/` 和 `logs/`）。管理命令软链到 `/usr/bin/folio-sync`（有的系统如 OpenCloudOS 的 sudo 搜索路径不含 `/usr/local/bin`）：`status`（服务状态 + 健康检查）、`start` / `stop` / `restart`、`logs [-f]`、`info`（地址、令牌、版本、路径）、`upgrade [--version]`（取最新安装脚本重跑，离线时用本地副本）、`uninstall [--purge]`。HTTPS 交给 Caddy（参照自建 Logseq 同步的做法，不依赖系统包管理器）：机器上没有 Caddy 时，询问后下载 Caddy 官方发布的二进制（版本固定为 2.11.7，SHA-512 写在脚本里校验），装在 `/opt/folio-sync/bin/caddy`，配置和证书在 `/opt/folio-sync/caddy/`，以系统用户 `folio-caddy` 运行独立服务 `folio-sync-caddy`（只开放绑定低端口的能力），日志写 `logs/caddy.log`；装之前先检查 80 和 HTTPS 端口是否被别的程序占用并说出是谁，有冲突就在改动任何东西之前停下；可换 HTTPS 端口（证书仍走 80，并关闭 TLS-ALPN 验证），与自建 Logseq 同步一致：在终端里直接运行时按步骤询问域名、公网 HTTPS 端口（默认 443，换成别的端口可以避开大部分扫描）和本机端口，回车用括号里的值；再列出安装计划（地址、端口、HTTPS 怎么配置、安装位置、安全组要放行的端口），同意后才动手。重跑和 `folio-sync upgrade` 沿用上次的端口；`--domain`、`--https-port`、`--port`、`--yes` 用于无人值守。机器上已经有系统的 Caddy（用 `/etc/caddy/Caddyfile` 管理）时，询问后追加站点（先备份、`caddy validate` 通过才写入、保留文件的属主和权限、用标记行包住，重跑时整块替换，改域名会再问一次）；Caddyfile 里已有同名站点就不动，只提示；Caddy 不是用 `/etc/caddy/Caddyfile` 管理的（如 Docker）就打印配置片段。还会检查域名是否解析到本机、端口是否被占用、ufw / firewalld 是否需要放行 80/443，最后等 `https://域名/health` 可访问并打印服务器地址和令牌。`folio-sync uninstall`（或 `--uninstall`）移除服务与程序，数据、令牌、日志留在 `/opt/folio-sync`；`--purge` 整个目录和用户一并删除。客户端实时通道支持 `wss://`（tungstenite 开启 rustls）；服务端收到 SIGTERM 会正常退出。CI 的 `Server install` 在全新的 Ubuntu 上跑全流程（装 Caddy、目录与权限、管理命令的启停与日志、重跑保留令牌、与其他站点共用 Caddyfile、卸载、彻底删除）。
@@ -817,7 +819,7 @@ Folio 现在的卡片库：
 | 标签数据库 | 标签即数据库、属性列、嵌套标签、导出 CSV / Excel | 无 | M6 |
 | 日记 | Journal、日历（可设周日为一周第一天） | 连续日记流；无日历 | 日历视图（M2 之后） |
 | 收集 | Inbox、快速写入、移动端小组件与语音、网页剪藏 | 快速记录（Cmd+E；全局 Cmd+Shift+Space）写入今天的日记 | 全局快速记录（M2）；移动端（M4） |
-| 媒体卡片 | PDF（高亮、批注、解析导出 Markdown）、视频、图片、网页卡片 | 图片仅能以链接插入 | 附件（M2，§4.6）；PDF 卡片（M6） |
+| 媒体卡片 | PDF（高亮、批注、解析导出 Markdown）、视频、图片、网页卡片 | 图片与附件可存进卡片并加密同步（2026-10-28） | 附件（M2，§4.6）；PDF 卡片（M6） |
 | AI | Chat、AI Agent 整理知识库、AI Skills、相关卡片推荐 | 语义 API 雏形；只读 MCP（搜索、读卡片/日记、反链） | MCP 写入（M3 之后）；检索与写入（M6） |
 | 同步与多端 | 同步、移动端 | 自托管同步（端到端加密，M3 进行中） | M3、M4 |
 | 分享与协作 | 公开链接、协作权限 | 无 | 不在当前计划内（个人笔记优先） |

@@ -43,6 +43,10 @@ function kindText(t: TFunction, kind: string | null): string | null {
       return t("sync.errorCode");
     case "no-workspace":
       return t("sync.errorNoWorkspace");
+    case "too-large":
+      return t("sync.errorFileTooLarge");
+    case "server-full":
+      return t("sync.errorServerFull");
     case "short-passphrase":
       return t("sync.passphraseShort", { n: MIN_PASSPHRASE });
     default:
@@ -52,7 +56,7 @@ function kindText(t: TFunction, kind: string | null): string | null {
 
 /** The status line's error; the host's own wording only for errors
  *  without a kind of their own. */
-export function errorText(t: TFunction, status: Pick<SyncStatus, "error" | "errorKind">): string {
+export function errorText(t: TFunction, status: { error: string | null; errorKind: string | null }): string {
   return kindText(t, status.errorKind) ?? status.error ?? "";
 }
 

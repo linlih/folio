@@ -385,7 +385,19 @@
     "openFailed": "Could not open the file: {{error}}",
     "tooLarge": "“{{name}}” is larger than {{mb}} MB and was not added.",
     "adding": "Adding “{{name}}”…",
-    "failed": "Could not add “{{name}}”: {{error}}"
+    "failed": "Could not add “{{name}}”: {{error}}",
+    "missing": {
+      "loading": "Downloading…",
+      "absent": "Not downloaded",
+      "elsewhere": "The file is still on another device; it comes once that device is online",
+      "damaged": "The file arrived damaged and was dropped; it will be downloaded again",
+      "offline": "Cannot reach the sync server; trying again later",
+      "noSync": "This file is not on this device",
+      "unreadable": "This picture cannot be shown"
+    },
+    "downloadAll": "Download all files in this card",
+    "downloading": "Downloading {{count}} files",
+    "allHere": "All files of this card are on this device"
   },
   "sync": {
     "title": "Sync",
@@ -440,7 +452,15 @@
     "seenDays_other": "Last synced {{count}} days ago",
     "stale": "Not synced for over {{days}} days. If it is no longer used, remove it.",
     "removeDevice": "Remove",
-    "removeConfirm": "It will no longer sync. To use it again, stop syncing on it and join again: its notes merge back. The passphrase and key stay the same."
+    "removeConfirm": "It will no longer sync. To use it again, stop syncing on it and join again: its notes merge back. The passphrase and key stay the same.",
+    "files": "Images and files",
+    "filesUp": "{{count}} to upload",
+    "filesDown": "{{count}} to download",
+    "filesNotDownloaded": "{{count}} not downloaded (downloaded when used)",
+    "filesSynced": "Synced",
+    "filesOnServer": "{{size}} on the server",
+    "errorFileTooLarge": "A file is larger than the server allows",
+    "errorServerFull": "The server is out of room for files"
   },
   "panel": {
     "title": "Details",

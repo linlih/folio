@@ -2,6 +2,13 @@
 //! only), and a background thread that pushes local edits and pulls other
 //! devices' through `folio_sync`. Remote changes reach open editors as a
 //! `sync-applied` event with the changed document ids.
+//!
+//! Files (images, attachments; design/attachments.md §5) have a thread of
+//! their own, so a sync of edits never waits for one. It uploads what the
+//! server lacks, then downloads: everything on a computer; on a phone only
+//! what the interface asks for (`asset_fetch`: the images of an open card,
+//! a file being opened). A file that arrives is announced as `asset-ready`;
+//! one asked for that cannot come, as `asset-missing`.
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc;
@@ -10,6 +17,7 @@ use std::time::Duration;
 
 use folio_sync::client::{Engine, Transport};
 use folio_sync::crypto::{self, Keys, WorkspaceKey};
+use folio_sync::files::{is_damaged, Fetched};
 use folio_sync::http::Http;
 use folio_sync::protocol::SyncCode;
 use folio_sync::SyncError;
@@ -31,6 +39,14 @@ const BACKOFF: Duration = Duration::from_secs(2);
 const MAX_BACKOFF: Duration = Duration::from_secs(60);
 /// How often the server is asked which logs to replace with snapshots.
 const SNAPSHOT_EVERY: Duration = Duration::from_secs(60 * 60);
+/// The file thread looks again this often when nothing wakes it.
+const FILES_POLL: Duration = Duration::from_secs(5 * 60);
+/// A file that came damaged is not tried again on its own for this long.
+const DAMAGED_PAUSE: Duration = Duration::from_secs(10 * 60);
+/// How often the server is asked how much room the files take.
+const USAGE_EVERY: Duration = Duration::from_secs(10 * 60);
+/// Computers keep every file; phones download what is looked at.
+const DOWNLOAD_ALL: bool = cfg!(desktop);
 
 /// Kept in `local_settings`. The workspace key is stored here for now; the
 /// OS keychain comes later (§5.3).
@@ -117,17 +133,43 @@ pub struct SyncStatus {
     /// What went wrong, for the interface to word it in its language:
     /// "network", "unauthorized", "removed" or "other".
     pub error_kind: Option<&'static str>,
+    /// Files waiting to go up, and files cards use that are not here.
+    pub files_up: i64,
+    pub files_down: i64,
+    /// Whether this device downloads every file (computers) or only what
+    /// is looked at (phones).
+    pub files_all: bool,
+    /// The sync space's files on the server, in bytes.
+    pub server_file_bytes: Option<i64>,
+    /// The last file transfer that failed, as for `error`.
+    pub files_error: Option<String>,
+    pub files_error_kind: Option<&'static str>,
+}
+
+/// Why a file asked for is not here (`asset-missing`).
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AssetMissing {
+    pub sha256: String,
+    /// "elsewhere": not on the server yet, the device that has it has not
+    /// uploaded it; "damaged": what came was not the file, it was dropped;
+    /// "offline": the server cannot be reached; "no-sync": this device does
+    /// not sync.
+    pub reason: &'static str,
 }
 
 struct Running {
     stop: Arc<AtomicBool>,
     wake: mpsc::Sender<()>,
+    wake_files: mpsc::Sender<()>,
 }
 
 #[derive(Default)]
 pub struct SyncState {
     running: Mutex<Option<Running>>,
     status: Arc<Mutex<SyncStatus>>,
+    /// Files the interface asked for, first asked first.
+    wanted: Mutex<Vec<String>>,
 }
 
 /// The name this device had when it last synced; empty for the system's.
@@ -162,6 +204,8 @@ fn kind(e: &SyncError) -> &'static str {
         SyncError::Unauthorized => "unauthorized",
         SyncError::Removed => "removed",
         SyncError::WrongPassphrase => "wrong-passphrase",
+        SyncError::TooLarge(_) => "too-large",
+        SyncError::Full(_) => "server-full",
         _ => "other",
     }
 }
@@ -205,10 +249,20 @@ pub fn poke(app: &tauri::AppHandle) {
     }
 }
 
+/// Asks the file thread to look now (a file was added, or one is wanted).
+/// False when this device does not sync.
+pub fn poke_files(app: &tauri::AppHandle) -> bool {
+    match app.state::<SyncState>().running.lock().unwrap_or_else(|e| e.into_inner()).as_ref() {
+        Some(r) => r.wake_files.send(()).is_ok(),
+        None => false,
+    }
+}
+
 pub(crate) fn stop(app: &tauri::AppHandle) {
     if let Some(r) = app.state::<SyncState>().running.lock().unwrap_or_else(|e| e.into_inner()).take() {
         r.stop.store(true, Ordering::SeqCst);
         let _ = r.wake.send(());
+        let _ = r.wake_files.send(());
     }
 }
 
@@ -223,10 +277,25 @@ fn start(app: &tauri::AppHandle, settings: SyncSettings) {
     };
     let stop_flag = Arc::new(AtomicBool::new(false));
     let (wake, woken) = mpsc::channel();
+    let (wake_files, files_woken) = mpsc::channel();
     let http = Http::new(&settings.server, &settings.token, &settings.workspace, &settings.device);
     update(app, |st| {
-        *st = SyncStatus { enabled: true, server: settings.server.clone(), device: settings.device.clone(), code: code_of(&settings), ..Default::default() };
+        *st = SyncStatus {
+            enabled: true,
+            server: settings.server.clone(),
+            device: settings.device.clone(),
+            code: code_of(&settings),
+            files_all: DOWNLOAD_ALL,
+            ..Default::default()
+        };
     });
+    {
+        let app = app.clone();
+        let http = http.clone();
+        let stop_flag = stop_flag.clone();
+        let engine = Engine::new(settings.workspace.clone(), keys.clone());
+        std::thread::Builder::new().name("sync-files".into()).spawn(move || run_files(app, engine, http, stop_flag, files_woken)).ok();
+    }
     {
         let app = app.clone();
         let http = http.clone();
@@ -239,9 +308,10 @@ fn start(app: &tauri::AppHandle, settings: SyncSettings) {
         let stop_flag = stop_flag.clone();
         let engine = Engine::new(settings.workspace.clone(), keys);
         let name = device_name(&settings);
-        std::thread::Builder::new().name("sync".into()).spawn(move || run(app, engine, http, name, stop_flag, woken)).ok();
+        let wake_files = wake_files.clone();
+        std::thread::Builder::new().name("sync".into()).spawn(move || run(app, engine, http, name, stop_flag, woken, wake_files)).ok();
     }
-    *app.state::<SyncState>().running.lock().unwrap_or_else(|e| e.into_inner()) = Some(Running { stop: stop_flag, wake });
+    *app.state::<SyncState>().running.lock().unwrap_or_else(|e| e.into_inner()) = Some(Running { stop: stop_flag, wake, wake_files });
 }
 
 /// Keeps the live channel open; each notice wakes the loop.
@@ -264,7 +334,7 @@ fn listen(app: tauri::AppHandle, http: Http, stop: Arc<AtomicBool>, wake: mpsc::
     }
 }
 
-fn run(app: tauri::AppHandle, engine: Engine, http: Http, name: String, stop: Arc<AtomicBool>, woken: mpsc::Receiver<()>) {
+fn run(app: tauri::AppHandle, engine: Engine, http: Http, name: String, stop: Arc<AtomicBool>, woken: mpsc::Receiver<()>, wake_files: mpsc::Sender<()>) {
     let mut wait = Duration::ZERO;
     let mut backoff = BACKOFF;
     // The name goes up once per start, at the first sync that can send it.
@@ -312,6 +382,10 @@ fn run(app: tauri::AppHandle, engine: Engine, http: Http, name: String, stop: Ar
                     tracing::info!(pushed = report.pushed, docs = ids.len(), "sync applied remote changes");
                     let _ = app.emit("sync-applied", ids);
                 }
+                // Edits are through: files next, on their own thread. New
+                // cards may use files not here; a live notice may be a
+                // file that is now whole.
+                let _ = wake_files.send(());
                 update(&app, |st| {
                     st.syncing = false;
                     st.last_sync = Some(now_ms());
@@ -334,6 +408,182 @@ fn run(app: tauri::AppHandle, engine: Engine, http: Http, name: String, stop: Ar
             }
         }
     }
+}
+
+fn file_counts(state: &AppState) -> (i64, i64) {
+    let Ok(store) = lock(state) else { return (0, 0) };
+    let up = store.assets_to_upload().map(|v| v.len() as i64).unwrap_or(0);
+    let down = store.missing_assets().map(|v| v.len() as i64).unwrap_or(0);
+    (up, down)
+}
+
+fn take_wanted(app: &tauri::AppHandle) -> Vec<String> {
+    std::mem::take(&mut *app.state::<SyncState>().wanted.lock().unwrap_or_else(|e| e.into_inner()))
+}
+
+/// The file thread: uploads, then downloads, each file on its own; a
+/// failure waits and tries again, as for edits.
+fn run_files(app: tauri::AppHandle, engine: Engine, http: Http, stop: Arc<AtomicBool>, woken: mpsc::Receiver<()>) {
+    let mut wait = Duration::ZERO;
+    let mut backoff = BACKOFF;
+    let mut damaged: std::collections::HashMap<String, std::time::Instant> = std::collections::HashMap::new();
+    let mut usage_at: Option<std::time::Instant> = None;
+    let stopped = || stop.load(Ordering::SeqCst);
+    loop {
+        match woken.recv_timeout(wait) {
+            Ok(()) => while woken.try_recv().is_ok() {},
+            Err(mpsc::RecvTimeoutError::Timeout) => {}
+            Err(mpsc::RecvTimeoutError::Disconnected) => return,
+        }
+        if stopped() {
+            return;
+        }
+        let state = app.state::<AppState>();
+        let result = (|| -> folio_sync::Result<()> {
+            // What someone is looking at comes first. A file not on the
+            // server yet stays asked for: it may come with the next round.
+            let wanted = take_wanted(&app);
+            let missing = lock(&state).ok().and_then(|s| s.missing_assets().ok()).unwrap_or_default();
+            let mime_of = |sha: &str| missing.iter().find(|(m, _)| m == sha).and_then(|(_, mime)| mime.clone());
+            let mut waiting = Vec::new();
+            let mut outcome = Ok(());
+            for (i, sha) in wanted.iter().enumerate() {
+                if stopped() {
+                    waiting.extend_from_slice(&wanted[i..]);
+                    break;
+                }
+                if lock(&state).ok().and_then(|s| s.asset_file(sha).ok().flatten()).is_some() {
+                    let _ = app.emit("asset-ready", sha);
+                    continue;
+                }
+                match fetch(&app, &engine, &http, sha, mime_of(sha).as_deref(), &mut damaged, true) {
+                    Ok(true) => waiting.push(sha.clone()),
+                    Ok(false) => {}
+                    Err(e) => {
+                        for sha in &wanted[i..] {
+                            let _ = app.emit("asset-missing", AssetMissing { sha256: sha.clone(), reason: "offline" });
+                        }
+                        waiting.extend_from_slice(&wanted[i..]);
+                        outcome = Err(e);
+                        break;
+                    }
+                }
+            }
+            {
+                let st = app.state::<SyncState>();
+                let mut w = st.wanted.lock().unwrap_or_else(|e| e.into_inner());
+                for sha in waiting {
+                    if !w.contains(&sha) {
+                        w.push(sha);
+                    }
+                }
+            }
+            outcome?;
+            let sent = engine.upload_files(&state.store, &http as &dyn Transport, &stopped)?;
+            if DOWNLOAD_ALL {
+                for (sha, mime) in &missing {
+                    if stopped() {
+                        return Ok(());
+                    }
+                    if damaged.get(sha).is_some_and(|t| t.elapsed() < DAMAGED_PAUSE) {
+                        continue;
+                    }
+                    fetch(&app, &engine, &http, sha, mime.as_deref(), &mut damaged, false)?;
+                }
+            }
+            if sent > 0 || usage_at.is_none_or(|t| t.elapsed() >= USAGE_EVERY) {
+                usage_at = Some(std::time::Instant::now());
+                if let Ok(bytes) = engine.server_file_bytes(&http as &dyn Transport) {
+                    update(&app, |st| st.server_file_bytes = Some(bytes));
+                }
+            }
+            Ok(())
+        })();
+        let (up, down) = file_counts(&state);
+        match result {
+            Ok(()) => {
+                backoff = BACKOFF;
+                wait = FILES_POLL;
+                update(&app, |st| {
+                    st.files_up = up;
+                    st.files_down = down;
+                    st.files_error = None;
+                    st.files_error_kind = None;
+                });
+            }
+            Err(e) => {
+                tracing::warn!(error = %e, "file sync failed");
+                wait = if matches!(e, SyncError::Removed) { MAX_BACKOFF } else { backoff };
+                backoff = (backoff * 2).min(MAX_BACKOFF);
+                update(&app, |st| {
+                    st.files_up = up;
+                    st.files_down = down;
+                    st.files_error = Some(message(&e));
+                    st.files_error_kind = Some(kind(&e));
+                });
+            }
+        }
+    }
+}
+
+/// Downloads one file and says how it went; true when it is not on the
+/// server yet. A file not there or damaged is not an error of the loop
+/// (the others go on); anything else (the network) is.
+fn fetch(
+    app: &tauri::AppHandle,
+    engine: &Engine,
+    http: &Http,
+    sha: &str,
+    mime: Option<&str>,
+    damaged: &mut std::collections::HashMap<String, std::time::Instant>,
+    asked: bool,
+) -> folio_sync::Result<bool> {
+    let state = app.state::<AppState>();
+    match engine.download_file(&state.store, http as &dyn Transport, sha, mime) {
+        Ok(Fetched::Done(_)) => {
+            damaged.remove(sha);
+            let _ = app.emit("asset-ready", sha);
+        }
+        Ok(Fetched::NotOnServer) => {
+            if asked {
+                let _ = app.emit("asset-missing", AssetMissing { sha256: sha.to_owned(), reason: "elsewhere" });
+            }
+            return Ok(true);
+        }
+        Err(e) if is_damaged(&e) => {
+            tracing::error!(asset = %sha, error = %e, "a downloaded file was damaged; dropped it");
+            damaged.insert(sha.to_owned(), std::time::Instant::now());
+            if asked {
+                let _ = app.emit("asset-missing", AssetMissing { sha256: sha.to_owned(), reason: "damaged" });
+            }
+        }
+        Err(e) => return Err(e),
+    }
+    Ok(false)
+}
+
+/// Asks for files this device does not have (the images of a card being
+/// looked at, a file being opened). They come as `asset-ready`, or
+/// `asset-missing` with the reason.
+#[tauri::command]
+pub fn asset_fetch(app: tauri::AppHandle, sha256s: Vec<String>) {
+    let sha256s: Vec<String> = sha256s.into_iter().filter(|s| folio_store::assets::is_hash(s)).collect();
+    if load(&app.state::<AppState>()).is_none() {
+        for sha in sha256s {
+            let _ = app.emit("asset-missing", AssetMissing { sha256: sha, reason: "no-sync" });
+        }
+        return;
+    }
+    {
+        let st = app.state::<SyncState>();
+        let mut wanted = st.wanted.lock().unwrap_or_else(|e| e.into_inner());
+        for sha in sha256s {
+            if !wanted.contains(&sha) {
+                wanted.push(sha);
+            }
+        }
+    }
+    poke_files(&app);
 }
 
 fn enable(app: &tauri::AppHandle, settings: SyncSettings) -> CmdResult<SyncStatus> {
@@ -364,7 +614,9 @@ fn check_passphrase(p: &str) -> CmdResult<()> {
 pub fn sync_status(app: tauri::AppHandle) -> SyncStatus {
     let mut st = current(&app);
     if st.enabled {
-        st.pending = lock(&app.state::<AppState>()).ok().and_then(|s| s.outbox_len().ok()).unwrap_or(st.pending);
+        let state = app.state::<AppState>();
+        st.pending = lock(&state).ok().and_then(|s| s.outbox_len().ok()).unwrap_or(st.pending);
+        (st.files_up, st.files_down) = file_counts(&state);
     }
     st
 }

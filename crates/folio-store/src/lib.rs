@@ -43,6 +43,8 @@ pub enum StoreError {
     Io(#[from] std::io::Error),
     #[error("the file is larger than {} MB", .0 / 1024 / 1024)]
     TooLarge(u64),
+    #[error("damaged: {0}")]
+    Damaged(String),
 }
 
 pub type Result<T> = std::result::Result<T, StoreError>;
@@ -922,8 +924,8 @@ impl Store {
         for topic in &topics {
             tx.execute("INSERT INTO idx.card_topics(card_id, topic) VALUES (?1, ?2)", params![id.as_str(), topic])?;
         }
-        for sha256 in &x.assets {
-            tx.execute("INSERT OR IGNORE INTO idx.asset_refs(sha256, doc_id) VALUES (?1, ?2)", params![sha256, id.as_str()])?;
+        for a in &x.assets {
+            tx.execute("INSERT OR IGNORE INTO idx.asset_refs(sha256, doc_id, mime) VALUES (?1, ?2, ?3)", params![a.sha256, id.as_str(), a.mime])?;
         }
         tx.commit()?;
         Ok(())

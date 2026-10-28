@@ -128,7 +128,23 @@ export interface SyncStatus {
   error: string | null;
   /** What went wrong, to word it in the interface's language. */
   errorKind: "network" | "unauthorized" | "removed" | "wrong-passphrase" | "other" | null;
+  /** Files waiting to go up; files cards use that are not on this device. */
+  filesUp: number;
+  filesDown: number;
+  /** True on computers (every file is downloaded); phones download what
+   *  is looked at. */
+  filesAll: boolean;
+  /** The sync space's files on the server, in bytes. */
+  serverFileBytes: number | null;
+  /** The last file transfer that failed. */
+  filesError: string | null;
+  filesErrorKind: "network" | "unauthorized" | "removed" | "too-large" | "server-full" | "other" | null;
 }
+
+/** A file asked for arrived, or why it cannot (src-tauri/src/sync.rs). */
+export type AssetEvent =
+  | { sha256: string; ready: true }
+  | { sha256: string; ready: false; reason: "elsewhere" | "damaged" | "offline" | "no-sync" };
 
 /** A device of the sync workspace (src-tauri/src/sync.rs). */
 export interface SyncDevice {

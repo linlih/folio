@@ -168,3 +168,57 @@ fn snapshots_and_removal_over_http() {
     assert!(engine.devices(&t[0]).unwrap().iter().all(|d| d.id != "device-c"));
     assert!(matches!(engine.remove_device(&t[0], "device-c"), Err(SyncError::NotFound(_))));
 }
+
+/// A file over HTTP: up in chunks, the other device hears of it, down
+/// whole; the server's limits come back as their own errors.
+#[test]
+fn files_over_http() {
+    use folio_store::{Incoming, Store};
+    use folio_sync::client::Engine;
+    use folio_sync::crypto::{Keys, CHUNK};
+    use folio_sync::files::Fetched;
+    use std::sync::Mutex;
+
+    let base = start_with(Relay::open_in_memory().unwrap().with_file_limits(2 * CHUNK as u64, Some(5 * CHUNK as u64)));
+    let key = WorkspaceKey::generate();
+    let engine = Engine::new("ws4", Keys::derive(&key));
+    let (da, db) = (tempfile::tempdir().unwrap(), tempfile::tempdir().unwrap());
+    let a = Mutex::new(Store::open(da.path()).unwrap());
+    let b = Mutex::new(Store::open(db.path()).unwrap());
+    let ta = Http::new(&base, TOKEN, "ws4", "device-a");
+    let tb = Http::new(&base, TOKEN, "ws4", "device-b");
+    ta.put_key(&wrap(&key, "passphrase", (1024, 1, 1)).unwrap()).unwrap();
+    let add = |s: &Mutex<Store>, bytes: &[u8]| {
+        let mut s = s.lock().unwrap();
+        let mut inc = Incoming::create(&s.assets_dir()).unwrap();
+        inc.write(bytes).unwrap();
+        s.add_asset(inc, "scan.pdf", "application/pdf", 1).unwrap().sha256
+    };
+
+    let (tx, rx) = mpsc::channel();
+    let listener = tb.clone();
+    std::thread::spawn(move || {
+        let _ = listener.listen(|head| {
+            let _ = tx.send(head);
+        });
+    });
+    rx.recv_timeout(Duration::from_secs(5)).unwrap();
+
+    let bytes: Vec<u8> = (0..CHUNK + CHUNK / 2).map(|i| (i % 251) as u8).collect();
+    let sha = add(&a, &bytes);
+    assert_eq!(engine.upload_files(&a, &ta, &|| false).unwrap(), 1);
+    rx.recv_timeout(Duration::from_secs(5)).expect("B hears that a file is whole");
+    let Fetched::Done(info) = engine.download_file(&b, &tb, &sha, Some("application/pdf")).unwrap() else { panic!("not there") };
+    assert_eq!(info.size, bytes.len() as u64);
+    assert_eq!(std::fs::read(b.lock().unwrap().asset_file(&sha).unwrap().unwrap().0).unwrap(), bytes);
+    assert!(engine.server_file_bytes(&tb).unwrap() > bytes.len() as i64);
+
+    // Over 2 MB: refused as too large; over the room left: as full.
+    let big: Vec<u8> = vec![7; 2 * CHUNK + 1];
+    add(&a, &big);
+    assert!(matches!(engine.upload_files(&a, &ta, &|| false), Err(SyncError::TooLarge(_))));
+    let c = Mutex::new(Store::open(tempfile::tempdir().unwrap().path()).unwrap());
+    add(&c, &vec![9; 2 * CHUNK]);
+    let tc = Http::new(&base, TOKEN, "ws4", "device-c");
+    assert!(matches!(engine.upload_files(&c, &tc, &|| false), Err(SyncError::Full(_))));
+}

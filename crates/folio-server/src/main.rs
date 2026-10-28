@@ -7,7 +7,12 @@
 //! - `FOLIO_SERVER_DB` (default `folio-server.db`): where updates are kept;
 //! - `FOLIO_SERVER_SNAPSHOT_UPDATES` (default 100): a document's log is
 //!   replaced by a snapshot from this many updates (lower it to try
-//!   compaction out).
+//!   compaction out);
+//! - `FOLIO_SERVER_MAX_FILE_MB` (default 100): the largest image or
+//!   attachment;
+//! - `FOLIO_SERVER_QUOTA_MB` (default none): room for files per sync space.
+//!
+//! Files are kept in `<FOLIO_SERVER_DB>.blobs/` beside the database.
 //!
 //! It stores only ciphertext and opaque document tags; the passphrase never
 //! leaves the devices.
@@ -56,12 +61,18 @@ async fn main() {
         relay = relay.with_snapshot_thresholds(n, folio_sync::relay::SNAPSHOT_MIN_BYTES);
         tracing::info!(updates = n, "snapshot threshold");
     }
+    let mb = |name: &str| std::env::var(name).ok().and_then(|n| n.parse::<u64>().ok()).filter(|n| *n > 0).map(|n| n * 1024 * 1024);
+    let max_file = mb("FOLIO_SERVER_MAX_FILE_MB").unwrap_or(folio_sync::relay::MAX_FILE_BYTES);
+    let quota = mb("FOLIO_SERVER_QUOTA_MB");
+    relay = relay.with_file_limits(max_file, quota);
     let listener = tokio::net::TcpListener::bind(&addr).await.unwrap_or_else(|e| {
         eprintln!("Cannot listen on {addr}: {e}");
         std::process::exit(1);
     });
     tracing::info!("folio-server listening on http://{addr}, data in {}", db.display());
-    axum::serve(listener, folio_server::router(folio_server::Server::new(relay, token)))
+    let server = folio_server::Server::new(relay, token);
+    tokio::spawn(folio_server::housekeeping(server.clone()));
+    axum::serve(listener, folio_server::router(server))
         .with_graceful_shutdown(stopped())
         .await
         .unwrap();

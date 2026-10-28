@@ -5,9 +5,11 @@
 //! - `relay`: the server's storage (append-only encrypted log per workspace).
 //! - `client`: the engine that pushes the outbox and pulls by cursor.
 //! - `http`: the client's HTTP and WebSocket transport.
+//! - `files`: images and attachments, sealed in chunks, up and down.
 
 pub mod client;
 pub mod crypto;
+pub mod files;
 pub mod http;
 pub mod protocol;
 pub mod relay;
@@ -28,6 +30,12 @@ pub enum SyncError {
     Unauthorized,
     #[error("this device was removed from the workspace")]
     Removed,
+    #[error("too large: {0}")]
+    TooLarge(String),
+    #[error("the server is out of room for files: {0}")]
+    Full(String),
+    #[error("storage: {0}")]
+    Storage(String),
     #[error("network: {0}")]
     Network(String),
     #[error("database: {0}")]

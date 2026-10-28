@@ -5,7 +5,7 @@ use std::time::Duration;
 
 use crate::client::Transport;
 use crate::crypto::WrappedKey;
-use crate::protocol::{AcksResponse, DeviceInfo, DeviceName, DevicesResponse, HeavyDoc, HeavyResponse, Live, PullResponse, PushItem, PushRequest, PushResponse, SnapshotRequest, SnapshotResponse, DEVICE_HEADER};
+use crate::protocol::{AcksResponse, BlobDone, BlobIds, BlobsResponse, DeviceInfo, DeviceName, DevicesResponse, HeavyDoc, HeavyResponse, Live, PullResponse, PushItem, PushRequest, PushResponse, SnapshotRequest, SnapshotResponse, DEVICE_HEADER};
 use crate::{Result, SyncError};
 
 /// Where and as whom: the server's address and token, the workspace, this
@@ -25,6 +25,8 @@ fn err(e: ureq::Error) -> SyncError {
         ureq::Error::Status(404, r) => SyncError::NotFound(r.into_string().unwrap_or_default()),
         ureq::Error::Status(410, _) => SyncError::Removed,
         ureq::Error::Status(409, r) => SyncError::Conflict(r.into_string().unwrap_or_default()),
+        ureq::Error::Status(413, r) => SyncError::TooLarge(r.into_string().unwrap_or_default()),
+        ureq::Error::Status(507, r) => SyncError::Full(r.into_string().unwrap_or_default()),
         ureq::Error::Status(code, r) => SyncError::Network(format!("{code}: {}", r.into_string().unwrap_or_default())),
         ureq::Error::Transport(t) => SyncError::Network(t.to_string()),
     }
@@ -144,5 +146,30 @@ impl Transport for Http {
 
     fn push_snapshot(&self, item: &PushItem, covers: i64) -> Result<i64> {
         Ok(json::<SnapshotResponse>(self.req("POST", "snapshot").send_json(SnapshotRequest { item: item.clone(), covers }).map_err(err)?)?.seq)
+    }
+
+    fn blobs(&self, ids: &[String]) -> Result<BlobsResponse> {
+        json(self.req("POST", "blobs/have").send_json(BlobIds { ids: ids.to_vec() }).map_err(err)?)
+    }
+
+    fn put_chunk(&self, id: &str, n: u32, sealed: &[u8]) -> Result<()> {
+        self.req("PUT", &format!("blobs/{id}/{n}")).set("Content-Type", "application/octet-stream").send_bytes(sealed).map_err(err)?;
+        Ok(())
+    }
+
+    fn finish_blob(&self, id: &str, chunks: u32) -> Result<()> {
+        self.req("POST", &format!("blobs/{id}/done")).send_json(BlobDone { chunks }).map_err(err)?;
+        Ok(())
+    }
+
+    fn get_chunk(&self, id: &str, n: u32) -> Result<Vec<u8>> {
+        use std::io::Read;
+        let r = self.req("GET", &format!("blobs/{id}/{n}")).call().map_err(err)?;
+        let mut out = Vec::new();
+        r.into_reader().take(crate::crypto::MAX_SEALED_CHUNK as u64 + 1).read_to_end(&mut out).map_err(|e| SyncError::Network(e.to_string()))?;
+        if out.len() > crate::crypto::MAX_SEALED_CHUNK {
+            return Err(SyncError::Protocol("file chunk too long".into()));
+        }
+        Ok(out)
     }
 }

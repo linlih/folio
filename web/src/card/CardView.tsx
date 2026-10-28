@@ -14,6 +14,9 @@ import { belowText, continueAtEnd, firstTextblock } from "../editor/outliner/fee
 import { focusedPane, useShell } from "../shell/tabs";
 import { Backlinks } from "./Backlinks";
 import { copyMarkdown, exportCardMarkdown } from "./markdown";
+import { downloadCardFiles } from "../editor/assets";
+import { backend } from "../platform";
+import { usePhone } from "../shell/phone";
 import { onReveal, revealIn, takePending } from "./reveal";
 import "./card.css";
 
@@ -52,6 +55,14 @@ function titleEdge(toTitle: () => void) {
 function CardMenu({ cardId, title }: { cardId: string; title: string }) {
   const { t } = useTranslation();
   const pinned = usePins((s) => isPinned(s.cards, cardId));
+  // Phones download files when they are looked at; this takes a card's
+  // all along before going offline (design/attachments.md §5.4).
+  const phone = usePhone() && backend.kind === "tauri";
+  const downloadAll = async () => {
+    const h = await docs().open(cardId);
+    const n = await downloadCardFiles(JSON.stringify(h.doc.toJSON()));
+    useShell.getState().setNotice(n ? t("assets.downloading", { count: n }) : t("assets.allHere"));
+  };
   return (
     <Menu.Root>
       <Menu.Trigger className="icon-button card-menu" aria-label={t("card.menu")} title={t("card.menu")}>
@@ -70,6 +81,14 @@ function CardMenu({ cardId, title }: { cardId: string; title: string }) {
             <Menu.Item className="popup-item" onClick={() => void exportCardMarkdown(cardId, title)}>
               {t("markdown.export")}
             </Menu.Item>
+            {phone && (
+              <>
+                <Menu.Separator className="popup-separator" />
+                <Menu.Item className="popup-item" onClick={() => void downloadAll()}>
+                  {t("assets.downloadAll")}
+                </Menu.Item>
+              </>
+            )}
           </Menu.Popup>
         </Menu.Positioner>
       </Menu.Portal>

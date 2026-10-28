@@ -13,7 +13,7 @@ use folio_core::{DocId, DocKind};
 use folio_store::Store;
 
 use crate::crypto::{b64, unb64, Keys};
-use crate::protocol::{AcksResponse, DeviceInfo, HeavyDoc, PullResponse, PushItem};
+use crate::protocol::{AcksResponse, BlobsResponse, DeviceInfo, HeavyDoc, PullResponse, PushItem};
 use crate::{Result, SyncError};
 
 /// The server's side of the conversation; HTTP in the app, the relay
@@ -33,6 +33,11 @@ pub trait Transport {
     /// Stores a document's snapshot covering its updates up to `covers`;
     /// returns its seq.
     fn push_snapshot(&self, item: &PushItem, covers: i64) -> Result<i64>;
+    /// Which of these files the server has (design/attachments.md §5.1).
+    fn blobs(&self, ids: &[String]) -> Result<BlobsResponse>;
+    fn put_chunk(&self, id: &str, n: u32, sealed: &[u8]) -> Result<()>;
+    fn finish_blob(&self, id: &str, chunks: u32) -> Result<()>;
+    fn get_chunk(&self, id: &str, n: u32) -> Result<Vec<u8>>;
 }
 
 /// Updates sent per push.
@@ -124,6 +129,7 @@ pub fn forget_workspace(store: &Store) -> Result<()> {
         store.set_sync_value(key, &[])?;
     }
     store.clear_device_acks()?;
+    store.forget_uploads()?;
     Ok(())
 }
 
@@ -141,19 +147,19 @@ fn name_aad(device: &str) -> String {
     format!("device\n{device}")
 }
 
-fn lock(store: &Mutex<Store>) -> std::sync::MutexGuard<'_, Store> {
+pub(crate) fn lock(store: &Mutex<Store>) -> std::sync::MutexGuard<'_, Store> {
     store.lock().unwrap_or_else(|e| e.into_inner())
 }
 
-fn now_ms() -> i64 {
+pub(crate) fn now_ms() -> i64 {
     std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_millis() as i64).unwrap_or(0)
 }
 
 /// One workspace's keys and name; stateless otherwise (the cursor and the
 /// outbox live in the store).
 pub struct Engine {
-    workspace: String,
-    keys: Keys,
+    pub(crate) workspace: String,
+    pub(crate) keys: Keys,
 }
 
 impl Engine {

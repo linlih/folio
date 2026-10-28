@@ -34,8 +34,16 @@ pub struct Extract {
     pub refs: Vec<(String, String)>,
     /// (block id holding the tag, tag name as written)
     pub tags: Vec<(String, String)>,
-    /// Hashes of the files (images, attachments) the body uses, once each.
-    pub assets: Vec<String>,
+    /// The files (images, attachments) the body uses, once each.
+    pub assets: Vec<AssetRef>,
+}
+
+/// A file a card uses: its hash, and its type as the node records it (a
+/// device that has not downloaded the file serves it with this type).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct AssetRef {
+    pub sha256: String,
+    pub mime: Option<String>,
 }
 
 fn name(node: &LoroValue) -> &str {
@@ -152,11 +160,11 @@ fn walk(nodes: &[LoroValue], parent: Option<&str>, out: &mut Extract) {
 }
 
 /// The files image and file blocks point at, wherever they sit.
-fn collect_assets(node: &LoroValue, out: &mut Vec<String>) {
+fn collect_assets(node: &LoroValue, out: &mut Vec<AssetRef>) {
     if matches!(name(node), "image" | "file") {
         if let Some(sha256) = attr(node, "asset") {
-            if !out.contains(&sha256) {
-                out.push(sha256);
+            if !out.iter().any(|a| a.sha256 == sha256) {
+                out.push(AssetRef { sha256, mime: attr(node, "mime") });
             }
         }
     }
@@ -223,7 +231,7 @@ mod tests {
         init_card(&doc, CardKind::Note, "", 1).unwrap();
         let a = "a".repeat(64);
         let b = "b".repeat(64);
-        add_block(&doc, None, "image", &[("asset", LoroValue::from(a.as_str()))]).unwrap();
+        add_block(&doc, None, "image", &[("asset", LoroValue::from(a.as_str())), ("mime", LoroValue::from("image/png"))]).unwrap();
         add_block(&doc, None, "image", &[("src", LoroValue::from("https://example.com/x.png"))]).unwrap();
         let list = add_block(&doc, None, "bulletList", &[]).unwrap();
         let item = add_block(&doc, Some(list), "listItem", &[("bid", LoroValue::from("i1"))]).unwrap();
@@ -231,6 +239,7 @@ mod tests {
         add_block(&doc, Some(item), "file", &[("asset", LoroValue::from(b.as_str()))]).unwrap();
         add_block(&doc, Some(item), "image", &[("asset", LoroValue::from(a.as_str()))]).unwrap();
         doc.commit();
-        assert_eq!(extract(&doc).assets, vec![a, b]);
+        let refs = extract(&doc).assets;
+        assert_eq!(refs, vec![AssetRef { sha256: a, mime: Some("image/png".into()) }, AssetRef { sha256: b, mime: None }]);
     }
 }

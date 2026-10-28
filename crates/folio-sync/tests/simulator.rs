@@ -20,7 +20,7 @@ use folio_store::{Origin, Store};
 use folio_sync::client::{forget_workspace, Engine, Report, Transport};
 use folio_sync::SyncError;
 use folio_sync::crypto::{Keys, WorkspaceKey};
-use folio_sync::protocol::{AcksResponse, DeviceInfo, HeavyDoc, PullResponse, PushItem};
+use folio_sync::protocol::{AcksResponse, BlobsResponse, DeviceInfo, HeavyDoc, PullResponse, PushItem};
 use folio_sync::relay::Relay;
 
 const WS: &str = "sim-workspace";
@@ -77,6 +77,18 @@ impl Transport for Direct<'_> {
     }
     fn push_snapshot(&self, item: &PushItem, covers: i64) -> folio_sync::Result<i64> {
         self.relay.push_snapshot(WS, &self.device, item, covers)
+    }
+    fn blobs(&self, ids: &[String]) -> folio_sync::Result<BlobsResponse> {
+        self.relay.blobs(WS, &self.device, ids)
+    }
+    fn put_chunk(&self, id: &str, n: u32, sealed: &[u8]) -> folio_sync::Result<()> {
+        self.relay.put_chunk(WS, &self.device, id, n, sealed)
+    }
+    fn finish_blob(&self, id: &str, chunks: u32) -> folio_sync::Result<()> {
+        self.relay.finish_blob(WS, &self.device, id, chunks)
+    }
+    fn get_chunk(&self, id: &str, n: u32) -> folio_sync::Result<Vec<u8>> {
+        self.relay.get_chunk(WS, &self.device, id, n)
     }
 }
 

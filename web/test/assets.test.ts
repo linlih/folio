@@ -2,7 +2,8 @@
 import { Slice } from "@tiptap/pm/model";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { initCard } from "../src/docs/card";
-import { addFiles, clipboardFiles, formatSize } from "../src/editor/assets";
+import { addFiles, clipboardFiles, downloadCardFiles, formatSize } from "../src/editor/assets";
+import i18n from "../src/i18n";
 import { backend } from "../src/platform";
 import { bids, bind, cursorAfter, device, settle, sync } from "./helpers";
 
@@ -181,5 +182,71 @@ describe("sizes", () => {
     expect(formatSize(3.2 * 1024 * 1024)).toBe("3.2 MB");
     expect(formatSize(42 * 1024 * 1024)).toBe("42 MB");
     expect(formatSize(null)).toBe("");
+  });
+});
+
+describe("files not on this device", () => {
+  const shaOf = async (body: string) =>
+    [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(body)))].map((b) => b.toString(16).padStart(2, "0")).join("");
+
+  it("an image that does not load asks for its file, keeps its shape and says why", async () => {
+    const sha = await shaOf("picture from the other device");
+    const fetch = vi.spyOn(backend, "fetchAssets");
+    const { editor } = await journal(`<p>x</p><img src="x" data-asset="${sha}" width="300" height="200">`);
+    const img = editor.view.dom.querySelector("img")!;
+    img.dispatchEvent(new Event("error"));
+    expect(fetch).toHaveBeenCalledWith([sha]);
+    // Nothing syncs in the browser: it cannot come.
+    await vi.waitFor(() => expect(img.dataset.missing).toBe("no-sync"));
+    expect(img.title).toBe(i18n.t("assets.missing.noSync"));
+    expect(img.src.startsWith("data:image/svg+xml")).toBe(true);
+    expect(decodeURIComponent(img.src)).toContain('viewBox="0 0 300 200"');
+    // The document is untouched.
+    expect(editor.state.doc.child(1).attrs).toMatchObject({ asset: sha, src: null, width: 300, height: 200 });
+
+    // The file arrives: the picture shows.
+    await backend.addAsset(new File(["picture from the other device"], "p.png", { type: "image/png" }));
+    await backend.fetchAssets([sha]);
+    expect(img.dataset.missing).toBeUndefined();
+    expect(img.getAttribute("src")).toBe(backend.assetUrl(sha));
+    expect(img.hasAttribute("title")).toBe(false);
+    fetch.mockRestore();
+  });
+
+  it("an attachment not here says so, and opening it downloads it first", async () => {
+    const sha = await shaOf("a pdf from the other device");
+    const open = vi.spyOn(backend, "openAsset");
+    const { editor } = await journal(`<p>x</p><div data-type="file" data-asset="${sha}" data-name="plan.pdf" data-size="27"></div>`);
+    const block = editor.view.dom.querySelector(".file-block")!;
+    await vi.waitFor(() => expect(block.querySelector(".file-state")?.textContent).toBe(i18n.t("assets.missing.absent")));
+    expect(block.classList.contains("file-missing")).toBe(true);
+
+    const fetch = vi.spyOn(backend, "fetchAssets").mockResolvedValue();
+    const node = editor.state.doc.child(1);
+    const click = () =>
+      editor.view.someProp("handleClickOn", (f) => f(editor.view, 0, node, 0, { target: block.querySelector(".file-name") } as unknown as MouseEvent, true));
+    click();
+    expect(fetch).toHaveBeenCalledWith([sha]);
+    expect(open).not.toHaveBeenCalled();
+    expect(block.querySelector(".file-state")!.textContent).toBe(i18n.t("assets.missing.loading"));
+    // It arrives: opened, and the note goes.
+    fetch.mockRestore();
+    await backend.addAsset(new File(["a pdf from the other device"], "plan.pdf", { type: "application/pdf" }));
+    open.mockResolvedValue();
+    await backend.fetchAssets([sha]);
+    expect(open).toHaveBeenCalledWith(sha, "plan.pdf");
+    expect(block.querySelector(".file-state")).toBeNull();
+    expect(block.classList.contains("file-missing")).toBe(false);
+    open.mockRestore();
+  });
+
+  it("downloading a card's files asks only for those not here", async () => {
+    const here = await backend.addAsset(png("here.png", "already here"));
+    const away = await shaOf("still away");
+    const fetch = vi.spyOn(backend, "fetchAssets").mockResolvedValue();
+    const json = JSON.stringify({ body: [{ attrs: { asset: here.sha256 } }, { attrs: { asset: away } }, { attrs: { asset: away } }] });
+    expect(await downloadCardFiles(json)).toBe(1);
+    expect(fetch).toHaveBeenCalledWith([away]);
+    fetch.mockRestore();
   });
 });

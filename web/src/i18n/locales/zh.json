@@ -385,7 +385,19 @@
     "openFailed": "打不开这个文件：{{error}}",
     "tooLarge": "“{{name}}”超过 {{mb}} MB，没有添加。",
     "adding": "正在添加“{{name}}”…",
-    "failed": "没能添加“{{name}}”：{{error}}"
+    "failed": "没能添加“{{name}}”：{{error}}",
+    "missing": {
+      "loading": "正在下载…",
+      "absent": "未下载",
+      "elsewhere": "文件还在另一台设备上，它上线后会自动传过来",
+      "damaged": "文件损坏，已丢弃，会重新下载",
+      "offline": "连不上同步服务器，稍后会再试",
+      "noSync": "这台设备上没有这个文件",
+      "unreadable": "无法显示这张图片"
+    },
+    "downloadAll": "下载本卡片的全部附件",
+    "downloading": "正在下载 {{count}} 个附件",
+    "allHere": "本卡片的附件都已在这台设备上"
   },
   "sync": {
     "title": "同步",
@@ -440,7 +452,15 @@
     "seenDays_other": "{{count}} 天前同步过",
     "stale": "超过 {{days}} 天没有同步。如果不再使用，可以移除。",
     "removeDevice": "移除",
-    "removeConfirm": "移除后它不能再同步。之后还要用，就在那台设备上停止同步再重新加入，上面的笔记会合并回来。口令和密钥不会改变。"
+    "removeConfirm": "移除后它不能再同步。之后还要用，就在那台设备上停止同步再重新加入，上面的笔记会合并回来。口令和密钥不会改变。",
+    "files": "图片与附件",
+    "filesUp": "待上传 {{count}} 个",
+    "filesDown": "待下载 {{count}} 个",
+    "filesNotDownloaded": "{{count}} 个未下载（用到时下载）",
+    "filesSynced": "已同步",
+    "filesOnServer": "服务器上共 {{size}}",
+    "errorFileTooLarge": "有文件超过服务器允许的大小",
+    "errorServerFull": "服务器上给文件的空间用完了"
   },
   "panel": {
     "title": "详情",

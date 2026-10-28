@@ -999,11 +999,13 @@ pub fn run() {
             sync::sync_devices,
             sync::sync_rename_device,
             sync::sync_remove_device,
+            sync::asset_fetch,
             assets::asset_begin,
             assets::asset_write,
             assets::asset_cancel,
             assets::asset_finish,
             assets::asset_open,
+            assets::asset_have,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Folio");

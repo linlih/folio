@@ -1,6 +1,8 @@
 import { RefreshCw } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
+import { formatSize } from "../editor/assets";
 import type { SyncStatus } from "../bindings/commands";
 import { CopyBlock } from "../mcp/McpDialogs";
 import { backend } from "../platform";
@@ -108,6 +110,18 @@ function Setup({ onDone }: { onDone: (s: SyncStatus) => void }) {
   );
 }
 
+/** Files: what waits to go up or come down, the server's total, or the
+ *  last failure. */
+function filesText(t: TFunction, s: SyncStatus): string {
+  if (s.filesError) return t("sync.stateError", { message: errorText(t, { error: s.filesError, errorKind: s.filesErrorKind }) });
+  const parts: string[] = [];
+  if (s.filesUp) parts.push(t("sync.filesUp", { count: s.filesUp }));
+  if (s.filesDown) parts.push(t(s.filesAll ? "sync.filesDown" : "sync.filesNotDownloaded", { count: s.filesDown }));
+  if (!parts.length) parts.push(t("sync.filesSynced"));
+  if (s.serverFileBytes) parts.push(t("sync.filesOnServer", { size: formatSize(s.serverFileBytes) }));
+  return parts.join(" · ");
+}
+
 function Enabled({ status, onChange }: { status: SyncStatus; onChange: (s: SyncStatus) => void }) {
   const { t } = useTranslation();
   const setNotice = useShell((s) => s.setNotice);
@@ -138,6 +152,10 @@ function Enabled({ status, onChange }: { status: SyncStatus; onChange: (s: SyncS
       <div className="mcp-field">
         <span>{t("sync.pending")}</span>
         <span className="sync-value sync-state">{status.pending === 0 ? t("sync.pendingNone") : t("sync.pendingSome", { count: status.pending })}</span>
+      </div>
+      <div className="mcp-field">
+        <span>{t("sync.files")}</span>
+        <span className={`sync-value ${status.filesError ? "mcp-error" : "sync-state"}`}>{filesText(t, status)}</span>
       </div>
       <CopyBlock label={t("sync.codeLabel")} text={status.code} />
       <p className="sync-hint">{t("sync.codeHint")}</p>

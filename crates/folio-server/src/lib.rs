@@ -13,7 +13,7 @@ use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use folio_sync::crypto::WrappedKey;
-use folio_sync::protocol::{DeviceName, DevicesResponse, HeavyResponse, Live, PushRequest, PushResponse, SnapshotRequest, SnapshotResponse, DEVICE_HEADER, MAX_PULL};
+use folio_sync::protocol::{BlobDone, BlobIds, BlobsResponse, DeviceName, DevicesResponse, HeavyResponse, Live, PushRequest, PushResponse, SnapshotRequest, SnapshotResponse, DEVICE_HEADER, MAX_PULL};
 use folio_sync::relay::Relay;
 use folio_sync::SyncError;
 use serde::Deserialize;
@@ -51,6 +51,9 @@ pub fn router(server: Arc<Server>) -> Router {
         .route("/v1/w/{ws}/heavy", get(heavy))
         .route("/v1/w/{ws}/snapshot", post(push_snapshot))
         .route("/v1/w/{ws}/acks", get(pull_acks).post(push_acks))
+        .route("/v1/w/{ws}/blobs/have", post(blobs_have))
+        .route("/v1/w/{ws}/blobs/{id}/done", post(blob_done))
+        .route("/v1/w/{ws}/blobs/{id}/{n}", get(get_chunk).put(put_chunk))
         .route("/health", get(|| async { "ok" }))
         .layer(DefaultBodyLimit::max(BODY_LIMIT))
         .with_state(server)
@@ -71,6 +74,8 @@ impl From<SyncError> for Failure {
             SyncError::Conflict(_) => StatusCode::CONFLICT,
             SyncError::Unauthorized => StatusCode::UNAUTHORIZED,
             SyncError::Removed => StatusCode::GONE,
+            SyncError::TooLarge(_) => StatusCode::PAYLOAD_TOO_LARGE,
+            SyncError::Full(_) => StatusCode::INSUFFICIENT_STORAGE,
             SyncError::Protocol(_) | SyncError::Crypto(_) => StatusCode::BAD_REQUEST,
             _ => {
                 tracing::error!("relay: {e}");
@@ -206,6 +211,62 @@ async fn pull_acks(State(s): State<Arc<Server>>, Path(ws): Path<String>, headers
     check_workspace(&ws)?;
     let resp = blocking(move || s.relay.pull_acks(&ws, &device, q.after, q.limit.unwrap_or(MAX_PULL))).await?;
     Ok(Json(resp).into_response())
+}
+
+async fn blobs_have(State(s): State<Arc<Server>>, Path(ws): Path<String>, headers: HeaderMap, Json(req): Json<BlobIds>) -> Result<Json<BlobsResponse>, Failure> {
+    let device = authorize(&s, &headers)?;
+    check_workspace(&ws)?;
+    Ok(Json(blocking(move || s.relay.blobs(&ws, &device, &req.ids)).await?))
+}
+
+async fn put_chunk(
+    State(s): State<Arc<Server>>,
+    Path((ws, id, n)): Path<(String, String, u32)>,
+    headers: HeaderMap,
+    body: axum::body::Bytes,
+) -> Result<StatusCode, Failure> {
+    let device = authorize(&s, &headers)?;
+    check_workspace(&ws)?;
+    blocking(move || s.relay.put_chunk(&ws, &device, &id, n, &body)).await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+/// A file is whole: devices waiting for it hear of it on the live channel
+/// (as the current head, which makes them sync and try again).
+async fn blob_done(State(s): State<Arc<Server>>, Path((ws, id)): Path<(String, String)>, headers: HeaderMap, Json(req): Json<BlobDone>) -> Result<StatusCode, Failure> {
+    let device = authorize(&s, &headers)?;
+    check_workspace(&ws)?;
+    let s2 = s.clone();
+    let ws2 = ws.clone();
+    let head = blocking(move || {
+        s2.relay.finish_blob(&ws2, &device, &id, req.chunks)?;
+        s2.relay.head(&ws2)
+    })
+    .await?;
+    let _ = s.channel(&ws).send(head);
+    Ok(StatusCode::NO_CONTENT)
+}
+
+async fn get_chunk(State(s): State<Arc<Server>>, Path((ws, id, n)): Path<(String, String, u32)>, headers: HeaderMap) -> Result<Response, Failure> {
+    let device = authorize(&s, &headers)?;
+    check_workspace(&ws)?;
+    let bytes = blocking(move || s.relay.get_chunk(&ws, &device, &id, n)).await?;
+    Ok(([(axum::http::header::CONTENT_TYPE, "application/octet-stream")], bytes).into_response())
+}
+
+/// Hourly: deletes uploads left unfinished for a week.
+pub async fn housekeeping(server: Arc<Server>) {
+    let mut every = tokio::time::interval(std::time::Duration::from_secs(60 * 60));
+    loop {
+        every.tick().await;
+        let s = server.clone();
+        let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_millis() as i64).unwrap_or(0);
+        match blocking(move || s.relay.expire_unfinished(now)).await {
+            Ok(0) => {}
+            Ok(n) => tracing::info!(files = n, "deleted unfinished uploads"),
+            Err(Failure(_, e)) => tracing::warn!(error = %e, "deleting unfinished uploads failed"),
+        }
+    }
 }
 
 async fn live(State(s): State<Arc<Server>>, Path(ws): Path<String>, headers: HeaderMap, upgrade: WebSocketUpgrade) -> Result<Response, Failure> {

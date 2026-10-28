@@ -54,7 +54,7 @@ pub fn has_pending_migrations(conn: &Connection) -> rusqlite::Result<bool> {
 }
 
 /// Bump whenever `INDEX_TABLES` changes.
-const INDEX_VERSION: i64 = 7;
+const INDEX_VERSION: i64 = 8;
 
 const INDEX_TABLES: &str = "
   CREATE TABLE idx.cards (
@@ -85,7 +85,7 @@ const INDEX_TABLES: &str = "
   CREATE INDEX idx.card_topics_by_topic ON card_topics(topic);
   CREATE INDEX idx.card_topics_by_card ON card_topics(card_id);
   -- Files (assets) the cards use, by hash.
-  CREATE TABLE idx.asset_refs (sha256 TEXT, doc_id TEXT, PRIMARY KEY (sha256, doc_id));
+  CREATE TABLE idx.asset_refs (sha256 TEXT, doc_id TEXT, mime TEXT, PRIMARY KEY (sha256, doc_id));
   CREATE INDEX idx.asset_refs_by_doc ON asset_refs(doc_id);
   -- Full text of titles (bid '') and blocks. Trigram works for Chinese
   -- without word splitting; queries under 3 characters use LIKE instead.

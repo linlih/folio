@@ -18,6 +18,13 @@
 //!   snapshot
 //! - `POST /v1/w/{workspace}/snapshot` — a document's full snapshot (sealed
 //!   like an update) covering its updates up to `covers`; those are deleted
+//! - `POST /v1/w/{workspace}/blobs/have` `{ids}` — which of these files the
+//!   server has, whole or in part (design/attachments.md §5.1)
+//! - `PUT  /v1/w/{workspace}/blobs/{id}/{n}` — chunk n of a file (raw sealed
+//!   bytes); sending a chunk again is fine
+//! - `POST /v1/w/{workspace}/blobs/{id}/done` `{chunks}` — every chunk is
+//!   there; the file can be downloaded, and live devices hear of it
+//! - `GET  /v1/w/{workspace}/blobs/{id}/{n}` — chunk n of a whole file
 //!
 //! Acknowledgements (`device_acks`, §5.3 compaction): after each sync a
 //! device reports, per changed document, the version it now has. History
@@ -130,6 +137,42 @@ pub struct SnapshotRequest {
 pub struct SnapshotResponse {
     pub seq: i64,
 }
+
+/// Files asked about.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct BlobIds {
+    pub ids: Vec<String>,
+}
+
+/// A file the server has, whole or in part.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct BlobState {
+    pub id: String,
+    pub complete: bool,
+    /// For a whole file: how many chunks it has.
+    pub chunks: u32,
+    /// For a partial one: the chunks received so far.
+    #[serde(default)]
+    pub have: Vec<u32>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BlobsResponse {
+    /// Only the files the server has.
+    pub blobs: Vec<BlobState>,
+    /// The workspace's whole files, in bytes as stored.
+    #[serde(default)]
+    pub total_bytes: i64,
+}
+
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+pub struct BlobDone {
+    pub chunks: u32,
+}
+
+/// Most files asked about at once.
+pub const MAX_BLOB_IDS: usize = 500;
 
 /// Most updates a pull returns.
 pub const MAX_PULL: u32 = 1000;
