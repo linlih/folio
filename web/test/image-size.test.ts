@@ -134,8 +134,13 @@ describe("an image added on an empty line", () => {
     const editor = await journal("<ul><li><p></p></li></ul>");
     editor.commands.setTextSelection(3);
     await add(editor);
-    const items = editor.getJSON().content![0].content!;
-    expect(items.map((i) => i.content!.map((c) => c.type))).toEqual([["paragraph", "image"], ["paragraph"]]);
+    const items: string[][] = [];
+    editor.state.doc.firstChild!.forEach((item) => {
+      const kinds: string[] = [];
+      item.forEach((c) => void kinds.push(c.type.name));
+      items.push(kinds);
+    });
+    expect(items).toEqual([["paragraph", "image"], ["paragraph"]]);
     expect(lines(editor)).toEqual(["hidden", "empty"]);
     expect(editor.state.selection.$head.parent).toBe(editor.state.doc.firstChild!.child(1).firstChild);
     // The line shows while the cursor is in it, for a caption.
@@ -150,7 +155,7 @@ describe("an image added on an empty line", () => {
     const editor = await journal("<ul><li><p>first</p></li></ul>");
     cursorAfter(editor, "first");
     await add(editor);
-    expect(editor.getJSON().content![0].content!.length).toBe(1);
+    expect(editor.state.doc.firstChild!.childCount).toBe(1);
     expect(lines(editor)).toEqual(["first"]);
     expect(editor.state.selection.$head.parent.textContent).toBe("first");
   });
