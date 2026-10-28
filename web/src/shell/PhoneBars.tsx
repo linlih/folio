@@ -205,7 +205,13 @@ export function KeyboardBar() {
   useEffect(() => {
     const vv = window.visualViewport;
     const root = document.documentElement;
+    // How far the keyboard covers the page, and how tall it is: on iOS the
+    // same, while Android usually shrinks the page instead, so nothing is
+    // covered and the keyboard shows as the page being shorter than it was
+    // at this width.
     let covered = 0;
+    let keyboardHeight = 0;
+    let tallest = { width: 0, height: 0 };
     let settle: ReturnType<typeof setTimeout> | undefined;
     // Typing means a field has the focus and the on-screen keyboard is up.
     // With it put away (or a keyboard attached) the bottom bar is back,
@@ -213,7 +219,7 @@ export function KeyboardBar() {
     const check = () => {
       const el = document.activeElement;
       const field = el instanceof HTMLElement && (el.isContentEditable || !!el.closest("input, textarea"));
-      const keyboard = covered >= KEYBOARD_MIN;
+      const keyboard = keyboardHeight >= KEYBOARD_MIN;
       const on = keyboard && el instanceof HTMLElement && el.isContentEditable && !!el.closest(".ProseMirror");
       setEditing((was) => (was === on ? was : on));
       document.body.classList.toggle("phone-typing", keyboard && field);
@@ -224,8 +230,11 @@ export function KeyboardBar() {
     // instead, and the page stays where it is.
     const place = () => {
       if (!vv) return;
-      const was = covered;
+      const was = keyboardHeight;
+      if (window.innerWidth !== tallest.width) tallest = { width: window.innerWidth, height: 0 };
+      tallest.height = Math.max(tallest.height, window.innerHeight);
       covered = Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop));
+      keyboardHeight = Math.max(covered, Math.round(tallest.height - vv.height));
       setBottom(covered);
       root.style.setProperty("--keyboard", `${covered}px`);
       if (window.scrollY !== 0) window.scrollTo(0, 0);
@@ -233,7 +242,7 @@ export function KeyboardBar() {
       // The line being typed on may now be under the keyboard (after the
       // shell has taken its new height, and again once iOS has done its
       // own scrolling for the keyboard).
-      if (covered > was) {
+      if (keyboardHeight > was) {
         requestAnimationFrame(caretIntoView);
         clearTimeout(settle);
         settle = setTimeout(caretIntoView, 400);
@@ -244,7 +253,7 @@ export function KeyboardBar() {
     let pending = 0;
     // Not while a selection is being dragged out: that scrolls by itself.
     const follow = () => {
-      if (covered < KEYBOARD_MIN || pending || !document.getSelection()?.isCollapsed) return;
+      if (keyboardHeight < KEYBOARD_MIN || pending || !document.getSelection()?.isCollapsed) return;
       pending = requestAnimationFrame(() => {
         pending = 0;
         caretIntoView();
@@ -260,6 +269,7 @@ export function KeyboardBar() {
     const poll = setInterval(check, 400);
     vv?.addEventListener("resize", place);
     vv?.addEventListener("scroll", place);
+    window.addEventListener("resize", place);
     place();
     return () => {
       document.removeEventListener("focusin", check);
@@ -271,6 +281,7 @@ export function KeyboardBar() {
       clearInterval(poll);
       vv?.removeEventListener("resize", place);
       vv?.removeEventListener("scroll", place);
+      window.removeEventListener("resize", place);
       document.body.classList.remove("phone-typing");
       root.style.removeProperty("--keyboard");
     };
