@@ -23,6 +23,7 @@
 .update-progress span { display: block; height: 100%; background: var(--accent); transition: width 0.2s; }
 .update-progress span.unknown { animation: update-pulse 1.2s ease-in-out infinite alternate; }
 @keyframes update-pulse { from { margin-left: 0; } to { margin-left: 70%; } }
+.update-hint { margin: 0; color: var(--secondary); }
 .update-error { margin: 0; color: #b5523f; overflow-wrap: anywhere; }
 .update-actions { display: flex; justify-content: flex-end; gap: 8px; }
 /* On a phone, above the bottom bar. */

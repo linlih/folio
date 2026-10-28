@@ -74,9 +74,14 @@ export interface Backend {
   moveLibrary(to: string): Promise<string>;
   openLibrary(path: string): Promise<string>;
   revealLibrary(): Promise<void>;
-  /** Updates on phones (desktop uses the updater plugin): the newest
-   *  release, and opening its download. */
+  /** Updates on Android (desktop uses the updater plugin): the newest
+   *  release; downloading its APK (the fraction done goes to `onProgress`)
+   *  and handing it to the system installer, which answers false when the
+   *  system page that allows installing opened instead; and, when the app
+   *  cannot download it, opening the download in the browser. */
   latestRelease(): Promise<LatestRelease>;
+  downloadUpdate(url: string, onProgress: (done: number) => void): Promise<string>;
+  installUpdate(path: string): Promise<boolean>;
   openReleaseDownload(url: string): Promise<void>;
   /** The theme of the phone's system bars and keyboard: "system", "light" or "dark". */
   setAppearance(theme: string): Promise<void>;

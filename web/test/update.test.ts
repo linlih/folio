@@ -2,6 +2,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { backend } from "../src/platform";
 import { isNewer, SKIPPED_SETTING, useUpdates } from "../src/update/updates";
 
+// Updating saves what is typed first; no documents are open here.
+vi.mock("../src/app", () => ({ docs: () => ({ flushAll: async () => {} }) }));
+
 describe("updates", () => {
   afterEach(() => {
     vi.restoreAllMocks();
@@ -22,26 +25,65 @@ describe("updates", () => {
     expect(useUpdates.getState().status).toBe("unsupported");
   });
 
-  it("on Android, offers the newer release's APK, and keeps a skipped one quiet", async () => {
+  it("on Android, downloads the newer release's APK and opens the installer, and keeps a skipped version quiet", async () => {
     // The platform is read once per session; the memory backend says "web",
     // so this case stands in for the Android app.
     const b = backend as unknown as Record<string, unknown>;
     const kind = b.kind;
     b.kind = "tauri";
     vi.spyOn(backend, "appInfo").mockResolvedValue({ version: "0.1.0", dataDir: "", frontendPeer: "1", apiPeer: "2", platform: "android" });
-    vi.spyOn(backend, "latestRelease").mockResolvedValue({ version: "0.2.0", notes: "新功能", date: null, apk: "https://github.com/linlih/folio/releases/latest/download/folio-android-arm64.apk" });
-    const opened = vi.spyOn(backend, "openReleaseDownload").mockResolvedValue();
+    vi.spyOn(backend, "latestRelease").mockResolvedValue({ version: "0.2.0", notes: "新功能", date: null, apk: "https://github.com/linlih/folio/releases/download/v0.2.0/folio-android-arm64.apk" });
+    const download = vi.spyOn(backend, "downloadUpdate").mockImplementation(async (_url, onProgress) => {
+      onProgress(0.5);
+      onProgress(1);
+      return "/cache/updates/folio-update.apk";
+    });
+    // The first time, Android asks the user to allow installing apps.
+    const installer = vi.spyOn(backend, "installUpdate").mockResolvedValueOnce(false).mockResolvedValue(true);
+    const browser = vi.spyOn(backend, "openReleaseDownload").mockResolvedValue();
     const { useUpdates: fresh } = await vi.importActual<typeof import("../src/update/updates")>("../src/update/updates?android");
     try {
       await fresh.getState().check({ silent: true });
-      expect(fresh.getState()).toMatchObject({ status: "available", prompt: true, found: { version: "0.2.0", how: "download" } });
+      expect(fresh.getState()).toMatchObject({ status: "available", prompt: true, found: { version: "0.2.0", how: "package" } });
       await fresh.getState().install();
-      expect(opened).toHaveBeenCalledWith(expect.stringContaining("folio-android-arm64.apk"));
+      expect(download).toHaveBeenCalledWith(expect.stringContaining("v0.2.0/folio-android-arm64.apk"), expect.any(Function));
+      expect(installer).toHaveBeenCalledWith("/cache/updates/folio-update.apk");
+      expect(fresh.getState()).toMatchObject({ status: "ready", progress: 1, allowing: true });
+      // Back from the system page: installing goes ahead, without downloading again.
+      document.dispatchEvent(new Event("visibilitychange"));
+      await vi.waitFor(() => expect(installer).toHaveBeenCalledTimes(2));
+      expect(download).toHaveBeenCalledTimes(1);
+      await vi.waitFor(() => expect(fresh.getState().allowing).toBe(false));
+      expect(browser).not.toHaveBeenCalled();
+
+      fresh.setState({ status: "idle", prompt: false, apk: null });
       await fresh.getState().skip();
       expect(await backend.getLocalSetting(SKIPPED_SETTING)).toEqual(["0.2.0"]);
-      fresh.setState({ status: "idle", prompt: false });
       await fresh.getState().check({ silent: true });
       expect(fresh.getState()).toMatchObject({ status: "available", prompt: false });
+    } finally {
+      b.kind = kind;
+    }
+  });
+
+  it("on Android, a failed download offers the browser", async () => {
+    const b = backend as unknown as Record<string, unknown>;
+    const kind = b.kind;
+    b.kind = "tauri";
+    vi.spyOn(backend, "appInfo").mockResolvedValue({ version: "0.1.0", dataDir: "", frontendPeer: "1", apiPeer: "2", platform: "android" });
+    vi.spyOn(backend, "latestRelease").mockResolvedValue({ version: "0.2.0", notes: "", date: null, apk: "https://github.com/linlih/folio/releases/download/v0.2.0/folio-android-arm64.apk" });
+    vi.spyOn(backend, "downloadUpdate").mockRejectedValue(new Error("the download stopped early"));
+    const installer = vi.spyOn(backend, "installUpdate").mockResolvedValue(true);
+    const browser = vi.spyOn(backend, "openReleaseDownload").mockResolvedValue();
+    const { useUpdates: fresh } = await vi.importActual<typeof import("../src/update/updates")>("../src/update/updates?android-fails");
+    try {
+      await fresh.getState().check();
+      await fresh.getState().install();
+      expect(fresh.getState()).toMatchObject({ status: "error", apk: null });
+      expect(fresh.getState().error).toContain("stopped early");
+      expect(installer).not.toHaveBeenCalled();
+      await fresh.getState().openInBrowser();
+      expect(browser).toHaveBeenCalledWith(expect.stringContaining("folio-android-arm64.apk"));
     } finally {
       b.kind = kind;
     }

@@ -9,7 +9,7 @@ import "./update.css";
  *  instead, since the dialog would cover it. */
 export function UpdatePrompt({ inline = false }: { inline?: boolean }) {
   const { t } = useTranslation();
-  const { found, prompt, status, progress, error, install, later, skip } = useUpdates();
+  const { found, prompt, status, progress, error, allowing, install, openInBrowser, later, skip } = useUpdates();
   const inSettings = useShell((s) => s.dialog?.kind === "settings");
   if (!found || !prompt || inSettings !== inline) return null;
   const busy = status === "downloading" || status === "restarting";
@@ -30,15 +30,25 @@ export function UpdatePrompt({ inline = false }: { inline?: boolean }) {
           <span style={{ width: progress === null ? "30%" : `${Math.round(progress * 100)}%` }} className={progress === null ? "unknown" : undefined} />
         </div>
       )}
-      {status === "error" && error && <p className="update-error">{t("update.failed", { message: error })}</p>}
+      {status === "ready" && allowing && <p className="update-hint">{t("update.allow")}</p>}
+      {error && (status === "error" || status === "ready") && <p className="update-error">{t("update.failed", { message: error })}</p>}
       <div className="update-actions">
-        {!busy && (
+        {status === "error" && found.how === "package" && (
+          <button className="button" onClick={() => void openInBrowser()}>
+            {t("update.browser")}
+          </button>
+        )}
+        {!busy && status !== "ready" && (
           <button className="button" onClick={() => void skip()}>
             {t("update.skip")}
           </button>
         )}
         <button className="button primary" disabled={busy} onClick={() => void install()}>
-          {status === "downloading" ? t("update.downloading") : status === "restarting" ? t("update.restarting") : found.how === "download" ? t("update.download") : t("update.now")}
+          {status === "downloading" ? t("update.downloading")
+            : status === "restarting" ? t("update.restarting")
+            : status === "ready" ? t("update.install")
+            : found.how === "package" ? t("update.download")
+            : t("update.now")}
         </button>
       </div>
     </div>

@@ -1,4 +1,4 @@
-import { convertFileSrc, invoke } from "@tauri-apps/api/core";
+import { Channel, convertFileSrc, invoke } from "@tauri-apps/api/core";
 import type { AppInfo, AssetInfo, BackupInfo, Backlink, BlockText, CardRow, JournalDay, McpStatus, SearchHit, SyncDevice, SyncStatus, TagInfo, TopicCount, CardText } from "../bindings/commands";
 import type { Backend, ExportResult } from "./backend";
 import type { LatestRelease, LibraryLocation, PickedFolder } from "../bindings/commands";
@@ -55,6 +55,12 @@ export function tauriBackend(): Backend {
     openLibrary: (path) => invoke<string>("open_library", { path }),
     revealLibrary: () => invoke<void>("reveal_library"),
     latestRelease: () => invoke<LatestRelease>("latest_release"),
+    downloadUpdate: (url, onProgress) => {
+      const progress = new Channel<number>();
+      progress.onmessage = onProgress;
+      return invoke<string>("download_update", { url, progress });
+    },
+    installUpdate: (path) => invoke<boolean>("install_update", { path }),
     openReleaseDownload: (url) => invoke<void>("open_release_download", { url }),
     setAppearance: (theme) => invoke<void>("set_appearance", { theme }),
     mcpStatus: () => invoke<McpStatus>("mcp_status"),

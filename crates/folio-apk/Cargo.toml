@@ -1,0 +1,17 @@
+[package]
+# Tauri requires plugin crates to be named tauri-plugin-<name> and to link
+# under the same name; the folder keeps the workspace's folio-* naming.
+name = "tauri-plugin-folio-apk"
+description = "Android: where update packages are downloaded to, and handing one to the system installer."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+links = "tauri-plugin-folio-apk"
+
+[dependencies]
+tauri = { version = "2", features = [] }
+serde.workspace = true
+
+[build-dependencies]
+tauri-plugin = { version = "2", features = ["build"] }

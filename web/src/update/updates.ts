@@ -4,8 +4,8 @@ import { backend } from "../platform";
 
 /** Updates from the project's GitHub Releases (design/ARCHITECTURE.md §7.3).
  *  On the desktop the updater plugin downloads, checks the signature and
- *  installs; on Android the app only learns of a new version and opens its
- *  APK; iOS updates come from the App Store. */
+ *  installs; on Android the app downloads the APK and opens the system
+ *  installer on it; iOS updates come from the App Store. */
 
 export const AUTO_SETTING = "update.auto";
 export const LAST_CHECK_SETTING = "update.lastCheck";
@@ -37,13 +37,16 @@ export interface FoundUpdate {
   version: string;
   notes: string;
   date: string | null;
-  /** "install": the app installs it itself; "download": the system does
-   *  (Android opens the APK from `url`). */
-  how: "install" | "download";
+  /** "install": the updater plugin installs it and restarts the app;
+   *  "package": the app downloads the APK at `url` and the system installs
+   *  it (Android). */
+  how: "install" | "package";
   url?: string;
 }
 
-export type UpdateStatus = "idle" | "unsupported" | "checking" | "uptodate" | "available" | "downloading" | "restarting" | "error";
+/** "ready": the APK is downloaded and the system installer was opened on it
+ *  (it can be opened again). */
+export type UpdateStatus = "idle" | "unsupported" | "checking" | "uptodate" | "available" | "downloading" | "ready" | "restarting" | "error";
 
 interface UpdateState {
   status: UpdateStatus;
@@ -53,8 +56,14 @@ interface UpdateState {
   error: string | null;
   /** The prompt is up (a quiet check of a skipped version keeps it down). */
   prompt: boolean;
+  /** The downloaded APK (Android). */
+  apk: string | null;
+  /** Android sent the user to allow installing apps; coming back installs. */
+  allowing: boolean;
   check(opts?: { silent?: boolean }): Promise<void>;
   install(): Promise<void>;
+  /** The way out when the app cannot download the APK: the browser. */
+  openInBrowser(): Promise<void>;
   later(): void;
   skip(): Promise<void>;
 }
@@ -78,9 +87,11 @@ export const useUpdates = create<UpdateState>((set, get) => ({
   progress: null,
   error: null,
   prompt: false,
+  apk: null,
+  allowing: false,
 
   async check({ silent = false } = {}) {
-    if (get().status === "checking" || get().status === "downloading") return;
+    if (["checking", "downloading", "ready", "restarting"].includes(get().status)) return;
     const where = await currentPlatform();
     if (backend.kind !== "tauri" || !(DESKTOP.has(where) || where === "android")) {
       set({ status: "unsupported" });
@@ -96,7 +107,7 @@ export const useUpdates = create<UpdateState>((set, get) => ({
         if (update) found = { version: update.version, notes: update.body ?? "", date: update.date ?? null, how: "install" };
       } else {
         const [latest, info] = await Promise.all([backend.latestRelease(), backend.appInfo()]);
-        if (isNewer(latest.version, info.version)) found = { version: latest.version, notes: latest.notes, date: latest.date, how: "download", url: latest.apk };
+        if (isNewer(latest.version, info.version)) found = { version: latest.version, notes: latest.notes, date: latest.date, how: "package", url: latest.apk };
       }
       void backend.setLocalSetting(LAST_CHECK_SETTING, Date.now()).catch(() => {});
       // A version the user chose to skip is not offered again unasked.
@@ -112,11 +123,7 @@ export const useUpdates = create<UpdateState>((set, get) => ({
   async install() {
     const { found } = get();
     if (!found) return;
-    if (found.how === "download") {
-      if (found.url) await backend.openReleaseDownload(found.url);
-      set({ prompt: false });
-      return;
-    }
+    if (found.how === "package") return installPackage(found, set, get);
     if (!pending) return;
     set({ status: "downloading", progress: null, error: null });
     try {
@@ -140,6 +147,11 @@ export const useUpdates = create<UpdateState>((set, get) => ({
     }
   },
 
+  async openInBrowser() {
+    const { found } = get();
+    if (found?.url) await backend.openReleaseDownload(found.url);
+  },
+
   later() {
     set({ prompt: false });
   },
@@ -150,6 +162,38 @@ export const useUpdates = create<UpdateState>((set, get) => ({
     if (found) await backend.setLocalSetting(SKIPPED_SETTING, [...(await skipped()), found.version]).catch(() => {});
   },
 }));
+
+type Set = (s: Partial<UpdateState>) => void;
+
+/** Android: downloads the APK once, then opens the system installer on it,
+ *  which replaces the app (everything typed is saved first). Installing
+ *  needs the user's permission once; the system page that grants it opens
+ *  instead, and coming back from it installs. */
+async function installPackage(found: FoundUpdate, set: Set, get: () => UpdateState): Promise<void> {
+  try {
+    let apk = get().apk;
+    if (!apk) {
+      if (!found.url) return;
+      set({ status: "downloading", progress: null, error: null });
+      apk = await backend.downloadUpdate(found.url, (done) => set({ progress: done }));
+      set({ apk });
+    }
+    set({ status: "ready", error: null });
+    await docs().flushAll();
+    const started = await backend.installUpdate(apk);
+    set({ allowing: !started });
+    if (!started) {
+      const back = () => {
+        if (document.visibilityState !== "visible") return;
+        document.removeEventListener("visibilitychange", back);
+        if (get().allowing && get().status === "ready") void get().install();
+      };
+      document.addEventListener("visibilitychange", back);
+    }
+  } catch (e) {
+    set({ status: get().apk ? "ready" : "error", error: String(e) });
+  }
+}
 
 /** Checks quietly once a day: soon after start-up, then hourly whether a
  *  day has passed. Off when the user turned automatic checks off. */

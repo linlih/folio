@@ -226,6 +226,12 @@ export function memoryBackend(now: () => number = Date.now): Backend {
     latestRelease: async () => {
       throw new Error("not available in the browser");
     },
+    downloadUpdate: async () => {
+      throw new Error("not available in the browser");
+    },
+    installUpdate: async () => {
+      throw new Error("not available in the browser");
+    },
     openReleaseDownload: async () => {},
     setAppearance: async () => {},
     // No server in the browser.

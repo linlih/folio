@@ -638,7 +638,10 @@
   "update": {
     "title": "Folio {{version}} is available",
     "now": "Update now",
-    "download": "Download",
+    "download": "Download and install",
+    "install": "Install",
+    "allow": "Allow Folio to install apps, then come back to continue.",
+    "browser": "Download in the browser",
     "later": "Later",
     "skip": "Skip this version",
     "downloading": "Downloading…",

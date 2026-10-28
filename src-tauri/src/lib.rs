@@ -118,12 +118,105 @@ async fn latest_release() -> CmdResult<LatestRelease> {
         version: text("version").unwrap_or_default().trim_start_matches('v').to_owned(),
         notes: text("notes").unwrap_or_default(),
         date: text("pub_date"),
-        apk: format!("{RELEASES}/folio-android-arm64.apk"),
+        // That version's own package, not whatever is latest when it is
+        // downloaded.
+        apk: format!("https://github.com/linlih/folio/releases/download/v{}/folio-android-arm64.apk", text("version").unwrap_or_default().trim_start_matches('v')),
     })
 }
 
-/// Opens a download from this project's releases in the system (the APK on
-/// Android installs from there). Only release links are opened.
+/// Downloads the APK of a release into the app's cache (Android), sending
+/// the fraction done to `progress`; answers the file's path for
+/// [`install_update`].
+#[tauri::command]
+async fn download_update(app: tauri::AppHandle, url: String, progress: tauri::ipc::Channel<f64>) -> CmdResult<String> {
+    #[cfg(target_os = "android")]
+    {
+        use tauri_plugin_folio_apk::ApkExt;
+        if !url.starts_with("https://github.com/linlih/folio/releases/") {
+            return Err(CommandError::Other("not a release link".into()));
+        }
+        let dir = app.apk().updates_dir().map_err(CommandError::Other)?;
+        tauri::async_runtime::spawn_blocking(move || download_apk(&url, &dir, |done| {
+            let _ = progress.send(done);
+        }))
+            .await
+            .map_err(|e| CommandError::Other(e.to_string()))?
+    }
+    #[cfg(not(target_os = "android"))]
+    {
+        let _ = (app, url, progress);
+        Err(CommandError::Other("only the Android app downloads its package itself".into()))
+    }
+}
+
+/// Downloads `url` into `dir` (emptied first) as folio-update.apk, telling
+/// `progress` the fraction done about every percent.
+#[cfg_attr(not(target_os = "android"), allow(dead_code))]
+fn download_apk(url: &str, dir: &std::path::Path, mut progress: impl FnMut(f64)) -> CmdResult<String> {
+    use std::io::{Read, Write};
+    let other = |e: &dyn std::fmt::Display| CommandError::Other(e.to_string());
+    // A slow network may take minutes in all; only a stalled one fails.
+    let agent = ureq::AgentBuilder::new()
+        .timeout_connect(std::time::Duration::from_secs(20))
+        .timeout_read(std::time::Duration::from_secs(60))
+        .build();
+    let response = agent.get(url).call().map_err(|e| other(&e))?;
+    let total: Option<u64> = response.header("Content-Length").and_then(|v| v.parse().ok());
+    for old in std::fs::read_dir(dir).map_err(|e| other(&e))?.flatten() {
+        let _ = std::fs::remove_file(old.path());
+    }
+    let part = dir.join("folio-update.apk.part");
+    let mut file = std::fs::File::create(&part).map_err(|e| other(&e))?;
+    let mut reader = response.into_reader();
+    let mut buf = vec![0u8; 64 * 1024];
+    let (mut got, mut sent) = (0u64, 0u64);
+    loop {
+        let n = reader.read(&mut buf).map_err(|e| other(&e))?;
+        if n == 0 {
+            break;
+        }
+        file.write_all(&buf[..n]).map_err(|e| other(&e))?;
+        got += n as u64;
+        // About every percent.
+        if let Some(total) = total.filter(|t| *t > 0)
+            && (got - sent) * 100 >= total
+        {
+            sent = got;
+            progress(got as f64 / total as f64);
+        }
+    }
+    file.sync_all().map_err(|e| other(&e))?;
+    if let Some(total) = total
+        && total != got
+    {
+        return Err(CommandError::Other(format!("the download stopped early ({got} of {total} bytes)")));
+    }
+    let apk = dir.join("folio-update.apk");
+    std::fs::rename(&part, &apk).map_err(|e| other(&e))?;
+    tracing::info!(bytes = got, "downloaded the update package");
+    Ok(apk.to_string_lossy().into_owned())
+}
+
+/// Hands a downloaded APK to the system installer (Android). `false`: the
+/// system page that lets Folio install apps opened instead; installing
+/// again after allowing it goes ahead.
+#[tauri::command]
+fn install_update(app: tauri::AppHandle, path: String) -> CmdResult<bool> {
+    #[cfg(target_os = "android")]
+    {
+        use tauri_plugin_folio_apk::ApkExt;
+        app.apk().install(std::path::Path::new(&path)).map_err(CommandError::Other)
+    }
+    #[cfg(not(target_os = "android"))]
+    {
+        let _ = (app, path);
+        Err(CommandError::Other("only the Android app installs a package itself".into()))
+    }
+}
+
+/// Opens a download from this project's releases in the system: the way
+/// out when the app cannot download an update itself. Only release links
+/// are opened.
 #[tauri::command]
 fn open_release_download(app: tauri::AppHandle, url: String) -> CmdResult<()> {
     use tauri_plugin_opener::OpenerExt;
@@ -874,6 +967,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_folio_apk::init())
         .register_asynchronous_uri_scheme_protocol("folio-asset", assets::protocol)
         .setup(|app| {
             // FOLIO_DATA_DIR runs a second copy on its own library, e.g. to try
@@ -947,6 +1041,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             app_info,
             latest_release,
+            download_update,
+            install_update,
             open_release_download,
             set_appearance,
             list_cards,
@@ -1139,5 +1235,40 @@ mod tests {
         assert_eq!(library::read_pointer(&app_dir), None);
         drop(store);
         std::fs::remove_dir_all(&root).unwrap();
+    }
+
+    /// Answers one request with `body`, saying it is `length` bytes long.
+    fn serve_once(body: Vec<u8>, length: usize) -> String {
+        use std::io::{Read, Write};
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let url = format!("http://{}/folio.apk", listener.local_addr().unwrap());
+        std::thread::spawn(move || {
+            let (mut socket, _) = listener.accept().unwrap();
+            let mut request = [0u8; 1024];
+            let _ = socket.read(&mut request);
+            let head = format!("HTTP/1.1 200 OK\r\nContent-Length: {length}\r\nConnection: close\r\n\r\n");
+            socket.write_all(head.as_bytes()).unwrap();
+            socket.write_all(&body).unwrap();
+        });
+        url
+    }
+
+    #[test]
+    fn an_update_package_downloads_whole_or_not_at_all() {
+        let dir = std::env::temp_dir().join(format!("folio-apk-{}", now_ms()));
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("old.apk"), b"old").unwrap();
+        let body: Vec<u8> = (0..300_000u32).map(|i| i as u8).collect();
+        let mut seen = Vec::new();
+        let path = download_apk(&serve_once(body.clone(), body.len()), &dir, |done| seen.push(done)).unwrap();
+        assert_eq!(std::fs::read(&path).unwrap(), body);
+        assert!(!dir.join("old.apk").exists(), "an earlier download is cleared");
+        assert!(!seen.is_empty() && seen.windows(2).all(|w| w[0] < w[1]) && *seen.last().unwrap() == 1.0);
+
+        // The connection drops halfway: nothing is left to install.
+        let err = download_apk(&serve_once(body[..1000].to_vec(), body.len()), &dir, |_| {});
+        assert!(err.is_err());
+        assert!(!dir.join("folio-update.apk").exists());
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 }
