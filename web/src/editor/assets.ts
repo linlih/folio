@@ -13,6 +13,7 @@ import type { AssetEvent, AssetInfo } from "../bindings/commands";
 import i18n from "../i18n";
 import { backend } from "../platform";
 import { useShell } from "../shell/tabs";
+import { ImageView, clampScale } from "./imageView";
 import { insertAfterLine } from "./outliner/tree";
 
 /** The largest file a card can hold (same as folio_store::assets). */
@@ -30,7 +31,8 @@ const fileAttributes = {
 
 /** An image: a web address (`src`) or a file in the library (`asset`).
  *  `width` / `height` are the picture's pixels, so the page keeps its
- *  shape while it loads. */
+ *  shape while it loads. `scale` is the width it is shown at, in percent of
+ *  its column, so a phone shows the same proportion as a computer. */
 export const CardImage = Image.extend({
   addAttributes() {
     return {
@@ -42,8 +44,19 @@ export const CardImage = Image.extend({
       },
       width: { default: null, parseHTML: (el: HTMLElement) => int(el.getAttribute("width")) },
       height: { default: null, parseHTML: (el: HTMLElement) => int(el.getAttribute("height")) },
+      scale: {
+        default: null,
+        parseHTML: (el: HTMLElement) => clampScale(el.getAttribute("data-scale")),
+        renderHTML: (a: Record<string, unknown>) => {
+          const scale = clampScale(a.scale);
+          return scale ? { "data-scale": scale, style: `width: ${scale}%` } : {};
+        },
+      },
       ...fileAttributes,
     };
+  },
+  addNodeView() {
+    return (props) => new ImageView(props.node, props.view, props.getPos as () => number | undefined, props.HTMLAttributes);
   },
 }).configure({ inline: false });
 

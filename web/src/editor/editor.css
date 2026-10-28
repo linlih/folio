@@ -202,6 +202,59 @@
 /* Images and formulas */
 .card-body img { display: block; max-width: 100%; height: auto; margin: 0.4em 0; border-radius: var(--radius); }
 .card-body img.ProseMirror-selectednode { outline: 2px solid var(--accent); }
+/* An image in its frame (imageView.ts): its own size up to the column, or a
+   width chosen in percent of it; the corner drags it. */
+.card-body .image-frame { position: relative; width: fit-content; max-width: 100%; margin: 0.4em 0; }
+.card-body .image-frame img { margin: 0; cursor: default; }
+.card-body .image-frame[data-scale] img { width: 100%; }
+.card-body .image-frame.ProseMirror-selectednode img { outline: 2px solid var(--accent); }
+.card-body .image-handle {
+  position: absolute; right: -5px; bottom: -5px; width: 12px; height: 12px;
+  border: 2px solid var(--paper); border-radius: 50%; background: var(--accent);
+  cursor: nwse-resize; touch-action: none; opacity: 0; transition: opacity 0.12s;
+}
+.card-body .image-frame:hover .image-handle,
+.card-body .image-frame.ProseMirror-selectednode .image-handle,
+.card-body .image-frame.resizing .image-handle { opacity: 1; }
+.card-body .image-frame.resizing { user-select: none; }
+.card-body[contenteditable="false"] .image-handle { display: none; }
+/* A finger sizes images in the viewer. */
+@media (hover: none) and (pointer: coarse) {
+  .card-body .image-handle { display: none; }
+}
+
+/* The image viewer (imageViewer.ts) */
+.image-viewer {
+  position: fixed; inset: 0; z-index: 200; display: flex; flex-direction: column;
+  background: rgba(0, 0, 0, calc(0.94 - 0.6 * var(--pull, 0))); color: #fff; outline: none;
+  font-family: var(--font-ui);
+}
+.image-viewer-stage {
+  flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center;
+  overflow: hidden; touch-action: none; padding: max(16px, env(safe-area-inset-top)) 16px 16px;
+}
+.image-viewer-stage img {
+  max-width: 100%; max-height: 100%; object-fit: contain; user-select: none; -webkit-user-select: none;
+  transform-origin: center; will-change: transform; cursor: zoom-in;
+}
+.image-viewer-close {
+  position: absolute; top: max(10px, env(safe-area-inset-top)); right: 12px; width: 40px; height: 40px;
+  border: 0; border-radius: 50%; background: rgba(255, 255, 255, 0.14); color: #fff; font-size: 24px; line-height: 1; cursor: pointer;
+}
+.image-viewer-bar {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px 16px;
+  padding: 10px 16px max(12px, env(safe-area-inset-bottom));
+}
+.image-viewer-sizes { display: flex; border-radius: 8px; background: rgba(255, 255, 255, 0.12); padding: 2px; }
+.image-viewer-bar button {
+  min-height: 34px; padding: 0 12px; border: 0; border-radius: 6px; background: none; color: #fff;
+  font: inherit; font-size: 14px; cursor: pointer;
+}
+.image-viewer-sizes button[aria-pressed="true"] { background: rgba(255, 255, 255, 0.92); color: #111; }
+.image-viewer-bar button:hover { background: rgba(255, 255, 255, 0.2); }
+.image-viewer-sizes button[aria-pressed="true"]:hover { background: #fff; }
+.image-viewer-delete { color: #ffb4a8 !important; }
+.image-viewer button:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 /* A library file keeps its shape (width / height) while it loads; a grey
    box when this device does not have it. */
 .card-body img[data-asset] { background: var(--hover); }

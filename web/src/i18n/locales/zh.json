@@ -382,6 +382,18 @@
   "assets": {
     "open": "用其他应用打开",
     "untitled": "未命名文件",
+    "image": {
+      "resize": "拖动调整大小，双击恢复原始大小",
+      "view": "查看图片",
+      "close": "关闭",
+      "size": "在卡片中的大小",
+      "small": "小",
+      "medium": "中",
+      "large": "大",
+      "full": "整栏",
+      "original": "原始",
+      "delete": "删除图片"
+    },
     "openFailed": "打不开这个文件：{{error}}",
     "tooLarge": "“{{name}}”超过 {{mb}} MB，没有添加。",
     "adding": "正在添加“{{name}}”…",

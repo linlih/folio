@@ -382,6 +382,18 @@
   "assets": {
     "open": "Open with another app",
     "untitled": "Untitled file",
+    "image": {
+      "resize": "Drag to resize; double-click for the original size",
+      "view": "View image",
+      "close": "Close",
+      "size": "Size in the card",
+      "small": "Small",
+      "medium": "Medium",
+      "large": "Large",
+      "full": "Full width",
+      "original": "Original",
+      "delete": "Delete image"
+    },
     "openFailed": "Could not open the file: {{error}}",
     "tooLarge": "“{{name}}” is larger than {{mb}} MB and was not added.",
     "adding": "Adding “{{name}}”…",

@@ -93,8 +93,10 @@ CREATE TABLE asset_refs (sha256 TEXT, doc_id TEXT, mime TEXT, PRIMARY KEY (sha25
 **图片**（沿用现有 `image` 节点，加属性；网址图片照旧用 `src`）
 
 ```
-image { asset?: sha256, src?: 网址, alt, mime, size, width, height, name }   （width / height 是像素，沿用 tiptap 图片节点的属性）
+image { asset?: sha256, src?: 网址, alt, mime, size, width, height, name, scale? }   （width / height 是像素，沿用 tiptap 图片节点的属性）
 ```
+
+`scale` 是图片在卡片里显示的宽度，按所在栏宽的百分比存（10–100 的整数），没有就按图片自身大小显示（最宽到栏宽）。存百分比而不是像素，手机和电脑显示的比例才一致。桌面端拖图片右下角调整，双击这个角恢复原始大小；手机在查看大图时选“小 / 中 / 大 / 整栏 / 原始”。查看大图：桌面端双击，手机点一下（`editor/imageViewer.ts`）。
 
 **文件**（新的块级节点）
 
