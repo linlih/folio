@@ -215,6 +215,16 @@ pub fn apply_pending_restore(data_dir: &Path, now_ms: i64) -> Result<Option<Stri
 /// current one is backed up first (a "before restore" backup), the backup
 /// is copied next to it and renamed into place, so a failed copy never
 /// leaves the library missing. The index is deleted and rebuilt on open.
+///
+/// The copy gets new peer ids: the backup's ones have gone on editing
+/// since, so a new edit with them would reuse op ids that other devices
+/// (and the server) already hold for other edits, and every device would
+/// then refuse it ("op id should be unique"), stopping its sync.
+///
+/// It also forgets the version reports (`device_acks`, `sync.acks.*`): the
+/// server still has this device's later ones, which claim content the
+/// backup lacks, and other devices would not send it that. Reporting starts
+/// over with what the library now has.
 pub fn replace_library(data_dir: &Path, backup: &str, now_ms: i64) -> Result<()> {
     let dir = backups_dir(data_dir);
     let source = backup_path(&dir, backup)?;
@@ -227,6 +237,11 @@ pub fn replace_library(data_dir: &Path, backup: &str, now_ms: i64) -> Result<()>
     }
     let incoming = data_dir.join("store.db.incoming");
     std::fs::copy(&source, &incoming)?;
+    let [a, b, c] = crate::PEER_KEYS;
+    let copy = Connection::open(&incoming)?;
+    copy.execute("DELETE FROM sync_state WHERE key IN (?1, ?2, ?3) OR key LIKE 'sync.acks.%'", [a, b, c])?;
+    copy.execute("DELETE FROM device_acks", [])?;
+    drop(copy);
     for suffix in ["-wal", "-shm"] {
         let _ = std::fs::remove_file(data_dir.join(format!("store.db{suffix}")));
     }
@@ -322,5 +337,24 @@ mod tests {
         let safety: Vec<_> = list_backups(&dir).unwrap().into_iter().filter(|b| b.safety).collect();
         assert_eq!(safety.len(), 1);
         assert_eq!(safety[0].created_at, 500);
+    }
+
+    #[test]
+    fn a_restored_library_edits_with_new_peer_ids() {
+        let data = tempfile::tempdir().unwrap();
+        let dir = backups_dir(data.path());
+        let peers = |s: &Store| (s.peer, s.frontend_peer().unwrap(), s.api_peer().unwrap());
+        let (before, backup) = {
+            let s = Store::open(data.path()).unwrap();
+            let before = peers(&s);
+            (before, s.backup(&dir, 100).unwrap())
+        };
+        replace_library(data.path(), &backup.name, 200).unwrap();
+        let s = Store::open(data.path()).unwrap();
+        let after = peers(&s);
+        assert!(after.0 != before.0 && after.1 != before.1 && after.2 != before.2, "{before:?} → {after:?}");
+        // And they stay.
+        drop(s);
+        assert_eq!(peers(&Store::open(data.path()).unwrap()), after);
     }
 }

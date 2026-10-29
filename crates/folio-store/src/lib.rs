@@ -226,6 +226,10 @@ pub struct Store {
     dir: PathBuf,
 }
 
+/// `sync_state` keys of this library's peer ids: Rust's, the editor's and
+/// the API replica's (§4.5 rule 3).
+pub(crate) const PEER_KEYS: [&str; 3] = ["peer.rust", "peer.frontend", "peer.api"];
+
 impl Store {
     /// Opens (creating if needed) `store.db` and `index.db` in `dir`.
     pub fn open(dir: &Path) -> Result<Self> {
@@ -238,7 +242,7 @@ impl Store {
             backup::backup_conn_before_upgrade(&conn, &backup::backups_dir(dir), now_ms())?;
         }
         let index_recreated = schema::migrate(&conn)?;
-        let peer = Self::load_or_create_peer(&conn, "peer.rust")?;
+        let peer = Self::load_or_create_peer(&conn, PEER_KEYS[0])?;
         let mut store = Store { conn, docs: HashMap::new(), peer, dir: dir.to_path_buf() };
         let migrated = store.migrate_bodies()?;
         if index_recreated || migrated > 0 || store.index_is_empty()? {
@@ -262,14 +266,14 @@ impl Store {
     /// The peer id the frontend replica must use: distinct from Rust's own and
     /// stable across launches (§4.5 rule 3).
     pub fn frontend_peer(&self) -> Result<u64> {
-        Self::load_or_create_peer(&self.conn, "peer.frontend")
+        Self::load_or_create_peer(&self.conn, PEER_KEYS[1])
     }
 
     /// The peer id of the frontend's API replica (`web/src/api`), which edits
     /// documents on behalf of commands, plugins and AI next to the editor's
     /// replica, so it needs its own id.
     pub fn api_peer(&self) -> Result<u64> {
-        Self::load_or_create_peer(&self.conn, "peer.api")
+        Self::load_or_create_peer(&self.conn, PEER_KEYS[2])
     }
 
     /// The single write path for document content.
@@ -325,6 +329,20 @@ impl Store {
 
     pub fn outbox_len(&self) -> Result<i64> {
         Ok(self.conn.query_row("SELECT count(*) FROM outbox", [], |r| r.get(0))?)
+    }
+
+    /// Documents with updates still to send.
+    pub fn outbox_docs(&self) -> Result<std::collections::HashSet<DocId>> {
+        let mut stmt = self.conn.prepare_cached("SELECT DISTINCT doc_id FROM outbox")?;
+        let ids = stmt.query_map([], |r| r.get::<_, String>(0))?;
+        ids.map(|id| DocId::parse(&id?).map_err(StoreError::from)).collect()
+    }
+
+    /// Queues an update of a stored document to send again (the convergence
+    /// check found a device without it).
+    pub fn queue_update(&self, id: &DocId, bytes: &[u8], now_ms: i64) -> Result<()> {
+        self.conn.execute("INSERT INTO outbox(doc_id, bytes, at) VALUES (?1, ?2, ?3)", params![id.as_str(), bytes, now_ms])?;
+        Ok(())
     }
 
     /// Replaces the outbox with each document's whole history, one entry per
@@ -386,6 +404,11 @@ impl Store {
             .conn
             .query_row("SELECT version FROM device_acks WHERE doc_id = ?1 AND device_id = ?2", params![id.as_str(), device], |r| r.get(0))
             .optional()?)
+    }
+
+    /// How many documents there is a report of from this device.
+    pub fn device_ack_count(&self, device: &str) -> Result<i64> {
+        Ok(self.conn.query_row("SELECT COUNT(*) FROM device_acks WHERE device_id = ?1", [device], |r| r.get(0))?)
     }
 
     pub fn set_device_ack(&self, id: &DocId, device: &str, version: &[u8], at: i64) -> Result<()> {

@@ -32,7 +32,7 @@ use rusqlite::{params, Connection, OptionalExtension};
 
 use crate::crypto::WrappedKey;
 use crate::crypto::{chunks_for, MAX_SEALED_CHUNK};
-use crate::protocol::{AcksResponse, BlobState, BlobsResponse, DeviceInfo, HeavyDoc, PullResponse, PulledAck, PulledItem, PushItem, MAX_BLOB_IDS, MAX_PULL, MAX_REF_IDS};
+use crate::protocol::{Round, AcksResponse, BlobState, BlobsResponse, DeviceInfo, HeavyDoc, PullResponse, PulledAck, PulledItem, PushItem, MAX_BLOB_IDS, MAX_PULL, MAX_REF_IDS};
 use crate::{Result, SyncError};
 
 const SCHEMA: &str = "
@@ -88,6 +88,11 @@ const ADDED_COLUMNS: &[(&str, &str, &str)] = &[
     ("devices", "refs_at", "INTEGER"),
     // When the file was first seen used by no device.
     ("blobs", "unused_since", "INTEGER"),
+    // The cursor the device's version reports are true as of, and the
+    // number of its last round of them.
+    ("devices", "acked_through", "INTEGER"),
+    ("devices", "acked_round", "INTEGER"),
+    ("devices", "acked_started", "INTEGER"),
 ];
 
 /// A document's log is due for a snapshot from this many updates…
@@ -146,7 +151,26 @@ impl Relay {
         conn.execute_batch("PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL;")?;
         let mut dir = path.as_os_str().to_owned();
         dir.push(".blobs");
-        Self::with(conn, PathBuf::from(dir), false)
+        let relay = Self::with(conn, PathBuf::from(dir), false)?;
+        relay.skip_used_seqs()?;
+        Ok(relay)
+    }
+
+    /// Starts the logs' seqs at no less than the time (µs): a database put
+    /// back to an older copy would otherwise give out seqs again that
+    /// devices have pulled past, and they would miss what goes under them.
+    /// Seqs given out before are below it unless more than a million a
+    /// second were.
+    fn skip_used_seqs(&self) -> Result<()> {
+        let floor = now_ms() * 1000;
+        let conn = self.conn();
+        for table in ["updates", "acks"] {
+            let n = conn.execute("UPDATE sqlite_sequence SET seq = MAX(seq, ?2) WHERE name = ?1", params![table, floor])?;
+            if n == 0 {
+                conn.execute("INSERT INTO sqlite_sequence(name, seq) VALUES (?1, ?2)", params![table, floor])?;
+            }
+        }
+        Ok(())
     }
 
     /// A relay that keeps nothing: its files go in a temporary folder.
@@ -326,7 +350,9 @@ impl Relay {
         self.require(&conn, workspace)?;
         Self::touch(&conn, workspace, device, now_ms())?;
         let mut stmt = conn.prepare_cached(
-            "SELECT device, name, first_seen, last_seen FROM devices WHERE workspace = ?1 AND removed_at IS NULL ORDER BY last_seen DESC, device",
+            "SELECT device, name, first_seen, last_seen, acked_through, acked_round, acked_started,
+                    (SELECT COUNT(*) FROM acks a WHERE a.workspace = devices.workspace AND a.device = devices.device)
+             FROM devices WHERE workspace = ?1 AND removed_at IS NULL ORDER BY last_seen DESC, device",
         )?;
         let rows = stmt.query_map([workspace], |r| {
             Ok(DeviceInfo {
@@ -334,19 +360,29 @@ impl Relay {
                 name: r.get::<_, Option<Vec<u8>>>(1)?.map(|n| crate::crypto::b64(&n)),
                 first_seen: r.get(2)?,
                 last_seen: r.get(3)?,
+                acked_through: r.get(4)?,
+                acked_round: r.get(5)?,
+                acked_started: r.get(6)?,
+                acked_docs: r.get(7)?,
             })
         })?;
         Ok(rows.collect::<std::result::Result<Vec<_>, _>>()?)
     }
 
     /// Stores the device's reports, each replacing its previous one for
-    /// that document.
-    pub fn push_acks(&self, workspace: &str, device: &str, items: &[PushItem]) -> Result<()> {
+    /// that document, and the round they end if it is taken (see
+    /// `AcksStored`). Returns whether it was (true with no round).
+    pub fn push_acks(&self, workspace: &str, device: &str, items: &[PushItem], round: Option<Round>) -> Result<bool> {
         let mut conn = self.conn();
         self.require(&conn, workspace)?;
         let tx = conn.transaction()?;
         let at = now_ms();
         Self::touch(&tx, workspace, device, at)?;
+        let (previous, started): (Option<i64>, Option<i64>) = tx.query_row(
+            "SELECT acked_round, acked_started FROM devices WHERE workspace = ?1 AND device = ?2",
+            params![workspace, device],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )?;
         for item in items {
             let blob = crate::crypto::unb64(&item.blob)?;
             tx.execute(
@@ -354,8 +390,17 @@ impl Relay {
                 params![workspace, device, item.doc, blob, at],
             )?;
         }
+        let accepted = round.is_none_or(|round| {
+            round.number == 1 || (started == Some(round.started) && previous.is_some_and(|p| p == round.number || p + 1 == round.number))
+        });
+        if let Some(round) = round.filter(|_| accepted) {
+            tx.execute(
+                "UPDATE devices SET acked_through = ?3, acked_round = ?4, acked_started = ?5 WHERE workspace = ?1 AND device = ?2",
+                params![workspace, device, round.through, round.number, round.started],
+            )?;
+        }
         tx.commit()?;
-        Ok(())
+        Ok(accepted)
     }
 
     /// Reports after `after`, oldest first.
@@ -398,8 +443,10 @@ impl Relay {
         let tx = conn.transaction()?;
         let at = now_ms();
         Self::touch(&tx, workspace, device, at)?;
+        // The device pulled further than the server now has (it was put
+        // back to an older copy): the device starts over at its next sync.
         if covers > Self::head_of(&tx, workspace)? {
-            return Err(SyncError::Protocol("a snapshot cannot cover updates not yet on the server".into()));
+            return Err(SyncError::Conflict("a snapshot cannot cover updates not yet on the server".into()));
         }
         let blob = crate::crypto::unb64(&item.blob)?;
         tx.execute(
@@ -616,6 +663,12 @@ impl Relay {
         Ok(())
     }
 
+    /// Copies the whole database to `path` (a backup).
+    pub fn copy_to(&self, path: &Path) -> Result<()> {
+        self.conn().execute("VACUUM main INTO ?1", [path.to_string_lossy()])?;
+        Ok(())
+    }
+
     pub fn head(&self, workspace: &str) -> Result<i64> {
         Self::head_of(&self.conn(), workspace)
     }
@@ -717,6 +770,28 @@ mod tests {
 
     /// A server database from before snapshots and removal gets the new
     /// columns and keeps its log.
+    /// A round of reports: its cursor and number kept and listed with the
+    /// devices; a round that does not follow the last is refused (what lets
+    /// a device see the server lost its reports).
+    #[test]
+    fn rounds_of_reports_are_kept() {
+        let relay = Relay::open_in_memory().unwrap();
+        relay.create_workspace("ws", &crate::crypto::wrap(&crate::crypto::WorkspaceKey::generate(), "p", (1024, 1, 1)).unwrap()).unwrap();
+        let item = PushItem { doc: "tag".into(), blob: crate::crypto::b64(b"sealed") };
+        let round = |through, number, started| Some(Round { through, number, started });
+        assert!(relay.push_acks("ws", "a", &[item.clone()], None).unwrap());
+        assert!(!relay.push_acks("ws", "a", &[], round(3, 4, 5)).unwrap(), "not a first round");
+        assert!(relay.push_acks("ws", "a", &[item], round(7, 1, 5)).unwrap());
+        assert!(relay.push_acks("ws", "a", &[], round(9, 2, 5)).unwrap());
+        assert!(relay.push_acks("ws", "a", &[], round(9, 2, 5)).unwrap(), "the reply was lost");
+        assert!(!relay.push_acks("ws", "a", &[], round(9, 4, 5)).unwrap(), "round 3 is missing");
+        assert!(!relay.push_acks("ws", "a", &[], round(9, 3, 6)).unwrap(), "another count");
+        let device = |d: &str| relay.devices("ws", "b").unwrap().into_iter().find(|x| x.device == d).unwrap();
+        assert_eq!((device("a").acked_through, device("a").acked_round, device("a").acked_started), (Some(9), Some(2), Some(5)));
+        assert_eq!(device("a").acked_docs, Some(1));
+        assert_eq!(device("b").acked_through, None);
+    }
+
     #[test]
     fn an_older_database_is_brought_up_to_date() {
         let dir = tempfile::tempdir().unwrap();

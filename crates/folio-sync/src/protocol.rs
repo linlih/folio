@@ -10,7 +10,9 @@
 //! - `PUT  /v1/w/{workspace}/device` — this device's name (sealed)
 //! - `GET  /v1/w/{workspace}/devices` — the workspace's devices
 //! - `POST /v1/w/{workspace}/acks` — this device's versions of documents
-//!   (sealed), replacing what it reported before for each
+//!   (sealed), replacing what it reported before for each; with the round
+//!   that ends: the pull cursor they are true as of (the convergence check)
+//!   and the round's number
 //! - `GET  /v1/w/{workspace}/acks?after=N&limit=M` — reports after a cursor
 //! - `DELETE /v1/w/{workspace}/devices/{device}` — removes another device;
 //!   its requests get 410 Gone from then on
@@ -26,9 +28,11 @@
 //!   there; the file can be downloaded, and live devices hear of it
 //! - `GET  /v1/w/{workspace}/blobs/{id}/{n}` — chunk n of a whole file
 //!
-//! Acknowledgements (`device_acks`, §5.3 compaction): after each sync a
-//! device reports, per changed document, the version it now has. History
-//! older than what every counted device has can be compacted.
+//! Acknowledgements (`device_acks`, §5.3): after each sync a device reports,
+//! per changed document, the version it now has, then the cursor it had
+//! pulled through when it read them. Every device compares the others'
+//! reports with its own to find content one of them lacks (the convergence
+//! check, `client::Engine::check`).
 //!
 //! Every request carries `Authorization: Bearer <server token>` (the token
 //! the server was started with) and `X-Folio-Device: <device id>`.
@@ -48,6 +52,38 @@ pub struct PushItem {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct PushRequest {
     pub items: Vec<PushItem>,
+}
+
+/// The end of a round of version reports.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Round {
+    /// Every version this device has reported is true as of having pulled
+    /// through this seq.
+    pub through: i64,
+    /// Counts the device's rounds.
+    pub number: i64,
+    /// When the device began this count (ms): it begins again after
+    /// starting over, and other devices then collect its reports again.
+    #[serde(default)]
+    pub started: i64,
+}
+
+/// Version reports; the last request of a round says so.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct AcksRequest {
+    pub items: Vec<PushItem>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub round: Option<Round>,
+}
+
+/// The reply to reports: whether the server took the round. It does when
+/// the round follows the last one it has of the device (or repeats it, the
+/// reply having been lost), or is a first round; otherwise it lost reports
+/// (it was put back to an older copy) and keeps the gap, so the device
+/// sees it however often it asks.
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+pub struct AcksStored {
+    pub accepted: bool,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -91,6 +127,18 @@ pub struct DeviceInfo {
     pub first_seen: i64,
     /// Its last request to the server.
     pub last_seen: i64,
+    /// The cursor its version reports are true as of, the number of its
+    /// last round of them and when it began counting (None from an app
+    /// without the convergence check).
+    #[serde(default)]
+    pub acked_through: Option<i64>,
+    #[serde(default)]
+    pub acked_round: Option<i64>,
+    #[serde(default)]
+    pub acked_started: Option<i64>,
+    /// How many documents it has a report of on the server.
+    #[serde(default)]
+    pub acked_docs: Option<i64>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

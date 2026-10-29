@@ -13,7 +13,7 @@ use folio_store::{Incoming, Origin, Store};
 use folio_sync::client::{Engine, Transport};
 use folio_sync::crypto::{Keys, WorkspaceKey, CHUNK};
 use folio_sync::files::{is_damaged, Fetched};
-use folio_sync::protocol::{AcksResponse, BlobsResponse, DeviceInfo, HeavyDoc, PullResponse, PushItem};
+use folio_sync::protocol::{Round, AcksResponse, BlobsResponse, DeviceInfo, HeavyDoc, PullResponse, PushItem};
 use folio_sync::relay::Relay;
 use folio_sync::SyncError;
 use loro::LoroValue;
@@ -52,8 +52,8 @@ impl Transport for Direct<'_> {
     fn devices(&self) -> folio_sync::Result<Vec<DeviceInfo>> {
         self.relay.devices(WS, &self.device)
     }
-    fn push_acks(&self, items: &[PushItem]) -> folio_sync::Result<()> {
-        self.relay.push_acks(WS, &self.device, items)
+    fn push_acks(&self, items: &[PushItem], round: Option<Round>) -> folio_sync::Result<Option<bool>> {
+        self.relay.push_acks(WS, &self.device, items, round).map(Some)
     }
     fn pull_acks(&self, after: i64, limit: u32) -> folio_sync::Result<AcksResponse> {
         self.relay.pull_acks(WS, &self.device, after, limit)

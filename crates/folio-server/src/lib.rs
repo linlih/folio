@@ -13,7 +13,7 @@ use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use folio_sync::crypto::WrappedKey;
-use folio_sync::protocol::{BlobDone, BlobIds, BlobsResponse, DeviceName, DevicesResponse, HeavyResponse, Live, PushRequest, PushResponse, RefsResponse, SnapshotRequest, SnapshotResponse, DEVICE_HEADER, MAX_PULL};
+use folio_sync::protocol::{AcksRequest, AcksStored, BlobDone, BlobIds, BlobsResponse, DeviceName, DevicesResponse, HeavyResponse, Live, PushRequest, PushResponse, RefsResponse, SnapshotRequest, SnapshotResponse, DEVICE_HEADER, MAX_PULL};
 use folio_sync::relay::Relay;
 use folio_sync::SyncError;
 use serde::Deserialize;
@@ -200,11 +200,11 @@ async fn push_snapshot(State(s): State<Arc<Server>>, Path(ws): Path<String>, hea
     Ok(Json(SnapshotResponse { seq }))
 }
 
-async fn push_acks(State(s): State<Arc<Server>>, Path(ws): Path<String>, headers: HeaderMap, Json(req): Json<PushRequest>) -> Result<StatusCode, Failure> {
+async fn push_acks(State(s): State<Arc<Server>>, Path(ws): Path<String>, headers: HeaderMap, Json(req): Json<AcksRequest>) -> Result<Json<AcksStored>, Failure> {
     let device = authorize(&s, &headers)?;
     check_workspace(&ws)?;
-    blocking(move || s.relay.push_acks(&ws, &device, &req.items)).await?;
-    Ok(StatusCode::NO_CONTENT)
+    let accepted = blocking(move || s.relay.push_acks(&ws, &device, &req.items, req.round)).await?;
+    Ok(Json(AcksStored { accepted }))
 }
 
 async fn pull_acks(State(s): State<Arc<Server>>, Path(ws): Path<String>, headers: HeaderMap, Query(q): Query<PullQuery>) -> Result<Response, Failure> {

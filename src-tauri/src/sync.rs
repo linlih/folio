@@ -383,6 +383,12 @@ fn run(app: tauri::AppHandle, engine: Engine, http: Http, name: String, stop: Ar
                 }
                 backoff = BACKOFF;
                 wait = POLL;
+                // The convergence check queued what another device lacks:
+                // send it now rather than at the next poll.
+                if report.resent > 0 {
+                    tracing::warn!(docs = report.resent, "another device lacks part of some documents; sending them again");
+                    wait = PUSH_DELAY;
+                }
                 if !report.applied.is_empty() {
                     let mut ids: Vec<String> = report.applied.iter().map(|a| a.doc.to_string()).collect();
                     ids.sort();

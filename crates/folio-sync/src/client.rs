@@ -1,8 +1,10 @@
 //! The client side of sync (design/ARCHITECTURE.md §5.3): push the outbox
 //! (local updates, encrypted), pull what other devices pushed after the
 //! cursor, apply it through the store's single write path; then report the
-//! versions this device now has and collect the other devices' reports
-//! (`device_acks`, which compaction goes by).
+//! versions this device now has, collect the other devices' reports
+//! (`device_acks`), and now and then compare them (the convergence check):
+//! a device that should have what this one has but lacks part of it gets
+//! that part sent again.
 //!
 //! The store lock is held only to read the outbox or to apply a batch, never
 //! across a network call, so editing goes on while a sync runs.
@@ -13,7 +15,7 @@ use folio_core::{DocId, DocKind};
 use folio_store::Store;
 
 use crate::crypto::{b64, unb64, Keys};
-use crate::protocol::{AcksResponse, BlobsResponse, DeviceInfo, HeavyDoc, PullResponse, PushItem};
+use crate::protocol::{Round, AcksResponse, BlobsResponse, DeviceInfo, HeavyDoc, PullResponse, PushItem};
 use crate::{Result, SyncError};
 
 /// The server's side of the conversation; HTTP in the app, the relay
@@ -26,7 +28,10 @@ pub trait Transport {
     fn pull(&self, after: i64, limit: u32) -> Result<PullResponse>;
     fn set_device_name(&self, sealed: &[u8]) -> Result<()>;
     fn devices(&self) -> Result<Vec<DeviceInfo>>;
-    fn push_acks(&self, items: &[PushItem]) -> Result<()>;
+    /// Stores version reports, and with the last request of a round, the
+    /// round. Returns whether the server took the round (None from a server
+    /// that does not say; see `AcksStored`).
+    fn push_acks(&self, items: &[PushItem], round: Option<Round>) -> Result<Option<bool>>;
     fn pull_acks(&self, after: i64, limit: u32) -> Result<AcksResponse>;
     fn remove_device(&self, other: &str) -> Result<()>;
     fn heavy_docs(&self) -> Result<Vec<HeavyDoc>>;
@@ -54,6 +59,28 @@ pub const ACKS_CURSOR: &str = "sync.acks.cursor";
 /// `sync_state` key: documents written after this change number
 /// (`docs.changed`) may have a version not yet reported.
 pub const ACKS_CHANGED: &str = "sync.acks.changed";
+/// `sync_state` key: the pull cursor this device's reports are true as of.
+pub const ACKS_THROUGH: &str = "sync.acks.through";
+/// `sync_state` key: the number of this device's last round of reports.
+const ACKS_ROUND: &str = "sync.acks.round";
+/// `sync_state` key: when this device began numbering its rounds.
+const ACKS_STARTED: &str = "sync.acks.started";
+/// `sync_state` key: when the convergence check last ran (ms).
+const CHECKED_AT: &str = "sync.check.at";
+/// How often the convergence check runs.
+pub const CHECK_EVERY_MS: i64 = 10 * 60 * 1000;
+
+/// `sync_state` key: the version of a document another device had when its
+/// lacking part was last sent again (not sent twice for one version).
+/// `sync_state` key: when another device began numbering its rounds, as
+/// last seen.
+fn started_key(device: &str) -> String {
+    format!("sync.started.{device}")
+}
+
+fn resent_key(device: &str, doc: &DocId) -> String {
+    format!("sync.resent.{device}.{doc}")
+}
 
 /// An update from another device that changed a document here.
 #[derive(Clone, Debug)]
@@ -69,6 +96,8 @@ pub struct Report {
     pub applied: Vec<Applied>,
     /// Reporting versions failed (the sync itself went through).
     pub acks_error: Option<String>,
+    /// Documents the convergence check queued to send again.
+    pub resent: usize,
 }
 
 /// A device of the workspace, its name opened.
@@ -79,6 +108,12 @@ pub struct Device {
     pub name: Option<String>,
     pub first_seen: i64,
     pub last_seen: i64,
+    /// The cursor its version reports are true as of, and the number of
+    /// its last round of them.
+    pub acked_through: Option<i64>,
+    pub acked_round: Option<i64>,
+    pub acked_started: Option<i64>,
+    pub acked_docs: Option<i64>,
 }
 
 const ENVELOPE_VERSION: u8 = 1;
@@ -128,11 +163,20 @@ fn open_envelope(bytes: &[u8]) -> Result<(DocKind, DocId, &[u8])> {
 /// joins again as a new device): cursors and reports start over. Its notes
 /// stay; joining queues their whole history again (`Store::queue_everything`).
 pub fn forget_workspace(store: &Store) -> Result<()> {
-    for key in [CURSOR, ACKS_CURSOR, ACKS_CHANGED, crate::files::REFS_REPORTED] {
+    for key in [CURSOR, ACKS_CURSOR, ACKS_CHANGED, ACKS_THROUGH, ACKS_ROUND, ACKS_STARTED, CHECKED_AT, crate::files::REFS_REPORTED] {
         store.set_sync_value(key, &[])?;
     }
     store.clear_device_acks()?;
     store.forget_uploads()?;
+    Ok(())
+}
+
+/// After the server went back to an older copy (restored from a backup):
+/// sync as a device joining, pulling from the start and sending everything,
+/// so nothing sent after that copy stays lost and no reused seq is skipped.
+fn start_over(store: &mut Store) -> Result<()> {
+    forget_workspace(store)?;
+    store.queue_everything(now_ms())?;
     Ok(())
 }
 
@@ -163,11 +207,18 @@ pub(crate) fn now_ms() -> i64 {
 pub struct Engine {
     pub(crate) workspace: String,
     pub(crate) keys: Keys,
+    check_every: i64,
 }
 
 impl Engine {
     pub fn new(workspace: impl Into<String>, keys: Keys) -> Self {
-        Engine { workspace: workspace.into(), keys }
+        Engine { workspace: workspace.into(), keys, check_every: CHECK_EVERY_MS }
+    }
+
+    /// Runs the convergence check this often instead (0: every sync).
+    pub fn with_check_every(mut self, ms: i64) -> Self {
+        self.check_every = ms;
+        self
     }
 
     pub fn workspace(&self) -> &str {
@@ -205,6 +256,11 @@ impl Engine {
         loop {
             let cursor = Self::cursor(&lock(store))?;
             let resp = t.pull(cursor, PULL_BATCH)?;
+            if resp.head < cursor {
+                tracing::warn!(cursor, head = resp.head, "the server is behind this device; syncing everything again");
+                start_over(&mut lock(store))?;
+                continue;
+            }
             let Some(last) = resp.updates.last().map(|u| u.seq) else { return Ok((pulled, applied)) };
             // Decrypt outside the lock.
             let mut opened = Vec::with_capacity(resp.updates.len());
@@ -230,15 +286,39 @@ impl Engine {
     }
 
     /// Reports the version this device has of each document written since
-    /// the last report; returns how many.
+    /// the last report, then the cursor they are all true as of; returns
+    /// how many. Run after a pull to the head: every reported version is
+    /// then on the server at or before the cursor. A document with updates
+    /// still to send is left for a later round, since its version is not.
     pub fn send_acks(&self, store: &Mutex<Store>, t: &dyn Transport) -> Result<usize> {
+        let sent = self.send_acks_once(store, t)?;
+        let Some((n, accepted)) = sent else { return Ok(0) };
+        // The server lacks this device's round before: it was put back to an
+        // older copy, which may also have reused seqs this device thinks it
+        // has pulled.
+        if accepted == Some(false) {
+            tracing::warn!("the server lost this device's version reports; syncing everything again");
+            start_over(&mut lock(store))?;
+        }
+        Ok(n)
+    }
+
+    /// One round of reports: how many, and whether the server took the
+    /// round (when it says).
+    fn send_acks_once(&self, store: &Mutex<Store>, t: &dyn Transport) -> Result<Option<(usize, Option<bool>)>> {
         let device = t.device();
-        let (todo, newest) = {
+        let (todo, newest, through, reported, number, started) = {
             let mut s = lock(store);
             let after = read_i64(&s, ACKS_CHANGED, -1)?;
+            let unsent = s.outbox_docs()?;
             let mut todo = Vec::new();
             let mut newest = after;
+            let mut held = i64::MAX;
             for (id, kind, changed) in s.docs_changed_after(after)? {
+                if unsent.contains(&id) {
+                    held = held.min(changed);
+                    continue;
+                }
                 newest = newest.max(changed);
                 let version = s.doc_version(&id, kind)?;
                 // Encodings of one version can differ in peer order.
@@ -247,9 +327,31 @@ impl Engine {
                     todo.push((id, kind, version));
                 }
             }
-            (todo, newest)
+            // The held documents are looked at again next time.
+            if held != i64::MAX {
+                newest = newest.min(held - 1);
+            }
+            let started = match read_i64(&s, ACKS_STARTED, -1)? {
+                -1 => {
+                    let now = now_ms();
+                    s.set_sync_value(ACKS_STARTED, &now.to_le_bytes())?;
+                    now
+                }
+                at => at,
+            };
+            (todo, newest, Self::cursor(&s)?, s.sync_value(ACKS_THROUGH)?, read_i64(&s, ACKS_ROUND, 0)? + 1, started)
         };
-        for chunk in todo.chunks(PUSH_BATCH as usize) {
+        let round = Round { through, number, started };
+        let chunks: Vec<_> = todo.chunks(PUSH_BATCH as usize).collect();
+        let mut accepted = None;
+        if chunks.is_empty() {
+            if reported.as_deref() == Some(&through.to_le_bytes()[..]) {
+                lock(store).set_sync_value(ACKS_CHANGED, &newest.to_le_bytes())?;
+                return Ok(None);
+            }
+            accepted = t.push_acks(&[], Some(round))?;
+        }
+        for (i, chunk) in chunks.iter().enumerate() {
             let items: Vec<PushItem> = chunk
                 .iter()
                 .map(|(id, kind, version)| {
@@ -258,14 +360,60 @@ impl Engine {
                     PushItem { doc: tag, blob: b64(&blob) }
                 })
                 .collect();
-            t.push_acks(&items)?;
+            let last = i + 1 == chunks.len();
+            let took = t.push_acks(&items, last.then_some(round))?;
+            if last {
+                accepted = took;
+            }
             let s = lock(store);
-            for (id, _, version) in chunk {
+            for (id, _, version) in chunk.iter() {
                 s.set_device_ack(id, device, version, now_ms())?;
             }
         }
-        lock(store).set_sync_value(ACKS_CHANGED, &newest.to_le_bytes())?;
-        Ok(todo.len())
+        let s = lock(store);
+        s.set_sync_value(ACKS_CHANGED, &newest.to_le_bytes())?;
+        s.set_sync_value(ACKS_THROUGH, &through.to_le_bytes())?;
+        s.set_sync_value(ACKS_ROUND, &number.to_le_bytes())?;
+        Ok(Some((todo.len(), accepted)))
+    }
+
+    /// The convergence check (design/ARCHITECTURE.md §5.3). Another
+    /// device's reports are true as of its cursor; once that is at or past
+    /// this device's own, it has pulled everything this device reported
+    /// having. A document it still lacks part of was lost on the way (the
+    /// server went back to an older copy, an update never arrived or could
+    /// not be applied): what it lacks is queued to send again, once for each
+    /// version it reports. Sending twice is harmless; updates import once.
+    /// Returns how many were queued.
+    pub fn check(&self, store: &Mutex<Store>, devices: &[Device], me: &str) -> Result<usize> {
+        let mut s = lock(store);
+        let Some(mine) = s.sync_value(ACKS_THROUGH)?.and_then(|v| v.try_into().ok()).map(i64::from_le_bytes) else { return Ok(0) };
+        let others: Vec<&Device> = devices.iter().filter(|d| d.id != me && d.acked_through.is_some_and(|t| t >= mine)).collect();
+        if others.is_empty() {
+            return Ok(0);
+        }
+        let decode = |b: Vec<u8>| loro::VersionVector::decode(&b).ok();
+        let mut queued = 0;
+        for (id, _) in s.all_docs()? {
+            let Some(have) = s.device_ack(&id, me)?.and_then(decode) else { continue };
+            for other in &others {
+                let theirs = s.device_ack(&id, &other.id)?.and_then(decode).unwrap_or_default();
+                if theirs.includes_vv(&have) {
+                    continue;
+                }
+                let key = resent_key(&other.id, &id);
+                let version = theirs.encode();
+                if s.sync_value(&key)?.as_deref() == Some(&version[..]) {
+                    continue;
+                }
+                let Some(bytes) = s.doc_updates_since(&id, &theirs)? else { continue };
+                tracing::warn!(doc = %id, device = %other.id, "convergence check: a device lacks part of a document; sending it again");
+                s.queue_update(&id, &bytes, now_ms())?;
+                s.set_sync_value(&key, &version)?;
+                queued += 1;
+            }
+        }
+        Ok(queued)
     }
 
     /// Collects the other devices' reports after the acks cursor; returns
@@ -346,19 +494,83 @@ impl Engine {
                     .and_then(|n| unb64(&n).ok())
                     .and_then(|n| self.keys.open(&self.workspace, &name_aad(&d.device), &n).ok())
                     .and_then(|n| String::from_utf8(n).ok());
-                Device { id: d.device, name, first_seen: d.first_seen, last_seen: d.last_seen }
+                Device { id: d.device, name, first_seen: d.first_seen, last_seen: d.last_seen, acked_through: d.acked_through, acked_round: d.acked_round, acked_started: d.acked_started, acked_docs: d.acked_docs }
             })
             .collect())
     }
 
-    /// Push, pull, then exchange version reports. A failed report does not
-    /// fail the sync (an older server may not take them); it is in the
-    /// report.
+    /// Push, pull, then exchange version reports and, when due, run the
+    /// convergence check. A failed report does not fail the sync (an older
+    /// server may not take them); it is in the report.
     pub fn sync(&self, store: &Mutex<Store>, t: &dyn Transport) -> Result<Report> {
         let pushed = self.push(store, t)?;
         let (pulled, applied) = self.pull(store, t)?;
-        let acks_error = self.send_acks(store, t).and_then(|_| self.pull_acks(store, t)).err().map(|e| e.to_string());
-        Ok(Report { pushed, pulled, applied, acks_error })
+        let (resent, acks_error) = match self.exchange_acks(store, t) {
+            Ok(n) => (n, None),
+            Err(e) => (0, Some(e.to_string())),
+        };
+        Ok(Report { pushed, pulled, applied, acks_error, resent })
+    }
+
+    fn exchange_acks(&self, store: &Mutex<Store>, t: &dyn Transport) -> Result<usize> {
+        self.send_acks(store, t)?;
+        let due = now_ms() - read_i64(&lock(store), CHECKED_AT, 0)? >= self.check_every;
+        // The devices (with their cursors) before their reports: a device
+        // sends its cursor after its reports, so every report a cursor
+        // vouches for is collected below.
+        let devices = if due { Some(self.devices(t)?) } else { None };
+        // The server behind on this device's rounds (or on another count of
+        // them), or holding fewer of its reports than it sent, went back to
+        // an older copy; a device with nothing new to report would not see
+        // it otherwise. It can be one round ahead: the reply to that round
+        // was lost (and then the round sent again may hold other reports,
+        // which only the count tells lost).
+        let lost = match devices.iter().flatten().find(|d| d.id == t.device()) {
+            Some(me) => {
+                let s = lock(store);
+                let started = read_i64(&s, ACKS_STARTED, -1)?;
+                let behind = me.acked_started.is_some()
+                    && started != -1
+                    && (me.acked_started != Some(started) || me.acked_round.unwrap_or(-1) < read_i64(&s, ACKS_ROUND, -1)?);
+                let sent = s.device_ack_count(t.device())?;
+                behind || me.acked_docs.is_some_and(|n| n < sent)
+            }
+            None => false,
+        };
+        if lost {
+            tracing::warn!("the server lost this device's version reports; syncing everything again");
+            start_over(&mut lock(store))?;
+            return Ok(0);
+        }
+        if let Some(devices) = &devices {
+            self.notice_restarted_rounds(&lock(store), devices, t.device())?;
+        }
+        self.pull_acks(store, t)?;
+        let Some(devices) = devices else { return Ok(0) };
+        let resent = self.check(store, &devices, t.device())?;
+        lock(store).set_sync_value(CHECKED_AT, &now_ms().to_le_bytes())?;
+        Ok(resent)
+    }
+
+    /// Another device that began numbering its rounds anew started over
+    /// (the server went back to an older copy, or it restored a backup) and
+    /// sent its reports again, possibly under sequence numbers this device's
+    /// acks cursor has passed: collects every report again (each replacing
+    /// the one held).
+    fn notice_restarted_rounds(&self, store: &Store, devices: &[Device], me: &str) -> Result<()> {
+        let mut restarted = false;
+        for d in devices.iter().filter(|d| d.id != me) {
+            let Some(started) = d.acked_started else { continue };
+            let key = started_key(&d.id);
+            let seen = read_i64(store, &key, started)?;
+            restarted |= seen != started;
+            store.set_sync_value(&key, &started.to_le_bytes())?;
+        }
+        if restarted {
+            tracing::info!("a device started its version reports over; collecting all reports again");
+            store.set_sync_value(ACKS_CURSOR, &[])?;
+        }
+        Ok(())
     }
 
     pub fn cursor(store: &Store) -> Result<i64> {
