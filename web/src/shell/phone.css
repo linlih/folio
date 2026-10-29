@@ -58,8 +58,22 @@ body.phone-typing:has(.keyboard-bar) .shell { padding-bottom: 44px; }
   border-top: 1px solid var(--border);
   background: var(--surface);
 }
-.keyboard-bar .icon-button { width: 44px; height: 40px; color: var(--secondary); }
-.keyboard-bar-gap { flex: 1; }
+.keyboard-bar .icon-button { flex: none; width: 44px; height: 40px; color: var(--secondary); }
+/* The keys scroll sideways; hiding the keyboard stays at the end. */
+.keyboard-bar-keys {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  align-items: center;
+  gap: 2px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+}
+.keyboard-bar-keys::-webkit-scrollbar { display: none; }
+.keyboard-bar-keys + .icon-button { border-left: 1px solid var(--border); border-radius: 0; }
+.keyboard-bar-glyph { font: 600 15px/1 var(--font-mono, ui-monospace, monospace); letter-spacing: -1px; }
 
 @media (max-width: 720px), (max-height: 500px) and (hover: none) and (pointer: coarse) {
   /* Room at the end of a page for the capture button. */

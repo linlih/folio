@@ -645,6 +645,14 @@
     "moveUp": "上移",
     "moveDown": "下移",
     "fold": "折叠 / 展开",
+    "task": "待办 / 切换状态",
+    "link": "链接卡片 [[",
+    "tag": "标签 #",
+    "command": "命令 /",
+    "image": "插入图片",
+    "undo": "撤销",
+    "redo": "重做",
+    "blockRef": "引用块 ((",
     "hideKeyboard": "收起键盘"
   },
   "update": {

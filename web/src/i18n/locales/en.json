@@ -645,6 +645,14 @@
     "moveUp": "Move up",
     "moveDown": "Move down",
     "fold": "Fold / unfold",
+    "task": "To-do / cycle status",
+    "link": "Link a card [[",
+    "tag": "Tag #",
+    "command": "Commands /",
+    "image": "Insert image",
+    "undo": "Undo",
+    "redo": "Redo",
+    "blockRef": "Reference a block ((",
     "hideKeyboard": "Hide keyboard"
   },
   "update": {

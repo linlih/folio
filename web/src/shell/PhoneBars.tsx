@@ -1,7 +1,9 @@
-import { ArrowDown, ArrowUp, CalendarDays, ChevronLeft, ChevronsDownUp, IndentDecrease, IndentIncrease, Keyboard, LayoutDashboard, LibraryBig, Search, Settings, SquarePen } from "lucide-react";
-import { useEffect, useState } from "react";
+import type { Editor } from "@tiptap/core";
+import { ArrowDown, ArrowUp, CalendarDays, ChevronLeft, ChevronsDownUp, Hash, ImagePlus, IndentDecrease, IndentIncrease, Keyboard, LayoutDashboard, LibraryBig, Redo2, Search, Settings, Slash, SquareCheck, SquarePen, Undo2 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { openQuickCapture } from "../capture/QuickCapture";
+import { addFiles, pickFiles } from "../editor/assets";
 import { useTabLabel } from "./TabBar";
 import { focusedPane, useShell, type Pane, type TabTarget } from "./tabs";
 import "./phone.css";
@@ -139,6 +141,40 @@ function press(key: string, mods: { shift?: boolean; alt?: boolean; mod?: boolea
   );
 }
 
+/** The editor that has the focus. */
+function focusedEditor(): Editor | null {
+  const el = document.activeElement?.closest(".ProseMirror") as (HTMLElement & { editor?: Editor }) | null | undefined;
+  return el?.editor ?? null;
+}
+
+/** Types `text` into the focused editor as if from the keyboard, so pairing
+ *  and the suggestion menus react as they do to typing ("[[" opens the card
+ *  search). `word` starts a new word first: "#" and "/" open their menus
+ *  only there. */
+function typeText(text: string, word = false) {
+  const view = focusedEditor()?.view;
+  if (!view) return;
+  const { $from } = view.state.selection;
+  const before = $from.parent.textBetween(Math.max(0, $from.parentOffset - 1), $from.parentOffset, "", "￼");
+  const chars = [...(word && before && !/\s/.test(before) ? " " : ""), ...text];
+  for (const ch of chars) {
+    const { from, to } = view.state.selection;
+    const deflt = () => view.state.tr.insertText(ch, from, to);
+    if (!view.someProp("handleTextInput", (f) => f(view, from, to, ch, deflt))) view.dispatch(deflt());
+  }
+}
+
+/** Adds pictures from the phone's photos or camera to the focused editor. */
+async function addImages() {
+  const view = focusedEditor()?.view;
+  if (!view) return;
+  const files = await pickFiles("image/*");
+  if (files.length) await addFiles(view, files);
+}
+
+/** A finger that moves this far is scrolling the bar, not tapping a key. */
+const TAP_SLOP = 10;
+
 /** The on-screen keyboard counts as up from this many pixels: less is an
  *  attached keyboard's shortcut strip, or nothing. */
 const KEYBOARD_MIN = 100;
@@ -195,13 +231,16 @@ function caretIntoView() {
 }
 
 /** A row above the on-screen keyboard while it is up for an editor on a
- *  touch screen: outdent, indent, move the item, fold, and put the keyboard
- *  away. Taps on it do not take the focus, so the keyboard stays. With the
- *  keyboard down the bottom bar shows instead. */
+ *  touch screen: keys the phone keyboard lacks or hides (outline moves,
+ *  links, tags, commands, tasks, pictures, undo), scrolled sideways, and
+ *  putting the keyboard away at its end. Taps on it do not take the focus,
+ *  so the keyboard stays. With the keyboard down the bottom bar shows
+ *  instead. */
 export function KeyboardBar() {
   const { t } = useTranslation();
   const [editing, setEditing] = useState(false);
   const [bottom, setBottom] = useState(0);
+  const tap = useRef<{ id: number; x: number; y: number } | null>(null);
   useEffect(() => {
     const vv = window.visualViewport;
     const root = document.documentElement;
@@ -287,9 +326,10 @@ export function KeyboardBar() {
     };
   }, []);
   if (!editing) return null;
-  // Acts as the finger goes down: keeping the focus (and the keyboard)
-  // means cancelling that, and WebKit then sends no click. A click from the
-  // keyboard (detail 0) still works.
+  // Keeping the focus (and the keyboard) means cancelling the finger going
+  // down, and WebKit then sends no click: a key acts as the finger lifts,
+  // unless it moved (the row was scrolled; the browser then also cancels
+  // the pointer). A click from the keyboard (detail 0) still works.
   const key = (label: string, icon: React.ReactNode, run: () => void) => (
     <button
       className="icon-button"
@@ -297,22 +337,38 @@ export function KeyboardBar() {
       title={label}
       onPointerDown={(e) => {
         e.preventDefault();
-        run();
+        tap.current = { id: e.pointerId, x: e.clientX, y: e.clientY };
       }}
+      onPointerUp={(e) => {
+        const start = tap.current;
+        tap.current = null;
+        if (start?.id === e.pointerId && Math.hypot(e.clientX - start.x, e.clientY - start.y) < TAP_SLOP) run();
+      }}
+      onPointerCancel={() => (tap.current = null)}
       onMouseDown={(e) => e.preventDefault()}
       onClick={(e) => e.detail === 0 && run()}
     >
       {icon}
     </button>
   );
+  const glyph = (text: string) => <span className="keyboard-bar-glyph">{text}</span>;
   return (
     <div className="keyboard-bar" role="toolbar" aria-label={t("phone.keys")} style={{ bottom }}>
-      {key(t("phone.outdent"), <IndentDecrease size={19} />, () => press("Tab", { shift: true }))}
-      {key(t("phone.indent"), <IndentIncrease size={19} />, () => press("Tab"))}
-      {key(t("phone.moveUp"), <ArrowUp size={19} />, () => press("ArrowUp", { alt: true, shift: true }))}
-      {key(t("phone.moveDown"), <ArrowDown size={19} />, () => press("ArrowDown", { alt: true, shift: true }))}
-      {key(t("phone.fold"), <ChevronsDownUp size={19} />, () => press(";", { mod: true }))}
-      <span className="keyboard-bar-gap" />
+      <div className="keyboard-bar-keys">
+        {key(t("phone.outdent"), <IndentDecrease size={19} />, () => press("Tab", { shift: true }))}
+        {key(t("phone.indent"), <IndentIncrease size={19} />, () => press("Tab"))}
+        {key(t("phone.task"), <SquareCheck size={19} />, () => press("Enter", { mod: true }))}
+        {key(t("phone.link"), glyph("[["), () => typeText("[["))}
+        {key(t("phone.tag"), <Hash size={19} />, () => typeText("#", true))}
+        {key(t("phone.command"), <Slash size={19} />, () => typeText("/", true))}
+        {key(t("phone.image"), <ImagePlus size={19} />, () => void addImages())}
+        {key(t("phone.undo"), <Undo2 size={19} />, () => press("z", { mod: true }))}
+        {key(t("phone.redo"), <Redo2 size={19} />, () => press("z", { mod: true, shift: true }))}
+        {key(t("phone.moveUp"), <ArrowUp size={19} />, () => press("ArrowUp", { alt: true, shift: true }))}
+        {key(t("phone.moveDown"), <ArrowDown size={19} />, () => press("ArrowDown", { alt: true, shift: true }))}
+        {key(t("phone.fold"), <ChevronsDownUp size={19} />, () => press(";", { mod: true }))}
+        {key(t("phone.blockRef"), glyph("(("), () => typeText("(("))}
+      </div>
       {key(t("phone.hideKeyboard"), <Keyboard size={19} />, () => (document.activeElement as HTMLElement | null)?.blur())}
     </div>
   );
