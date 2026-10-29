@@ -209,7 +209,9 @@ export function syncCursorsToPmSelection(
 
   const { doc, mapping } = state;
   const anchorPos = cursorToAbsolutePosition(anchor, doc, mapping)[0];
-  const focusPos = focus && cursorToAbsolutePosition(focus, doc, mapping)[0];
+  const focusPos = (focus && cursorToAbsolutePosition(focus, doc, mapping)[0]) ?? undefined;
+  // folio patch 11: the cursor's line was deleted (undone); the selection
+  // ProseMirror mapped through the change stands.
   if (anchorPos == null) {
     return;
   }

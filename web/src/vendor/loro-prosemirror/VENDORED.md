@@ -67,5 +67,12 @@
    none instead of throwing, which dropped the transaction. Selecting an
    image and deleting it removed it on screen but not in the document, so
    the deletion never synced. Test: `web/test/asset-delete.test.ts`.
+11. Cursors in deleted blocks (`tree.ts`, `cursor/common.ts`,
+   `sync-plugin.ts`). An update that deletes the line the cursor is on (undo
+   of typing that made a new line) left the saved cursor in a deleted tree
+   node; mapping it asked Loro for the parent of a deleted node, which
+   throws ("TreeID(…) not found"). Such a cursor maps to no position and is
+   not restored; the undo's own saved selection still is. Test:
+   `web/test/cursor-mapping.test.ts`.
 
 Search for `folio patch` to find every change in the code.

@@ -272,11 +272,14 @@ export function clearChangedTreeNodes(doc: LoroDoc, event: LoroEventBatch, mappi
 
 /** The ProseMirror position `index` within the block whose data map is
  *  `dataId` becomes, counted from the document start: the sizes of the
- *  blocks before it at each level, plus one per level entered. */
-export function treePosition(doc: LoroDoc, dataId: ContainerID, index: number, mapping: LoroNodeMapping): number {
+ *  blocks before it at each level, plus one per level entered. Null for a
+ *  deleted block (an undo removed the line the cursor was on): it has no
+ *  place, and Loro throws on asking a deleted node for its parent. */
+export function treePosition(doc: LoroDoc, dataId: ContainerID, index: number, mapping: LoroNodeMapping): number | null {
   const tree = bodyTree(doc);
   const id = treeIdOfData(dataId);
   let node = id ? tree.getNodeByID(id) : undefined;
+  if (node?.isDeleted()) return null;
   while (node) {
     const parent = node.parent();
     for (const sib of childrenOf(tree, parent)) {

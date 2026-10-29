@@ -14,10 +14,5 @@ export default defineConfig({
   test: {
     environment: "jsdom",
     setupFiles: ["test/setup.ts"],
-    // Known: undoing back past a new line, Loro's own deferred work (not a
-    // callback of ours) fails looking up the tree root and throws outside any
-    // test; contents and cursor come back right (test/cursor-mapping.test.ts).
-    // Only that message is let through, so any other stray error still fails.
-    onUnhandledError: (error) => !/TreeID\(2147483647@18446744073709551615\) not found/.test(error.message ?? ""),
   },
 });

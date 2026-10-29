@@ -225,6 +225,10 @@ function createDecorations(
       doc as LoroDocType,
       loroState.mapping,
     );
+    // folio patch 11: the peer's line was deleted.
+    if (focus == null) {
+      continue;
+    }
     d.push(Decoration.widget(focus, createCursor(peer as PeerID)));
     if (!cursorEq(cursor.anchor, cursor.focus)) {
       const [anchor, anchorCursorUpdate] = cursorToAbsolutePosition(
@@ -232,6 +236,9 @@ function createDecorations(
         doc as LoroDocType,
         loroState.mapping,
       );
+      if (anchor == null) {
+        continue;
+      }
       d.push(
         Decoration.inline(
           Math.min(anchor, focus),
@@ -384,7 +391,7 @@ export function cursorToAbsolutePosition(
   cursor: Cursor,
   doc: LoroDocType,
   mapping: LoroNodeMapping,
-): [number, Cursor | undefined] {
+): [number | null, Cursor | undefined] {
   // folio patch: layout 3. The cursor is in a text block's inline list (an
   // empty line) or in one of its texts; the block sits in the LoroTree.
   const containerId = cursor.containerId();
