@@ -84,17 +84,21 @@ body.phone-typing:has(.keyboard-bar) .shell { padding-bottom: 44px; }
      search takes a line, the filters the next. */
   :root .library .page-header { flex-wrap: wrap; row-gap: 8px; }
   /* Sub-topics are taller for fingers; a question about the topic puts its
-     text above its choices. */
+     text, the list of topics (whole, not cut off) and the buttons on lines
+     of their own. */
   :root .subtopic { height: 36px; }
   :root .topic-confirm.choose { flex-wrap: wrap; }
   :root .topic-confirm.choose p { flex-basis: 100%; }
-  :root .topic-confirm.choose select { flex: 1; min-width: 0; max-width: none; }
+  :root .topic-confirm.choose select { flex: 1 1 100%; min-width: 0; max-width: none; }
+  :root .topic-confirm.choose select + .button { margin-left: auto; }
   :root .library .page-header h1 { font-size: 28px; }
   :root .library-header-actions { flex-wrap: wrap; justify-content: flex-end; }
   :root .library-header-actions .button { white-space: nowrap; }
   :root .library-toolbar { flex-wrap: wrap; }
   :root .library-toolbar .library-search { flex: 1 1 100%; }
   :root .library-selection { flex-wrap: wrap; height: auto; }
+  /* Close leads the first row, not alone on a last one. */
+  :root .library-selection > .icon-button:last-child { order: -1; margin-left: -6px; }
 
   /* Whiteboard: zoom at the top right, the tools alone at the bottom. */
   :root .board-zoom { top: 10px; bottom: auto; right: 10px; }
