@@ -3,6 +3,7 @@ import { ArrowDown, ArrowUp, CalendarDays, ChevronLeft, ChevronsDownUp, Hash, Im
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { openQuickCapture } from "../capture/QuickCapture";
+import { useTopics } from "../docs/topics";
 import { addFiles, pickFiles } from "../editor/assets";
 import { useTabLabel } from "./TabBar";
 import { focusedPane, useShell, type Pane, type TabTarget } from "./tabs";
@@ -43,24 +44,33 @@ function goBack(pane: Pane) {
 }
 
 /** The bar at the top of a pane on a phone, in place of the tab bar:
- *  Back on a page opened from another, the page's name, and settings. */
+ *  Back on a page opened from another (and inside a topic of the card
+ *  library, up to its parent topic or the library), the page's name, and
+ *  settings. */
 export function PhoneTopBar({ pane }: { pane: Pane }) {
   const { t } = useTranslation();
   const label = useTabLabel();
   const setDialog = useShell((s) => s.setDialog);
+  const libraryTopic = useShell((s) => s.libraryTopic);
+  const topics = useTopics((s) => s.topics);
   useHistory(pane);
   const tab = pane.tabs.find((x) => x.key === pane.active);
   if (!tab) return null;
-  const root = isRoot(tab.target.kind);
+  const inTopic = tab.target.kind === "library" && !!libraryTopic;
+  const root = isRoot(tab.target.kind) && !inTopic;
+  const back = () => {
+    if (!inTopic) return goBack(pane);
+    useShell.getState().setLibraryTopic(topics.find((x) => x.id === libraryTopic)?.parent ?? null);
+  };
   return (
     <header className="phone-top">
       {!root && (
-        <button className="icon-button phone-back" aria-label={t("phone.back")} title={t("phone.back")} onClick={() => goBack(pane)}>
+        <button className="icon-button phone-back" aria-label={t("phone.back")} title={t("phone.back")} onClick={back}>
           <ChevronLeft size={20} />
         </button>
       )}
-      {/* A whiteboard shows its own name, which can be edited there. */}
-      <span className="phone-title">{root || tab.target.kind === "board" ? "" : label(tab)}</span>
+      {/* A whiteboard and a topic show their own names, on the page. */}
+      <span className="phone-title">{root || inTopic || tab.target.kind === "board" ? "" : label(tab)}</span>
       {root && (
         <button className="icon-button" aria-label={t("settings.title")} title={t("settings.title")} onClick={() => setDialog({ kind: "settings" })}>
           <Settings size={18} />
@@ -107,7 +117,16 @@ export function PhoneNav() {
       )}
       <nav className="phone-nav" aria-label={t("phone.nav")}>
         {items.map((it) => (
-          <button key={it.kind} className="phone-nav-item" aria-current={current === it.kind ? "page" : undefined} onClick={() => open({ kind: it.kind } as TabTarget)}>
+          <button
+            key={it.kind}
+            className="phone-nav-item"
+            aria-current={current === it.kind ? "page" : undefined}
+            onClick={() => {
+              // The card library means its home, not the topic last shown.
+              if (it.kind === "library") useShell.getState().setLibraryTopic(null);
+              open({ kind: it.kind } as TabTarget);
+            }}
+          >
             {it.icon}
             <span>{it.label}</span>
           </button>

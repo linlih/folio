@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import { addCardTopic, readCardTopics, removeCardTopic } from "../docs/card";
 import type { DocHandle } from "../docs/hub";
 import { newTopic, topicPath, useTopics } from "../docs/topics";
+import { isTouch } from "../shell/phone";
 import { toSide, useShell } from "../shell/tabs";
 
 /** The card's topics under its title (§4.7): open one, take the card out,
@@ -88,7 +89,8 @@ export function TopicPicker({ taken, onPick, className, title, children }: { tak
         <Popover.Positioner side="bottom" align="start" sideOffset={4}>
           <Popover.Popup className="popup topic-picker">
             <input
-              autoFocus
+              // A phone's keyboard would cover the list; it comes up on a tap.
+              autoFocus={!isTouch()}
               value={query}
               placeholder={t("topics.search")}
               onChange={(e) => {
