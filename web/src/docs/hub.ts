@@ -1,6 +1,7 @@
 import { LoroDoc, UndoManager } from "loro-crdt";
 import type { Backend } from "../platform/backend";
 import { initCard, META_ORIGIN } from "./card";
+import { afterComposition, trackComposition } from "./composition";
 import { isJournalId } from "./ids";
 import { Persistence } from "./persistence";
 import { WORKSPACE_ID } from "./workspace";
@@ -41,7 +42,9 @@ export class DocHub {
      *  moment after their view unmounts and must not find the undo history
      *  freed, and a tab moved to the other pane keeps its history. */
     private readonly closeDelayMs = 0,
-  ) {}
+  ) {
+    trackComposition();
+  }
 
   open(id: string): Promise<DocHandle> {
     let entry = this.entries.get(id);
@@ -84,13 +87,15 @@ export class DocHub {
   }
 
   /** Another device changed these documents (sync): open replicas take
-   *  the host's copy; editors bound to them update as for any import. */
+   *  the host's copy; editors bound to them update as for any import, once
+   *  no input method is composing. */
   async refresh(ids: string[]): Promise<void> {
     await Promise.all(
       ids.map(async (id) => {
         const entry = this.entries.get(id);
         if (!entry) return;
         const handle = await entry.handle.catch(() => null);
+        await afterComposition();
         const snapshot = handle && (await this.backend.docSnapshot(id));
         if (handle && snapshot && this.entries.get(id) === entry) handle.persistence.mergeHost(snapshot);
       }),

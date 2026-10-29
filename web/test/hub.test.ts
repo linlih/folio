@@ -62,4 +62,28 @@ describe("DocHub", () => {
     expect(open.persistence.dirty).toBe(false);
     await hub.release(id);
   });
+
+  it("holds another device's change while an input method composes", async () => {
+    const backend = memoryBackend();
+    const id = await backend.createCard("t");
+    const hub = new DocHub(backend, MEMORY_FRONTEND_PEER);
+    const open = await hub.open(id);
+    const other = new LoroDoc();
+    other.setPeerId(77n);
+    other.import((await backend.docSnapshot(id))!);
+    const before = other.oplogVersion();
+    other.getMap("synced").set("from", "elsewhere");
+    other.commit();
+    await backend.applyUpdate(id, "card", other.export({ mode: "update", from: before }));
+    document.dispatchEvent(new CompositionEvent("compositionstart"));
+    let done = false;
+    const refreshed = hub.refresh([id]).then(() => (done = true));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(done).toBe(false);
+    expect(open.doc.getMap("synced").get("from")).toBeUndefined();
+    document.dispatchEvent(new CompositionEvent("compositionend", { data: "中文" }));
+    await refreshed;
+    expect(open.doc.getMap("synced").get("from")).toBe("elsewhere");
+    await hub.release(id);
+  });
 });
