@@ -1,4 +1,4 @@
-import { Brush, Layers, LayoutGrid, List, Plus, Search, Trash2, X, LibraryBig } from "lucide-react";
+import { Brush, FolderInput, Layers, LayoutGrid, List, Plus, Search, Trash2, X, LibraryBig } from "lucide-react";
 import { isTouch } from "../shell/phone";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -10,7 +10,8 @@ import { applyQuery, DEFAULT_QUERY, isEmptyCard, type EditedWithin, type Library
 import "./library.css";
 import { EmptyState } from "../shell/EmptyState";
 import { TopicPicker } from "../card/TopicRow";
-import { setCardsTopic, useTopics } from "../docs/topics";
+import { moveCards, setCardsTopic, useTopics } from "../docs/topics";
+import { subTopics } from "../docs/workspace";
 import { CARDS_MIME } from "../card/drag";
 import { TopicGrid, TopicHeader } from "./TopicGrid";
 import { keyLabel } from "../shell/shortcuts";
@@ -32,6 +33,13 @@ export function CardLibrary({ active = true }: { active?: boolean }) {
   const topicExists = useTopics((s) => !topic || s.topics.some((x) => x.id === topic));
   /** Which cards are in which topics. */
   const [pairs, setPairs] = useState<[string, string][]>([]);
+  const topics = useTopics((s) => s.topics);
+  /** The sub-topics of the topic shown. */
+  const subs = useMemo(() => (topic ? subTopics(topics, topic).map((x) => x.id) : []), [topics, topic]);
+  /** Inside a topic with sub-topics: show their cards too. */
+  const [withSubs, setWithSubs] = useState(false);
+  /** Naming a new sub-topic (asked for from the topic's menu). */
+  const [addingSub, setAddingSub] = useState(false);
 
   const reload = useCallback(async () => {
     try {
@@ -49,7 +57,10 @@ export function CardLibrary({ active = true }: { active?: boolean }) {
   }, [topicExists]);
 
   // Another topic: what was selected belonged to the last view.
-  useEffect(() => setSelected(new Set()), [topic]);
+  useEffect(() => {
+    setSelected(new Set());
+    setAddingSub(false);
+  }, [topic]);
 
   // Titles and previews change in other tabs; read them again when shown.
   useEffect(() => {
@@ -92,18 +103,28 @@ export function CardLibrary({ active = true }: { active?: boolean }) {
     for (const list of out.values()) list.sort((a, b) => b.updatedAt - a.updatedAt);
     return out;
   }, [cards, pairs]);
-  const topicCount = useTopics((s) => s.topics.length);
+  // The same with each topic's sub-topics' cards, each card once: for tiles.
+  const deepByTopic = useMemo(() => {
+    const out = new Map<string, CardRow[]>();
+    for (const x of topics) {
+      const seen = new Map<string, CardRow>();
+      for (const id of [x.id, ...subTopics(topics, x.id).map((s) => s.id)]) for (const c of byTopic.get(id) ?? []) seen.set(c.id, c);
+      out.set(x.id, [...seen.values()].sort((a, b) => b.updatedAt - a.updatedAt));
+    }
+    return out;
+  }, [topics, byTopic]);
+  const topicCount = topics.filter((x) => !x.parent).length;
   // Home with topics shows their tiles and the cards in none; a search
   // always looks through every card.
   const searching = query.text.trim() !== "";
   const home = !topic && query.grouping === "topics" && !searching;
   const inView = useMemo(() => {
     if (!cards) return null;
-    if (topic) return byTopic.get(topic) ?? [];
+    if (topic) return (withSubs && subs.length > 0 ? deepByTopic : byTopic).get(topic) ?? [];
     if (!home) return cards;
     const filed = new Set(pairs.map(([c]) => c));
     return cards.filter((c) => !filed.has(c.id));
-  }, [cards, topic, home, byTopic, pairs]);
+  }, [cards, topic, home, byTopic, deepByTopic, withSubs, subs, pairs]);
   const shown = useMemo(() => (inView ? applyQuery(inView, query, i18n.language) : []), [inView, query, i18n.language]);
   const empties = useMemo(() => (cards ?? []).filter(isEmptyCard), [cards]);
 
@@ -199,8 +220,8 @@ export function CardLibrary({ active = true }: { active?: boolean }) {
   return (
     <div className={`page library${query.view === "grid" ? " grid-view" : ""}`}>
       <header className="page-header">
-        {topic ? <TopicHeader topicId={topic} /> : <h1>{t("library.title")}</h1>}
-        {cards && <span className="page-meta">{t("library.count", { count: topic ? (inView?.length ?? 0) : cards.length })}</span>}
+        {topic ? <TopicHeader topicId={topic} onNewSub={() => setAddingSub(true)} /> : <h1>{t("library.title")}</h1>}
+        {cards && <span className="page-meta">{t("library.count", { count: topic ? (deepByTopic.get(topic)?.length ?? 0) : cards.length })}</span>}
         <span className="library-header-actions">
           {empties.length > 0 && (
             <button className="button" title={t("library.cleanEmptyHint")} onClick={() => void moveManyToTrash(empties)}>
@@ -232,6 +253,22 @@ export function CardLibrary({ active = true }: { active?: boolean }) {
             <Layers size={14} />
             {t("topics.add")}
           </TopicPicker>
+          {topic && (
+            <TopicPicker
+              taken={[topic]}
+              title={t("topics.moveCards")}
+              onPick={(id) => {
+                const chosen = [...selected];
+                setSelected(new Set());
+                // Out of this topic, and of its sub-topics when their cards show.
+                void moveCards(chosen, withSubs ? [topic, ...subs] : [topic], id);
+              }}
+              className="button"
+            >
+              <FolderInput size={14} />
+              {t("topics.moveCards")}
+            </TopicPicker>
+          )}
           {topic && (
             <button
               className="button"
@@ -310,11 +347,23 @@ export function CardLibrary({ active = true }: { active?: boolean }) {
         </div>
       )}
 
-      {home && cards && cards.length > 0 && <TopicGrid byTopic={byTopic} when={when} />}
+      {home && cards && cards.length > 0 && <TopicGrid byTopic={deepByTopic} when={when} />}
+      {topic && !topics.find((x) => x.id === topic)?.parent && (subs.length > 0 || addingSub) && (
+        <TopicGrid parent={topic} byTopic={deepByTopic} when={when} adding={addingSub} onAdded={() => setAddingSub(false)} />
+      )}
+      {topic && subs.length > 0 && (
+        <div className="library-section topic-cards-head">
+          <h2>{withSubs ? t("topics.allCards", { count: inView?.length ?? 0 }) : t("topics.directCards", { count: inView?.length ?? 0 })}</h2>
+          <label className="topic-with-subs">
+            <input type="checkbox" checked={withSubs} onChange={(e) => setWithSubs(e.target.checked)} />
+            {t("topics.withSubs")}
+          </label>
+        </div>
+      )}
       {home && cards && cards.length > 0 && inView && (inView.length > 0 || topicCount === 0) && (
         <h2 className="library-section">{topicCount > 0 ? t("library.unfiled", { count: inView.length }) : t("library.cards")}</h2>
       )}
-      {topic && inView?.length === 0 && <EmptyState icon={<Layers size={28} strokeWidth={1.5} />} title={t("topics.noCards")} hint={t("topics.noCardsHint")} />}
+      {topic && subs.length === 0 && inView?.length === 0 && <EmptyState icon={<Layers size={28} strokeWidth={1.5} />} title={t("topics.noCards")} hint={t("topics.noCardsHint")} />}
       {!topic && cards?.length === 0 && (
         <EmptyState
           icon={<LibraryBig size={28} strokeWidth={1.5} />}

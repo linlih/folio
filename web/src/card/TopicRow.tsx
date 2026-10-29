@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { addCardTopic, readCardTopics, removeCardTopic } from "../docs/card";
 import type { DocHandle } from "../docs/hub";
-import { newTopic, topicName, useTopics } from "../docs/topics";
+import { newTopic, topicPath, useTopics } from "../docs/topics";
 import { toSide, useShell } from "../shell/tabs";
 
 /** The card's topics under its title (§4.7): open one, take the card out,
@@ -24,7 +24,7 @@ export function TopicRow({ handle }: { handle: DocHandle }) {
     [handle],
   );
   // A topic deleted elsewhere drops out of the row.
-  const shown = ids.map((id) => ({ id, name: topicName(topics, id) })).filter((x): x is { id: string; name: string } => x.name !== null);
+  const shown = ids.map((id) => ({ id, name: topicPath(topics, id) })).filter((x): x is { id: string; name: string } => x.name !== null);
 
   return (
     <div className="topic-row">
@@ -49,7 +49,7 @@ export function TopicRow({ handle }: { handle: DocHandle }) {
 
 /** Choose a topic, or make one from what was typed; `children` is the
  *  button that opens it. */
-export function TopicPicker({ taken, onPick, className, children }: { taken: string[]; onPick: (topicId: string) => void; className: string; children: ReactNode }) {
+export function TopicPicker({ taken, onPick, className, title, children }: { taken: string[]; onPick: (topicId: string) => void; className: string; title?: string; children: ReactNode }) {
   const { t } = useTranslation();
   const topics = useTopics((s) => s.topics);
   const counts = useTopics((s) => s.counts);
@@ -65,10 +65,11 @@ export function TopicPicker({ taken, onPick, className, children }: { taken: str
 
   const options = useMemo(() => {
     const q = query.trim().toLowerCase();
+    // Sub-topics show with their parent ("AI › Course A") and are found by it.
     const found = topics
-      .filter((topic) => !taken.includes(topic.id) && (!q || topic.name.toLowerCase().includes(q)))
-      .slice(0, 8)
-      .map((topic) => ({ id: topic.id, name: topic.name, count: counts[topic.id] ?? 0 }));
+      .map((topic) => ({ id: topic.id, name: topicPath(topics, topic.id) ?? topic.name, count: counts[topic.id] ?? 0 }))
+      .filter((o) => !taken.includes(o.id) && (!q || o.name.toLowerCase().includes(q)))
+      .slice(0, 8);
     const exact = topics.some((topic) => topic.name.toLowerCase() === q);
     return q && !exact ? [...found, { id: null, name: query.trim(), count: 0 }] : found;
   }, [topics, counts, query, taken]);
@@ -80,7 +81,7 @@ export function TopicPicker({ taken, onPick, className, children }: { taken: str
 
   return (
     <Popover.Root open={open} onOpenChange={setOpen}>
-      <Popover.Trigger className={className} title={t("topics.add")}>
+      <Popover.Trigger className={className} title={title ?? t("topics.add")}>
         {children}
       </Popover.Trigger>
       <Popover.Portal>

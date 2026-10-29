@@ -5,7 +5,7 @@ import { docs } from "../app";
 import { Backlinks } from "../card/Backlinks";
 import { openAt } from "../card/reveal";
 import { bodyFacts, readCardTopics, readMeta, type BodyFacts } from "../docs/card";
-import { topicName, useTopics } from "../docs/topics";
+import { topicPath, useTopics } from "../docs/topics";
 import { keyLabel, PANEL_COMBO, togglePanel } from "./shortcuts";
 import { focusedPane, useShell } from "./tabs";
 import "./panel.css";
@@ -81,7 +81,7 @@ function CardDetails({ cardId }: { cardId: string }) {
   const facts = useFacts(cardId);
   const allTopics = useTopics((s) => s.topics);
   if (!facts) return null;
-  const topics = facts.topics.map((id) => ({ id, name: topicName(allTopics, id) })).filter((x) => x.name !== null);
+  const topics = facts.topics.map((id) => ({ id, name: topicPath(allTopics, id) })).filter((x) => x.name !== null);
   const top = Math.min(...facts.headings.map((h) => h.level));
   const date = (ms: number) => new Intl.DateTimeFormat(i18n.language, { dateStyle: "medium", timeStyle: "short" }).format(ms);
   return (

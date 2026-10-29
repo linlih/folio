@@ -1,5 +1,5 @@
 import { Menu } from "@base-ui/react/menu";
-import { CalendarDays, FileText, Layers, LayoutDashboard, Plus, Hash, LibraryBig, MoreHorizontal, PanelLeftClose, PanelLeftOpen, Search, SquarePen, Trash2 } from "lucide-react";
+import { CalendarDays, ChevronRight, FileText, Layers, LayoutDashboard, Plus, Hash, LibraryBig, MoreHorizontal, PanelLeftClose, PanelLeftOpen, Search, SquarePen, Trash2 } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import type { TagInfo } from "../bindings/commands";
 import { CARDS_CHANGED, moveToTrash } from "../card/actions";
@@ -95,6 +95,8 @@ export function Sidebar() {
   const topics = useTopics((s) => s.topics);
   const counts = useTopics((s) => s.counts);
   const [naming, setNaming] = useState(false);
+  /** Topics whose sub-topics are folded away. */
+  const [folded, setFolded] = useState<Set<string>>(() => new Set());
   const libraryTopic = useShell((s) => s.libraryTopic);
   const boards = useBoards((s) => s.boards);
   usePinsLoader();
@@ -173,18 +175,50 @@ export function Sidebar() {
                 <Plus size={13} />
               </button>
             </h2>
-            {topics.map((topic) => (
-              <button
-                key={topic.id}
-                className="nav-item"
-                aria-current={active === "library" && libraryTopic === topic.id ? "page" : undefined}
-                onClick={(e) => useShell.getState().openTopic(topic.id, toSide(e))}
-              >
-                <Layers size={15} strokeWidth={1.75} />
-                <span>{topic.name}</span>
-                <span className="nav-count">{counts[topic.id] ?? 0}</span>
-              </button>
-            ))}
+            {/* Two levels: a topic with sub-topics folds them away. */}
+            {topics
+              .filter((topic) => !topic.parent)
+              .map((topic) => {
+                const subs = topics.filter((x) => x.parent === topic.id);
+                const item = (x: typeof topic, sub: boolean, fold?: React.ReactNode) => (
+                  <button
+                    key={x.id}
+                    className={`nav-item${sub ? " nav-sub" : ""}`}
+                    aria-current={active === "library" && libraryTopic === x.id ? "page" : undefined}
+                    onClick={(e) => useShell.getState().openTopic(x.id, toSide(e))}
+                  >
+                    {fold ? <span className="nav-icon-slot" /> : <Layers size={15} strokeWidth={1.75} />}
+                    <span>{x.name}</span>
+                    <span className="nav-count">{counts[x.id] ?? 0}</span>
+                  </button>
+                );
+                if (subs.length === 0) return item(topic, false);
+                const open = !folded.has(topic.id);
+                const label = t(open ? "topics.foldSubs" : "topics.unfoldSubs", { name: topic.name });
+                return (
+                  <div key={topic.id}>
+                    <div className="nav-row">
+                      {item(topic, false, true)}
+                      <button
+                        className="icon-button nav-fold"
+                        aria-expanded={open}
+                        aria-label={label}
+                        title={label}
+                        onClick={() =>
+                          setFolded((f) => {
+                            const next = new Set(f);
+                            if (!next.delete(topic.id)) next.add(topic.id);
+                            return next;
+                          })
+                        }
+                      >
+                        <ChevronRight size={14} strokeWidth={2} />
+                      </button>
+                    </div>
+                    {open && subs.map((x) => item(x, true))}
+                  </div>
+                );
+              })}
             {naming && (
               <input
                 className="nav-new-topic"

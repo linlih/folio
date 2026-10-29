@@ -83,6 +83,14 @@ body.phone-typing:has(.keyboard-bar) .shell { padding-bottom: 44px; }
   /* Card library: the header wraps instead of squeezing its words; the
      search takes a line, the filters the next. */
   :root .library .page-header { flex-wrap: wrap; row-gap: 8px; }
+  /* Sub-topics are rows to go into, not previews; a question about the
+     topic puts its text above its choices. */
+  :root .topic-grid-section.sub .topic-grid { gap: 8px; }
+  :root .topic-grid-section.sub .topic-tile-open { min-height: 0; }
+  :root .topic-grid-section.sub .topic-tile-cards, :root .topic-grid-section.sub .library-tile-date { display: none; }
+  :root .topic-confirm.choose { flex-wrap: wrap; }
+  :root .topic-confirm.choose p { flex-basis: 100%; }
+  :root .topic-confirm.choose select { flex: 1; min-width: 0; max-width: none; }
   :root .library .page-header h1 { font-size: 28px; }
   :root .library-header-actions { flex-wrap: wrap; justify-content: flex-end; }
   :root .library-header-actions .button { white-space: nowrap; }
