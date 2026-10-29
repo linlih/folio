@@ -1,10 +1,13 @@
 //! The read-only tools (design/ARCHITECTURE.md §0.3): search, read a card
-//! or journal day as Markdown, backlinks, recent cards. Answers are text
+//! or journal day as Markdown, backlinks, recent cards, topics. Answers are text
 //! for the model to read; ids are included so it can follow up.
 
+use std::collections::HashSet;
+
+use folio_core::workspace::{topics, Topic};
 use folio_core::DocId;
 use folio_io::{body_markdown, Links};
-use folio_store::Store;
+use folio_store::{Store, StoreError};
 use serde_json::{json, Value};
 
 pub fn list() -> Value {
@@ -91,6 +94,28 @@ pub fn list() -> Value {
                 "properties": { "limit": { "type": "integer", "minimum": 1, "maximum": 200, "default": 20 } }
             },
             "annotations": { "readOnlyHint": true }
+        },
+        {
+            "name": "list_topics",
+            "title": "Topics",
+            "description": "The topics cards are filed under, with their sub-topics (two levels) and how many cards each has (a topic's count includes its sub-topics', each card once).",
+            "inputSchema": { "type": "object", "properties": {} },
+            "annotations": { "readOnlyHint": true }
+        },
+        {
+            "name": "topic_cards",
+            "title": "Cards in a topic",
+            "description": "The cards filed under a topic, newest edit first, with ids. By default a topic's sub-topics' cards are included and marked with the sub-topic they are in.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "topic": { "type": "string", "description": "Topic id, name, or path as “Parent › Name”." },
+                    "include_subtopics": { "type": "boolean", "default": true },
+                    "limit": { "type": "integer", "minimum": 1, "maximum": 500, "default": 100 }
+                },
+                "required": ["topic"]
+            },
+            "annotations": { "readOnlyHint": true }
         }
     ])
 }
@@ -124,6 +149,44 @@ fn card_markdown(store: &mut Store, id: &DocId) -> Result<Option<String>, String
     let block_text = |bid: &str| store.block_texts(&[bid.to_owned()]).ok().and_then(|b| b.into_iter().next()).map(|b| b.text);
     let body = body_markdown(&doc, &Links { card_title: &card_title, block_text: &block_text, file: &|_, _| None });
     Ok(Some(format!("# {}\n\nid: {}\n\n{}", title_or(&row.title, &row.id), row.id, if body.is_empty() { "(empty)\n".into() } else { body })))
+}
+
+/// The library's topics; none before the first one is made.
+fn library_topics(store: &mut Store) -> Result<Vec<Topic>, String> {
+    match store.doc_copy(&DocId::workspace()) {
+        Ok(doc) => Ok(topics(&doc)),
+        Err(StoreError::NotFound(_)) => Ok(Vec::new()),
+        Err(e) => Err(e.to_string()),
+    }
+}
+
+/// "Parent › Name" for a sub-topic, the name for one at the top.
+fn topic_path(all: &[Topic], t: &Topic) -> String {
+    match t.parent.as_ref().and_then(|p| all.iter().find(|x| &x.id == p)) {
+        Some(p) => format!("{} › {}", p.name, t.name),
+        None => t.name.clone(),
+    }
+}
+
+/// A topic by id, path ("›", ">" or "/" between the names) or name.
+fn find_topic<'a>(all: &'a [Topic], query: &str) -> Result<&'a Topic, String> {
+    if let Some(t) = all.iter().find(|t| t.id == query) {
+        return Ok(t);
+    }
+    let norm = |s: &str| s.split(['›', '>', '/']).map(|p| p.trim().to_lowercase()).collect::<Vec<_>>().join(" › ");
+    let q = norm(query);
+    if let Some(t) = all.iter().find(|t| norm(&topic_path(all, t)) == q) {
+        return Ok(t);
+    }
+    let named: Vec<&Topic> = all.iter().filter(|t| t.name.to_lowercase() == q).collect();
+    match named.as_slice() {
+        [one] => Ok(one),
+        [] => Err(format!("No topic “{query}”. Try list_topics.")),
+        many => Err(format!(
+            "Several topics are named “{query}”: {}. Give the path or the id.",
+            many.iter().map(|t| format!("“{}” (id {})", topic_path(all, t), t.id)).collect::<Vec<_>>().join(", ")
+        )),
+    }
 }
 
 /// Runs a tool; Err is shown to the model as a tool error.
@@ -210,6 +273,55 @@ pub fn call(store: &mut Store, name: &str, args: &Value) -> Result<String, Strin
                 .map(|c| format!("- “{}” (id {}){}", title_or(&c.title, &c.id), c.id, if c.preview.is_empty() { String::new() } else { format!(": {}", c.preview) }))
                 .collect::<Vec<_>>()
                 .join("\n"))
+        }
+        "list_topics" => {
+            let all = library_topics(store)?;
+            if all.is_empty() {
+                return Ok("No topics yet.".into());
+            }
+            let pairs = store.card_topic_pairs().map_err(|e| e.to_string())?;
+            let cards_in = |ids: &[&str]| pairs.iter().filter(|(_, t)| ids.contains(&t.as_str())).map(|(c, _)| c.as_str()).collect::<HashSet<_>>().len();
+            let mut lines = Vec::new();
+            for top in all.iter().filter(|t| t.parent.is_none()) {
+                let subs: Vec<&Topic> = all.iter().filter(|t| t.parent.as_ref() == Some(&top.id)).collect();
+                let mut ids = vec![top.id.as_str()];
+                ids.extend(subs.iter().map(|t| t.id.as_str()));
+                lines.push(format!("- {} (id {}, {} cards)", top.name, top.id, cards_in(&ids)));
+                for sub in subs {
+                    lines.push(format!("  - {} (id {}, {} cards)", sub.name, sub.id, cards_in(&[sub.id.as_str()])));
+                }
+            }
+            Ok(lines.join("\n"))
+        }
+        "topic_cards" => {
+            let all = library_topics(store)?;
+            let topic = find_topic(&all, arg_str(args, "topic").ok_or("topic is required")?)?;
+            let with_subs = args.get("include_subtopics").and_then(Value::as_bool).unwrap_or(true);
+            let mut sources = vec![(topic, None)];
+            if with_subs {
+                sources.extend(all.iter().filter(|t| t.parent.as_ref() == Some(&topic.id)).map(|t| (t, Some(t.name.as_str()))));
+            }
+            let mut rows = Vec::new();
+            let mut seen = HashSet::new();
+            for (t, sub) in sources {
+                for c in store.topic_cards(&t.id).map_err(|e| e.to_string())? {
+                    if seen.insert(c.id.clone()) {
+                        rows.push((c, sub));
+                    }
+                }
+            }
+            let path = topic_path(&all, topic);
+            if rows.is_empty() {
+                return Ok(format!("No cards in “{path}”."));
+            }
+            rows.sort_by(|a, b| b.0.updated_at.cmp(&a.0.updated_at));
+            rows.truncate(arg_limit(args, 100, 500) as usize);
+            let mut out = vec![format!("Cards in “{path}”{}:", if with_subs { ", sub-topics included" } else { "" })];
+            out.extend(rows.iter().map(|(c, sub)| {
+                let place = sub.map(|s| format!(" [in {s}]")).unwrap_or_default();
+                format!("- “{}” (id {}){place}", title_or(&c.title, &c.id), c.id)
+            }));
+            Ok(out.join("\n"))
         }
         _ => Err(format!("unknown tool {name}")),
     }

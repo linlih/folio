@@ -180,14 +180,14 @@ export function Sidebar() {
               .filter((topic) => !topic.parent)
               .map((topic) => {
                 const subs = topics.filter((x) => x.parent === topic.id);
-                const item = (x: typeof topic, sub: boolean, fold?: React.ReactNode) => (
+                const item = (x: typeof topic, sub: boolean) => (
                   <button
                     key={x.id}
                     className={`nav-item${sub ? " nav-sub" : ""}`}
                     aria-current={active === "library" && libraryTopic === x.id ? "page" : undefined}
                     onClick={(e) => useShell.getState().openTopic(x.id, toSide(e))}
                   >
-                    {fold ? <span className="nav-icon-slot" /> : <Layers size={15} strokeWidth={1.75} />}
+                    <Layers size={15} strokeWidth={1.75} />
                     <span>{x.name}</span>
                     <span className="nav-count">{counts[x.id] ?? 0}</span>
                   </button>
@@ -198,7 +198,7 @@ export function Sidebar() {
                 return (
                   <div key={topic.id}>
                     <div className="nav-row">
-                      {item(topic, false, true)}
+                      {item(topic, false)}
                       <button
                         className="icon-button nav-fold"
                         aria-expanded={open}

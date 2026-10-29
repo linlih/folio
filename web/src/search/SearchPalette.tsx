@@ -1,4 +1,4 @@
-import { CalendarDays, ChevronRight, FileText, Hash, Plus, Search, TextQuote } from "lucide-react";
+import { CalendarDays, ChevronRight, FileText, Hash, Layers, Plus, Search, TextQuote } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { SearchHit, TagInfo } from "../bindings/commands";
@@ -6,6 +6,7 @@ import { openTag } from "../editor/tag";
 import { cardsChanged } from "../card/actions";
 import { cardName, openAt } from "../card/reveal";
 import { isJournalId } from "../docs/ids";
+import { topicPath, useTopics } from "../docs/topics";
 import { backend } from "../platform";
 import { findCommands, type Command } from "../shell/commands";
 import { keyLabel } from "../shell/shortcuts";
@@ -27,8 +28,9 @@ export function snippet(text: string, query: string, room = 60): { before: strin
 
 interface Row {
   key: string;
-  icon: "card" | "journal" | "block" | "new" | "tag" | "command";
+  icon: "card" | "journal" | "block" | "new" | "tag" | "command" | "topic";
   title: string;
+  topicId?: string;
   hit?: SearchHit;
   command?: Command;
 }
@@ -45,6 +47,7 @@ export function SearchPalette() {
   const [query, setQuery] = useState("");
   const [hits, setHits] = useState<SearchHit[]>([]);
   const [tags, setTags] = useState<TagInfo[]>([]);
+  const topics = useTopics((s) => s.topics);
   const [index, setIndex] = useState(0);
   const input = useRef<HTMLInputElement>(null);
   const list = useRef<HTMLUListElement>(null);
@@ -78,7 +81,16 @@ export function SearchPalette() {
     // Tags whose name has the query (with or without its #), first.
     const tq = query.trim().replace(/^#/, "").toLowerCase();
     const tagRows: Row[] = tq ? tags.filter((tag) => tag.key.includes(tq)).slice(0, 5).map((tag) => ({ key: `tag:${tag.key}`, icon: "tag", title: tag.name })) : [];
-    const out: Row[] = [...tagRows, ...hits.map((h): Row => ({
+    // Topics whose name or path ("AI › Course A") has the query, first.
+    const q0 = query.trim().toLowerCase();
+    const topicRows: Row[] = q0
+      ? topics
+          .map((x) => ({ id: x.id, path: topicPath(topics, x.id) ?? x.name }))
+          .filter((x) => x.path.toLowerCase().includes(q0))
+          .slice(0, 5)
+          .map((x) => ({ key: `topic:${x.id}`, icon: "topic", title: x.path, topicId: x.id }))
+      : [];
+    const out: Row[] = [...topicRows, ...tagRows, ...hits.map((h): Row => ({
       key: `${h.cardId}:${h.bid ?? ""}`,
       icon: h.bid ? "block" : isJournalId(h.cardId) ? "journal" : "card",
       title: cardName(h.cardId, h.cardTitle),
@@ -87,7 +99,7 @@ export function SearchPalette() {
     const q = query.trim();
     if (q && !hits.some((h) => !h.bid && h.cardTitle === q)) out.push({ key: "new", icon: "new", title: t("search.newCard", { title: q }) });
     return out;
-  }, [hits, tags, query, t, commandMode]);
+  }, [hits, tags, topics, query, t, commandMode]);
 
   const close = () => setSearchOpen(false);
 
@@ -97,6 +109,8 @@ export function SearchPalette() {
     close();
     if (row.command) {
       void row.command.run();
+    } else if (row.topicId) {
+      useShell.getState().openTopic(row.topicId, side);
     } else if (row.icon === "tag") {
       openTag(row.title, side);
     } else if (row.icon === "new") {
@@ -111,9 +125,9 @@ export function SearchPalette() {
   }, [index]);
 
   if (!searchOpen) return null;
-  const icons = { card: FileText, journal: CalendarDays, block: TextQuote, new: Plus, tag: Hash, command: ChevronRight };
+  const icons = { card: FileText, journal: CalendarDays, block: TextQuote, new: Plus, tag: Hash, command: ChevronRight, topic: Layers };
   const sectionOf = (row: Row | undefined) =>
-    !row ? null : row.icon === "block" ? "blocks" : row.icon === "tag" ? "tags" : row.icon === "command" ? "commands" : row.icon === "new" ? null : "cards";
+    !row ? null : row.icon === "block" ? "blocks" : row.icon === "tag" ? "tags" : row.icon === "topic" ? "topics" : row.icon === "command" ? "commands" : row.icon === "new" ? null : "cards";
   return (
     <div className="search-backdrop" onMouseDown={(e) => e.target === e.currentTarget && close()}>
       <div className="search-panel" role="dialog" aria-label={t("nav.search")}>

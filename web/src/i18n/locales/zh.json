@@ -233,7 +233,8 @@
     "inCard": "来自「{{title}}」",
     "tags": "标签",
     "commands": "命令",
-    "commandHint": "输入文字搜索卡片和内容；先输入 > 可以执行命令。"
+    "commandHint": "输入文字搜索卡片和内容；先输入 > 可以执行命令。",
+    "topics": "主题"
   },
   "refs": {
     "copied": "已复制块引用，粘贴到任意位置即可引用这个块",
@@ -528,8 +529,6 @@
     "rename": "重命名",
     "removeSelected": "移出此主题",
     "subTopics": "子主题",
-    "subCount_one": "{{count}} 个子主题",
-    "subCount_other": "{{count}} 个子主题",
     "newSub": "新建子主题",
     "subNamePlaceholder": "子主题名称，回车创建",
     "moveTopic": "移动到…",
@@ -543,12 +542,14 @@
     "deleteSubs_one": "它的子主题会移到顶层。",
     "deleteSubs_other": "它的 {{count}} 个子主题会移到顶层。",
     "moveCards": "移动到…",
-    "directCards": "直接放在这里的卡片 · {{count}}",
-    "allCards": "全部卡片（含子主题）· {{count}}",
-    "withSubs": "包括子主题里的卡片",
     "foldSubs": "收起「{{name}}」的子主题",
     "unfoldSubs": "展开「{{name}}」的子主题",
-    "tileEmpty": "还没有卡片，把卡片拖到这里"
+    "tileEmpty": "还没有卡片，把卡片拖到这里",
+    "scope": "显示哪些卡片",
+    "scopeHere": "本主题",
+    "scopeAll": "含子主题",
+    "noDirectCards": "卡片都在子主题里。新建的卡片会放在本主题。",
+    "sep": "、"
   },
   "code": {
     "language": "代码语言",

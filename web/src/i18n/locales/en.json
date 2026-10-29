@@ -233,7 +233,8 @@
     "inCard": "in “{{title}}”",
     "tags": "Tags",
     "commands": "Commands",
-    "commandHint": "Type to search cards and text; start with > to run a command."
+    "commandHint": "Type to search cards and text; start with > to run a command.",
+    "topics": "Topics"
   },
   "refs": {
     "copied": "Block reference copied; paste it anywhere to reference this block",
@@ -528,8 +529,6 @@
     "rename": "Rename",
     "removeSelected": "Remove from topic",
     "subTopics": "Sub-topics",
-    "subCount_one": "{{count}} sub-topic",
-    "subCount_other": "{{count}} sub-topics",
     "newSub": "New sub-topic",
     "subNamePlaceholder": "Sub-topic name, Enter to create",
     "moveTopic": "Move to…",
@@ -543,12 +542,14 @@
     "deleteSubs_one": "Its sub-topic moves to the top level.",
     "deleteSubs_other": "Its {{count}} sub-topics move to the top level.",
     "moveCards": "Move to…",
-    "directCards": "Cards directly here · {{count}}",
-    "allCards": "All cards, sub-topics included · {{count}}",
-    "withSubs": "Include sub-topics' cards",
     "foldSubs": "Fold the sub-topics of “{{name}}”",
     "unfoldSubs": "Show the sub-topics of “{{name}}”",
-    "tileEmpty": "No cards yet; drop cards here"
+    "tileEmpty": "No cards yet; drop cards here",
+    "scope": "Which cards to show",
+    "scopeHere": "This topic",
+    "scopeAll": "With sub-topics",
+    "noDirectCards": "All cards are in sub-topics. New cards go in this topic.",
+    "sep": ", "
   },
   "code": {
     "language": "Code language",

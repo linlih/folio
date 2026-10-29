@@ -6,6 +6,7 @@ pub mod body;
 pub mod card;
 pub mod ids;
 pub mod index;
+pub mod workspace;
 
 pub use card::{CardKind, CardSummary, EditorMode};
 pub use ids::{DocId, DocKind, IdError};

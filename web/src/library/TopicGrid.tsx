@@ -13,28 +13,15 @@ import { CARDS_MIME } from "../card/drag";
  *  a sub-topic. */
 const TOPIC_MIME = "application/x-folio-topic";
 
-/** Topic tiles (§4.7): on the library's home the top-level topics, inside
- *  a topic its sub-topics. Each shows its newest cards (its sub-topics'
- *  included); a click goes in, cards dropped on a tile join the topic, and
- *  on a computer a tile dropped on a top-level one becomes its sub-topic. */
-export function TopicGrid({
-  parent = null,
-  byTopic,
-  when,
-  adding = false,
-  onAdded,
-}: {
-  parent?: string | null;
-  byTopic: Map<string, CardRow[]>;
-  when: (ms: number | null) => string;
-  /** Naming a new one, asked for from elsewhere (the topic's menu). */
-  adding?: boolean;
-  onAdded?: () => void;
-}) {
+/** The library's home (§4.7): a tile per top-level topic with its
+ *  sub-topics' names and its newest cards (theirs included); a click goes
+ *  in, cards dropped on a tile join the topic, and on a computer a tile
+ *  dropped on another becomes its sub-topic. */
+export function TopicGrid({ byTopic, when }: { byTopic: Map<string, CardRow[]>; when: (ms: number | null) => string }) {
   const { t } = useTranslation();
   const all = useTopics((s) => s.topics);
   const counts = useTopics((s) => s.counts);
-  const topics = all.filter((x) => x.parent === parent);
+  const topics = all.filter((x) => !x.parent);
   const select = useShell((s) => s.setLibraryTopic);
   const [naming, setNaming] = useState(false);
   const [over, setOver] = useState<string | null>(null);
@@ -59,17 +46,17 @@ export function TopicGrid({
   };
 
   return (
-    <section className={`topic-grid-section${parent ? " sub" : ""}`}>
-      <h2 className="library-section">{parent ? t("topics.subTopics") : t("nav.topics")}</h2>
+    <section className="topic-grid-section">
+      <h2 className="library-section">{t("nav.topics")}</h2>
       <ul className="topic-grid">
         {topics.map((topic) => {
           const cards = byTopic.get(topic.id) ?? [];
-          const subs = subTopics(all, topic.id).length;
+          const subs = subTopics(all, topic.id);
           return (
             <li
               key={topic.id}
               className={`topic-tile${over === topic.id ? " drop" : ""}`}
-              draggable={!parent && subs === 0}
+              draggable={subs.length === 0}
               onDragStart={(e) => {
                 dragging.current = topic.id;
                 e.dataTransfer.setData(TOPIC_MIME, topic.id);
@@ -92,7 +79,11 @@ export function TopicGrid({
                   <span className="topic-tile-name">{topic.name}</span>
                   <span className="topic-tile-count">{counts[topic.id] ?? 0}</span>
                 </span>
-                {subs > 0 && <span className="topic-tile-subs">{t("topics.subCount", { count: subs })}</span>}
+                {subs.length > 0 && (
+                  <span className="topic-tile-subs" title={t("topics.subTopics")}>
+                    {subs.map((x) => x.name).join(t("topics.sep"))}
+                  </span>
+                )}
                 <span className="topic-tile-cards">
                   {cards.length === 0 ? (
                     <span className="topic-tile-empty">{t("topics.tileEmpty")}</span>
@@ -106,24 +97,80 @@ export function TopicGrid({
           );
         })}
         <li className="topic-tile new">
-          {naming || adding ? (
+          {naming ? (
             <NameInput
-              placeholder={parent ? t("topics.subNamePlaceholder") : t("topics.namePlaceholder")}
+              placeholder={t("topics.namePlaceholder")}
               onDone={async (v) => {
                 setNaming(false);
-                onAdded?.();
-                if (v.trim()) await newTopic(v, parent);
+                if (v.trim()) await newTopic(v);
               }}
             />
           ) : (
             <button className="topic-tile-open" onClick={() => setNaming(true)}>
               <Plus size={16} />
-              {parent ? t("topics.newSub") : t("topics.new")}
+              {t("topics.new")}
             </button>
           )}
         </li>
       </ul>
     </section>
+  );
+}
+
+/** Inside a topic: its sub-topics in one quiet row, each with its count, to
+ *  go into or drop cards on; at its end a small button names a new one. */
+export function SubTopicStrip({ parent, adding, onAdded }: { parent: string; adding: boolean; onAdded: () => void }) {
+  const { t } = useTranslation();
+  const all = useTopics((s) => s.topics);
+  const counts = useTopics((s) => s.counts);
+  const select = useShell((s) => s.setLibraryTopic);
+  const [naming, setNaming] = useState(false);
+  const [over, setOver] = useState<string | null>(null);
+  const subs = subTopics(all, parent);
+  return (
+    <nav className="subtopics" aria-label={t("topics.subTopics")}>
+      {subs.map((x) => (
+        <button
+          key={x.id}
+          className={`subtopic${over === x.id ? " drop" : ""}`}
+          onClick={() => select(x.id)}
+          onDragOver={(e) => {
+            if (!e.dataTransfer.types.includes(CARDS_MIME)) return;
+            e.preventDefault();
+            e.dataTransfer.dropEffect = "link";
+            setOver(x.id);
+          }}
+          onDragLeave={() => setOver((o) => (o === x.id ? null : o))}
+          onDrop={(e) => {
+            e.preventDefault();
+            setOver(null);
+            const ids = JSON.parse(e.dataTransfer.getData(CARDS_MIME) || "[]") as string[];
+            if (ids.length) void setCardsTopic(ids, x.id, true);
+          }}
+        >
+          <Layers size={14} strokeWidth={1.75} />
+          <span className="subtopic-name">{x.name}</span>
+          <span className="subtopic-count">{counts[x.id] ?? 0}</span>
+        </button>
+      ))}
+      {naming || adding ? (
+        <span className="subtopic new">
+          <NameInput
+            placeholder={t("topics.subNamePlaceholder")}
+            onDone={async (v) => {
+              setNaming(false);
+              onAdded();
+              if (v.trim()) await newTopic(v, parent);
+            }}
+          />
+        </span>
+      ) : (
+        <button className="subtopic new" onClick={() => setNaming(true)}>
+          <Plus size={14} />
+          {t("topics.newSub")}
+        </button>
+      )}
+    </nav>
   );
 }
 

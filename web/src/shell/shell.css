@@ -60,10 +60,13 @@
 .nav-row > .nav-item { padding-right: 28px; }
 .nav-row-menu { position: absolute; top: 50%; right: 3px; width: 24px; height: 24px; transform: translateY(-50%); opacity: 0; }
 .nav-row:hover .nav-row-menu, .nav-row-menu[data-popup-open], .nav-row-menu:focus-visible { opacity: 1; }
-/* Sub-topics sit under their topic, their icons under its name. */
+/* Sub-topics sit under their topic, their icons under its name. A topic
+   with sub-topics shows its fold arrow in place of its icon on hover, and
+   while folded (so the hidden ones are not forgotten). */
 .nav-item.nav-sub { padding-left: 31px; }
-.nav-icon-slot { flex: none; width: 15px; }
-.nav-fold { position: absolute; top: 50%; left: 4px; width: 22px; height: 22px; transform: translateY(-50%); color: var(--muted); }
+.nav-fold { position: absolute; top: 50%; left: 4px; width: 22px; height: 22px; transform: translateY(-50%); color: var(--muted); opacity: 0; }
+.nav-row:hover .nav-fold, .nav-fold:focus-visible, .nav-fold[aria-expanded="false"] { opacity: 1; }
+.nav-row:hover > .nav-item > svg, .nav-row:has(.nav-fold:focus-visible, .nav-fold[aria-expanded="false"]) > .nav-item > svg { opacity: 0; }
 .nav-fold svg { transition: transform 0.12s; }
 .nav-fold[aria-expanded="true"] svg { transform: rotate(90deg); }
 .nav-footer-row { display: flex; align-items: center; gap: 2px; }

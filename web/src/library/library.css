@@ -134,11 +134,39 @@
 
 /* Topics in the library (library/TopicGrid.tsx, §4.7). */
 .library-section { margin: 4px 0 10px; font: 600 13px var(--font-ui); color: var(--secondary); }
-/* Inside a topic with sub-topics: its own cards, or all of them. */
-.topic-cards-head { display: flex; align-items: center; gap: 12px; }
-.topic-cards-head h2 { margin: 0; font: inherit; }
-.topic-with-subs { display: flex; align-items: center; gap: 5px; margin-left: auto; font-weight: 400; color: var(--muted); cursor: pointer; }
-.topic-tile-subs { font-size: 12px; color: var(--muted); }
+/* Inside a topic: its sub-topics as one quiet row of folders, then which
+   cards show (this topic's own, or with its sub-topics'). */
+.subtopics { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 18px; }
+.subtopic {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  height: 32px;
+  padding: 0 11px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--secondary);
+  font-size: 13px;
+  transition: border-color 0.12s, box-shadow 0.12s;
+}
+.subtopic:hover { border-color: color-mix(in srgb, var(--ink) 20%, var(--paper)); color: var(--text); }
+.subtopic.drop { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent); }
+.subtopic svg { flex: none; color: var(--muted); }
+.subtopic-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
+.subtopic-count { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.subtopic.new { border-style: dashed; background: none; color: var(--muted); }
+.subtopic.new:hover { color: var(--text); }
+.subtopic.new .topic-name-input { width: 160px; margin: 0; border: none; padding: 0; background: none; }
+.topic-scope { display: inline-flex; margin: 0 0 14px; }
+.topic-scope-count { margin-left: 6px; color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.topic-here-empty { margin: 4px 0 0; }
+.topic-tile-subs { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--muted); }
+/* Which sub-topic a card is in, while their cards show. */
+.library-tile-foot { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.library-tile-topic { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11.5px; color: var(--muted); }
+.library-tile-foot .library-tile-topic::before { content: "· "; }
 .topic-confirm.choose select { max-width: 40%; }
 /* Asking about the topic (delete, move, merge): a row under its name. */
 .library .page-header:has(> .topic-confirm) { flex-wrap: wrap; }

@@ -13,7 +13,7 @@ import { TopicPicker } from "../card/TopicRow";
 import { moveCards, setCardsTopic, useTopics } from "../docs/topics";
 import { subTopics } from "../docs/workspace";
 import { CARDS_MIME } from "../card/drag";
-import { TopicGrid, TopicHeader } from "./TopicGrid";
+import { SubTopicStrip, TopicGrid, TopicHeader } from "./TopicGrid";
 import { keyLabel } from "../shell/shortcuts";
 
 /** Sort and filter choices are remembered on this device. */
@@ -114,6 +114,14 @@ export function CardLibrary({ active = true }: { active?: boolean }) {
     return out;
   }, [topics, byTopic]);
   const topicCount = topics.filter((x) => !x.parent).length;
+  /** With sub-topics' cards showing: the sub-topics each card is in. */
+  const subOf = useMemo(() => {
+    const out = new Map<string, string[]>();
+    if (!withSubs) return out;
+    const names = new Map(topics.filter((x) => subs.includes(x.id)).map((x) => [x.id, x.name]));
+    for (const [card, x] of pairs) if (names.has(x)) out.set(card, [...(out.get(card) ?? []), names.get(x)!]);
+    return out;
+  }, [withSubs, topics, subs, pairs]);
   // Home with topics shows their tiles and the cards in none; a search
   // always looks through every card.
   const searching = query.text.trim() !== "";
@@ -349,17 +357,19 @@ export function CardLibrary({ active = true }: { active?: boolean }) {
 
       {home && cards && cards.length > 0 && <TopicGrid byTopic={deepByTopic} when={when} />}
       {topic && !topics.find((x) => x.id === topic)?.parent && (subs.length > 0 || addingSub) && (
-        <TopicGrid parent={topic} byTopic={deepByTopic} when={when} adding={addingSub} onAdded={() => setAddingSub(false)} />
+        <SubTopicStrip parent={topic} adding={addingSub} onAdded={() => setAddingSub(false)} />
       )}
       {topic && subs.length > 0 && (
-        <div className="library-section topic-cards-head">
-          <h2>{withSubs ? t("topics.allCards", { count: inView?.length ?? 0 }) : t("topics.directCards", { count: inView?.length ?? 0 })}</h2>
-          <label className="topic-with-subs">
-            <input type="checkbox" checked={withSubs} onChange={(e) => setWithSubs(e.target.checked)} />
-            {t("topics.withSubs")}
-          </label>
-        </div>
+        <span className="segmented topic-scope" role="radiogroup" aria-label={t("topics.scope")}>
+          {[false, true].map((all) => (
+            <button key={String(all)} role="radio" aria-checked={withSubs === all} className={withSubs === all ? "on" : undefined} onClick={() => setWithSubs(all)}>
+              {all ? t("topics.scopeAll") : t("topics.scopeHere")}
+              <span className="topic-scope-count">{(all ? deepByTopic : byTopic).get(topic)?.length ?? 0}</span>
+            </button>
+          ))}
+        </span>
       )}
+      {topic && subs.length > 0 && !withSubs && inView?.length === 0 && <p className="empty topic-here-empty">{t("topics.noDirectCards")}</p>}
       {home && cards && cards.length > 0 && inView && (inView.length > 0 || topicCount === 0) && (
         <h2 className="library-section">{topicCount > 0 ? t("library.unfiled", { count: inView.length }) : t("library.cards")}</h2>
       )}
@@ -379,9 +389,12 @@ export function CardLibrary({ active = true }: { active?: boolean }) {
               <button className="library-tile-open" onClick={(e) => clickCard(c, e)}>
                 <span className={`library-title${c.title ? "" : " untitled"}`}>{c.title || t("library.untitled")}</span>
                 <span className="library-tile-text">{c.preview || t("library.noText")}</span>
-                <time className="library-tile-date" title={t("library.sortBy.updated")}>
-                  {when(c.updatedAt)}
-                </time>
+                <span className="library-tile-foot">
+                  <time className="library-tile-date" title={t("library.sortBy.updated")}>
+                    {when(c.updatedAt)}
+                  </time>
+                  {subOf.has(c.id) && <span className="library-tile-topic">{subOf.get(c.id)!.join(t("topics.sep"))}</span>}
+                </span>
               </button>
               <input
                 type="checkbox"
@@ -410,6 +423,7 @@ export function CardLibrary({ active = true }: { active?: boolean }) {
               <button className="library-open" onClick={(e) => clickCard(c, e)}>
                 <span className={`library-title${c.title ? "" : " untitled"}`}>{c.title || t("library.untitled")}</span>
                 {c.preview && <span className="library-preview">{c.preview}</span>}
+                {subOf.has(c.id) && <span className="library-tile-topic">{subOf.get(c.id)!.join(t("topics.sep"))}</span>}
               </button>
               <span className="library-dates">
                 <time title={t("library.sortBy.updated")}>{when(c.updatedAt)}</time>

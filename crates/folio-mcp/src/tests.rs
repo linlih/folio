@@ -4,7 +4,7 @@ use std::sync::{Arc, Mutex};
 
 use loro::{ExportMode, LoroDoc};
 use folio_core::card::{append_paragraph, CardKind};
-use folio_core::DocKind;
+use folio_core::{DocId, DocKind};
 use folio_store::{Origin, Store};
 use serde_json::{json, Value};
 
@@ -64,7 +64,7 @@ fn an_approved_client_gets_a_session_and_reads_notes() {
     };
     let (list, _) = handle(&*host, &json!({ "jsonrpc": "2.0", "id": 3, "method": "tools/list" }), Some("s1"), &mut never);
     let Reply::Json(list) = list else { panic!() };
-    assert_eq!(list["result"]["tools"].as_array().unwrap().len(), 7);
+    assert_eq!(list["result"]["tools"].as_array().unwrap().len(), 9);
 
     let found = text(handle(&*host, &call("search", json!({ "query": "借用" })), Some("s1"), &mut never).0);
     assert!(found.contains(&id), "{found}");
@@ -129,4 +129,40 @@ fn http_needs_the_token_a_local_origin_and_a_session() {
     let note = json!({ "jsonrpc": "2.0", "method": "notifications/initialized" }).to_string();
     assert_eq!(http(port, &[auth, ("Mcp-Session-Id", &session)], &note).0, 202);
     server.stop();
+}
+
+#[test]
+fn topics_list_with_their_sub_topics_and_cards() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut store = Store::open(dir.path()).unwrap();
+    // Topics as the app writes them into the workspace document.
+    let ws = LoroDoc::new();
+    let topic = |id: &str, name: &str, at: f64, parent: Option<&str>| {
+        let m = ws.get_map("topics").insert_container(id, loro::LoroMap::new()).unwrap();
+        m.insert("name", name).unwrap();
+        m.insert("created_at", at).unwrap();
+        if let Some(p) = parent {
+            m.insert("parent", p).unwrap();
+        }
+    };
+    topic("ai", "AI学习", 1.0, None);
+    topic("a", "课程A", 2.0, Some("ai"));
+    topic("b", "课程B", 3.0, Some("ai"));
+    ws.commit();
+    store.apply_update(&DocId::workspace(), DocKind::Workspace, &ws.export(ExportMode::all_updates()).unwrap(), Origin::Local, 1).unwrap();
+    let road = store.create_card(CardKind::Note, "学习路线", 2).unwrap();
+    let lesson = store.create_card(CardKind::Note, "第1讲", 3).unwrap();
+    store.set_card_topic(&road, "ai", true, 4).unwrap();
+    store.set_card_topic(&lesson, "a", true, 4).unwrap();
+    store.set_card_topic(&lesson, "b", true, 4).unwrap();
+
+    let list = tools::call(&mut store, "list_topics", &json!({})).unwrap();
+    assert_eq!(list, "- AI学习 (id ai, 2 cards)\n  - 课程A (id a, 1 cards)\n  - 课程B (id b, 1 cards)");
+    let all = tools::call(&mut store, "topic_cards", &json!({ "topic": "AI学习" })).unwrap();
+    assert!(all.contains("“学习路线”") && all.contains("“第1讲”") && all.contains("[in 课程A]"), "{all}");
+    let here = tools::call(&mut store, "topic_cards", &json!({ "topic": "ai学习", "include_subtopics": false })).unwrap();
+    assert!(!here.contains("第1讲"), "{here}");
+    let sub = tools::call(&mut store, "topic_cards", &json!({ "topic": "AI学习 / 课程B" })).unwrap();
+    assert!(sub.starts_with("Cards in “AI学习 › 课程B”"), "{sub}");
+    assert!(tools::call(&mut store, "topic_cards", &json!({ "topic": "投资" })).is_err());
 }
