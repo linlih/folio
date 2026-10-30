@@ -285,10 +285,9 @@ fn empty_trash(app: tauri::AppHandle, state: tauri::State<AppState>) -> CmdResul
 const TRASH_DAYS: i64 = 30;
 
 /// Deletes for good the cards that have been in the trash for
-/// `TRASH_DAYS`; run hourly, after a backup.
+/// `TRASH_DAYS` (see `Store::expired_trash`); run hourly, after a backup.
 fn purge_old_trash(app: &tauri::AppHandle, state: &AppState) {
-    let cutoff = now_ms() - TRASH_DAYS * 24 * 60 * 60 * 1000;
-    let gone = lock(state).map(|mut s| s.trashed_before(cutoff).and_then(|ids| s.purge_cards(&ids, now_ms())));
+    let gone = lock(state).map(|mut s| s.expired_trash(TRASH_DAYS, now_ms()).and_then(|ids| s.purge_cards(&ids, now_ms())));
     match gone {
         Ok(Ok(gone)) if !gone.is_empty() => {
             tracing::info!(cards = gone.len(), days = TRASH_DAYS, "deleted cards long in the trash");

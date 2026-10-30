@@ -544,6 +544,26 @@ impl Store {
         ids.map(|id| DocId::parse(&id?).map_err(StoreError::from)).collect()
     }
 
+    /// Cards that have been in the trash for `days`, counted from no earlier
+    /// than when this device first looked (`trash.cleanupSince`): cards
+    /// trashed before the app deleted anything for good were trashed as
+    /// "can be restored any time", so they get the full time from then.
+    pub fn expired_trash(&mut self, days: i64, now_ms: i64) -> Result<Vec<DocId>> {
+        const SINCE: &str = "trash.cleanupSince";
+        let since = match self.local_setting(SINCE)?.and_then(|v| v.as_i64()) {
+            Some(at) => at,
+            None => {
+                self.set_local_setting(SINCE, &serde_json::json!(now_ms))?;
+                now_ms
+            }
+        };
+        let span = days * 24 * 60 * 60 * 1000;
+        if now_ms - since < span {
+            return Ok(Vec::new());
+        }
+        self.trashed_before(now_ms - span)
+    }
+
     /// Documents deleted for good since the last call (here or, through the
     /// workspace document, on another device), for the app to close them.
     pub fn take_purged(&mut self) -> Vec<DocId> {
@@ -1162,6 +1182,22 @@ mod tests {
         let mut a = Store::open(a_dir.path()).unwrap();
         assert!(a.take_purged().is_empty());
         assert!(!a.apply_remote(&gone, DocKind::Card, &edit_from_b, 40).unwrap());
+    }
+
+    #[test]
+    fn cards_trashed_before_the_cleanup_existed_get_the_full_time() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut s = Store::open(dir.path()).unwrap();
+        let day = 24 * 60 * 60 * 1000;
+        let old = s.create_card(CardKind::Note, "早就在回收站", 1).unwrap();
+        s.trash_card(&old, 1).unwrap();
+        let start = 100 * day;
+        assert!(s.expired_trash(30, start).unwrap().is_empty(), "the first look only starts the clock");
+        let new = s.create_card(CardKind::Note, "后来放进去", start).unwrap();
+        s.trash_card(&new, start + day).unwrap();
+        assert!(s.expired_trash(30, start + 29 * day).unwrap().is_empty());
+        assert_eq!(s.expired_trash(30, start + 30 * day).unwrap(), vec![old.clone()]);
+        assert_eq!(s.expired_trash(30, start + 31 * day).unwrap().len(), 2);
     }
 
     #[test]
