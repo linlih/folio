@@ -523,6 +523,7 @@ CREATE TABLE index_meta (doc_id TEXT PRIMARY KEY, indexed_vv BLOB, gen INT);
   - 实测：把校验关掉，模拟器有的种子永远不收敛（某台设备缺内容而无人补发），打开后全部收敛。
 - **附件**：按 sha256 内容寻址，分块加密后经单独的接口上传，服务器存成文件；卡片里只存哈希（存储见 4.6，同步设计见 `design/attachments.md` §5，2026-10-28 已实现，接口为 `POST blobs/have`、`PUT/GET blobs/{id}/{n}`、`POST blobs/{id}/done`、`PUT blobs/refs`）。
 - **E2EE**：工作区主密钥用用户口令（Argon2id）派生的 KEK 包裹后存服务端；新设备输入口令解开。所有 blob 用 XChaCha20-Poly1305 加密，`doc_id` 也可做 HMAC 混淆。
+- **恢复码（2026-10-31）**：设置里可生成恢复码（160 位随机，Crockford base32，8 组 × 4 字符，只显示一次）；主密钥再用它包裹一份存服务端（`workspaces.recovery_key`，`PUT/GET /v1/w/{ws}/key/recovery`），服务端看不到恢复码。忘了口令时，新设备凭同步码 + 恢复码解开主密钥并设新口令（`PUT key/passphrase` 替换口令那一份）；已在同步的设备有主密钥，不受影响，也不重新加密任何内容。已有设备也可直接更改口令。重新生成会让旧恢复码失效。纯新增：旧服务器返回 404 时提示升级服务器，旧数据不动。
 - **第一版实现（M3，2026-10）**：`crates/folio-sync`（协议、加密、服务端存储 `relay`、客户端引擎 `client`、HTTP/WebSocket 传输）+ `crates/folio-server`（axum）。与上面草图的差别：日志按**工作区**一条，`seq` 与游标都是工作区级的（一次拉取覆盖所有文档）；`doc_id` 用 HMAC 混淆成标签，文档种类和真实 id 封在密文信封里，服务端只看到“某工作区、某标签、某设备的一段密文”。接口：`PUT/GET /v1/w/{ws}/key`（包裹后的主密钥）、`POST push`、`GET pull?after=`、`GET live`（WebSocket，只通知新的 head）、`PUT device`（加密的设备名）、`GET devices`、`POST/GET acks`（加密的版本报告）；所有请求带服务器令牌（启动时的 `FOLIO_SERVER_TOKEN`）和设备 id。新设备凭“同步码”（服务器地址 + 令牌 + 工作区 id）加口令加入；口令不在同步码里。设备开启同步时把每个文档的完整历史放进 outbox 一次，之前写入的内容（迁移、恢复、导入）不会漏传。工作区主密钥暂存本机设置，之后移到系统钥匙串。附件已于 2026-10-28 加入，收敛校验、跨设备永久删除已于 2026-10-30 加入。
 - **无服务器模式（可选，后期）**：同样的协议也可以落到 WebDAV / iCloud Drive / S3：每台设备只写自己的 `ops-<device>/` 目录（单写者），其他设备读取 → 天然无冲突（tine BACKLOG 中提到的思路，在 CRDT 下变得简单）。
 
@@ -558,7 +559,7 @@ CREATE TABLE index_meta (doc_id TEXT PRIMARY KEY, indexed_vv BLOB, gen INT);
 | # | 缺口 | 做法 | 为什么重要 |
 |---|---|---|---|
 | 1 | 传输 | 官方托管只接受 HTTPS；自托管使用 http 时，在同步设置里明显提示（局域网测试除外） | 令牌与包裹后的主密钥不能明文传 |
-| 2 | **忘记口令** | 开启同步时生成**恢复码**（类似 1Password 的 Secret Key / Bitwarden 恢复码），要求用户保存并确认；口令可用恢复码重置 | 端到端加密下官方也无法找回；用户会把“进不去”当成“数据丢了”，是最大的口碑风险 |
+| 2 | **忘记口令** ✅ 2026-10-31 | 开启同步时生成**恢复码**（类似 1Password 的 Secret Key / Bitwarden 恢复码），要求用户保存并确认；口令可用恢复码重置 | 端到端加密下官方也无法找回；用户会把“进不去”当成“数据丢了”，是最大的口碑风险 |
 | 3 | 口令强度 | 设置口令时显示强度，拒绝常见弱口令；Argon2id 参数随硬件调高 | 服务器或截获者拿到包裹后的密钥可离线猜口令 |
 | 4 | 本机密钥 | 工作区主密钥存系统钥匙串（macOS/iOS Keychain、Windows DPAPI、Android Keystore），不存本机设置；本地数据库静态加密作为选项（参考 Notesnook 的 sqlite-multiple-ciphers） | 现在主密钥明文存在 `local_settings` |
 | 5 | 账号与设备 | 账号体系；每台设备单独的凭证，替代共用的服务器令牌；设备列表可单独移除；移除后轮换主密钥（重新加密，新密钥只发给留下的设备） | 丢了手机要能只撤销那一台；同步码泄露要能补救 |

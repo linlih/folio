@@ -100,6 +100,15 @@ export interface Backend {
   syncCreate(server: string, token: string, passphrase: string): Promise<SyncStatus>;
   /** Another device: joins with the sync code and passphrase. */
   syncJoin(code: string, passphrase: string): Promise<SyncStatus>;
+  /** Joins with the sync code and the recovery code when the passphrase
+   *  is forgotten; the passphrase becomes the workspace's new one. */
+  syncJoinRecovery(code: string, recovery: string, passphrase: string): Promise<SyncStatus>;
+  /** Makes a new recovery code (the old one stops working); shown once. */
+  syncRecoveryCreate(): Promise<string>;
+  /** Whether the workspace has a recovery code. */
+  syncRecoveryExists(): Promise<boolean>;
+  /** The passphrase new devices join with; devices already in keep working. */
+  syncChangePassphrase(passphrase: string): Promise<void>;
   syncNow(): Promise<void>;
   syncDisable(): Promise<SyncStatus>;
   /** The workspace's devices, most recently seen first (asks the server). */

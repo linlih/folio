@@ -58,6 +58,28 @@ impl Http {
         }
     }
 
+    /// The workspace key wrapped under the recovery code; None when there
+    /// is none (or the server is from before recovery codes).
+    pub fn get_recovery_key(&self) -> Result<Option<WrappedKey>> {
+        match self.req("GET", "key/recovery").call() {
+            Ok(r) => Ok(Some(r.into_json().map_err(|e| SyncError::Protocol(e.to_string()))?)),
+            Err(ureq::Error::Status(404, _)) => Ok(None),
+            Err(e) => Err(err(e)),
+        }
+    }
+
+    /// Keeps the workspace key wrapped under a new recovery code.
+    pub fn put_recovery_key(&self, key: &WrappedKey) -> Result<()> {
+        self.req("PUT", "key/recovery").send_json(key).map_err(err)?;
+        Ok(())
+    }
+
+    /// Replaces the passphrase's wrapping of the workspace key.
+    pub fn put_passphrase_key(&self, key: &WrappedKey) -> Result<()> {
+        self.req("PUT", "key/passphrase").send_json(key).map_err(err)?;
+        Ok(())
+    }
+
     /// Creates the workspace with its wrapped key (the first device).
     pub fn put_key(&self, key: &WrappedKey) -> Result<()> {
         self.req("PUT", "key").send_json(key).map_err(err)?;

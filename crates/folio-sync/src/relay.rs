@@ -94,6 +94,9 @@ const ADDED_COLUMNS: &[(&str, &str, &str)] = &[
     ("devices", "refs_at", "INTEGER"),
     // When the file was first seen used by no device.
     ("blobs", "unused_since", "INTEGER"),
+    // The workspace key wrapped under the user's recovery code, when they
+    // made one.
+    ("workspaces", "recovery_key", "TEXT"),
     // The cursor the device's version reports are true as of, and the
     // number of its last round of them.
     ("devices", "acked_through", "INTEGER"),
@@ -249,6 +252,35 @@ impl Relay {
         let json: Option<String> =
             self.conn().query_row("SELECT wrapped_key FROM workspaces WHERE id = ?1", [workspace], |r| r.get(0)).optional()?;
         json.map(|j| serde_json::from_str(&j).map_err(SyncError::from)).transpose()
+    }
+
+    /// The workspace key wrapped under the recovery code; None until one
+    /// was made (or for no such workspace).
+    pub fn recovery_key(&self, workspace: &str) -> Result<Option<WrappedKey>> {
+        let json: Option<Option<String>> =
+            self.conn().query_row("SELECT recovery_key FROM workspaces WHERE id = ?1", [workspace], |r| r.get(0)).optional()?;
+        json.flatten().map(|j| serde_json::from_str(&j).map_err(SyncError::from)).transpose()
+    }
+
+    /// Keeps the workspace key wrapped under a (new) recovery code, from a
+    /// device of the workspace.
+    pub fn set_recovery_key(&self, workspace: &str, device: &str, key: &WrappedKey) -> Result<()> {
+        self.replace_wrapping(workspace, device, "recovery_key", key)
+    }
+
+    /// Replaces the passphrase's wrapping of the workspace key (a new
+    /// passphrase), from a device of the workspace.
+    pub fn set_wrapped_key(&self, workspace: &str, device: &str, key: &WrappedKey) -> Result<()> {
+        self.replace_wrapping(workspace, device, "wrapped_key", key)
+    }
+
+    fn replace_wrapping(&self, workspace: &str, device: &str, column: &str, key: &WrappedKey) -> Result<()> {
+        let json = serde_json::to_string(key)?;
+        let conn = self.conn();
+        self.require(&conn, workspace)?;
+        Self::touch(&conn, workspace, device, now_ms())?;
+        conn.execute(&format!("UPDATE workspaces SET {column} = ?2 WHERE id = ?1"), params![workspace, json])?;
+        Ok(())
     }
 
     fn require(&self, conn: &Connection, workspace: &str) -> Result<()> {

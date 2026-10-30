@@ -4,6 +4,8 @@
 //! - A random 32-byte **workspace key** is made by the first device.
 //! - It is kept on the server only *wrapped*: sealed with a key derived from
 //!   the user's passphrase by Argon2id. A new device needs the passphrase.
+//!   A second copy may be wrapped the same way under a random **recovery
+//!   code** the user keeps, for when the passphrase is forgotten.
 //! - Keys are derived from it (HKDF-SHA256): one seals updates
 //!   (XChaCha20-Poly1305, random 24-byte nonces), one turns document ids
 //!   into opaque tags (HMAC-SHA256) the server can group by, and two do the
@@ -210,6 +212,52 @@ pub fn unwrap(wrapped: &WrappedKey, passphrase: &str) -> Result<WorkspaceKey> {
     Ok(WorkspaceKey(key))
 }
 
+/// Crockford's base32: no I, L, O or U, so a code read off paper is not
+/// mistaken.
+const CROCKFORD: &[u8; 32] = b"0123456789ABCDEFGHJKMNPQRSTVWXYZ";
+
+/// A new recovery code: 160 random bits as eight groups of four
+/// characters (`K7QF-2M9X-…`). It wraps the workspace key like a
+/// passphrase; being random, it cannot be guessed.
+pub fn new_recovery_code() -> String {
+    let bytes: [u8; 20] = random_bytes();
+    let mut chars = String::with_capacity(39);
+    let (mut acc, mut bits) = (0u32, 0);
+    for b in bytes {
+        acc = (acc << 8) | u32::from(b);
+        bits += 8;
+        while bits >= 5 {
+            bits -= 5;
+            if !chars.is_empty() && chars.len() % 5 == 4 {
+                chars.push('-');
+            }
+            chars.push(CROCKFORD[((acc >> bits) & 31) as usize] as char);
+        }
+    }
+    chars
+}
+
+/// A recovery code as typed: case, spaces and dashes do not matter, and O,
+/// I and L read as 0, 1 and 1. None unless it has the 32 characters of one.
+pub fn normalize_recovery_code(typed: &str) -> Option<String> {
+    let mut out = String::with_capacity(39);
+    for c in typed.chars().filter(|c| !c.is_whitespace() && *c != '-') {
+        let c = match c.to_ascii_uppercase() {
+            'O' => '0',
+            'I' | 'L' => '1',
+            c => c,
+        };
+        if !c.is_ascii() || !CROCKFORD.contains(&(c as u8)) {
+            return None;
+        }
+        if !out.is_empty() && out.len() % 5 == 4 {
+            out.push('-');
+        }
+        out.push(c);
+    }
+    (out.len() == 39).then_some(out)
+}
+
 pub fn b64(bytes: &[u8]) -> String {
     B64.encode(bytes)
 }
@@ -224,6 +272,23 @@ mod tests {
 
     /// Light Argon2 cost for tests.
     pub const TEST_COST: (u32, u32, u32) = (1024, 1, 1);
+
+    #[test]
+    fn recovery_codes_unwrap_the_key_however_they_are_typed() {
+        let code = new_recovery_code();
+        assert_eq!(code.len(), 39);
+        assert_eq!(code.split('-').count(), 8);
+        assert_ne!(code, new_recovery_code());
+        assert_eq!(normalize_recovery_code(&code).as_deref(), Some(code.as_str()));
+        let typed = code.to_lowercase().replace('-', " ").replace('0', "o").replace('1', "l");
+        assert_eq!(normalize_recovery_code(&typed).as_deref(), Some(code.as_str()));
+        assert_eq!(normalize_recovery_code(&code[..30]), None, "too short");
+        assert_eq!(normalize_recovery_code(&code.replace(&code[..1], "U")), None, "not a code character");
+        let key = WorkspaceKey::generate();
+        let wrapped = wrap(&key, &code, TEST_COST).unwrap();
+        assert_eq!(unwrap(&wrapped, &normalize_recovery_code(&typed).unwrap()).unwrap().0, key.0);
+        assert!(matches!(unwrap(&wrapped, &new_recovery_code()), Err(SyncError::WrongPassphrase)));
+    }
 
     #[test]
     fn seal_open_and_tags() {

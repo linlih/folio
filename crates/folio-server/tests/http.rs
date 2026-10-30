@@ -60,6 +60,37 @@ fn key_push_pull_and_live() {
     assert_eq!(b.pull(1, 10).unwrap().updates.len(), 1);
 }
 
+/// A forgotten passphrase: a device joins with the recovery code, sets a
+/// new passphrase, and the next device joins with that.
+#[test]
+fn recovery_code_and_new_passphrase() {
+    use folio_sync::crypto::{new_recovery_code, normalize_recovery_code, unwrap};
+    const COST: (u32, u32, u32) = (1024, 1, 1);
+    let base = start();
+    let a = Http::new(&base, TOKEN, "ws1", "device-a");
+    let key = WorkspaceKey::generate();
+    a.put_key(&wrap(&key, "forgotten", COST).unwrap()).unwrap();
+    assert!(a.get_recovery_key().unwrap().is_none(), "none until one is made");
+    let code = new_recovery_code();
+    a.put_recovery_key(&wrap(&key, &code, COST).unwrap()).unwrap();
+
+    let b = Http::new(&base, TOKEN, "ws1", "device-b");
+    let typed = normalize_recovery_code(&code.to_lowercase()).unwrap();
+    let opened = unwrap(&b.get_recovery_key().unwrap().unwrap(), &typed).unwrap();
+    assert_eq!(opened.0, key.0);
+    b.put_passphrase_key(&wrap(&opened, "a new one", COST).unwrap()).unwrap();
+    let c = Http::new(&base, TOKEN, "ws1", "device-c");
+    assert_eq!(unwrap(&c.get_key().unwrap().unwrap(), "a new one").unwrap().0, key.0);
+    assert!(matches!(unwrap(&c.get_key().unwrap().unwrap(), "forgotten"), Err(SyncError::WrongPassphrase)));
+
+    // A removed device can change neither.
+    a.remove_device("device-b").unwrap();
+    assert!(matches!(b.put_passphrase_key(&wrap(&key, "mine now", COST).unwrap()), Err(SyncError::Removed)));
+    assert!(matches!(b.put_recovery_key(&wrap(&key, &new_recovery_code(), COST).unwrap()), Err(SyncError::Removed)));
+    let missing = Http::new(&base, TOKEN, "missing", "device-a");
+    assert!(matches!(missing.put_recovery_key(&wrap(&key, &code, COST).unwrap()), Err(SyncError::NotFound(_))));
+}
+
 #[test]
 fn wrong_token_is_refused() {
     let base = start();

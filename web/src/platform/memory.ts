@@ -266,6 +266,16 @@ export function memoryBackend(now: () => number = Date.now): Backend {
     syncJoin: async () => {
       throw new Error("not available in the browser");
     },
+    syncJoinRecovery: async () => {
+      throw new Error("not available in the browser");
+    },
+    syncRecoveryCreate: async () => {
+      throw new Error("not available in the browser");
+    },
+    syncRecoveryExists: async () => false,
+    syncChangePassphrase: async () => {
+      throw new Error("not available in the browser");
+    },
     syncNow: async () => {},
     syncDisable: async () => {
       throw new Error("not available in the browser");

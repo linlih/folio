@@ -42,6 +42,8 @@ impl Server {
 pub fn router(server: Arc<Server>) -> Router {
     Router::new()
         .route("/v1/w/{ws}/key", get(get_key).put(put_key))
+        .route("/v1/w/{ws}/key/recovery", get(get_recovery_key).put(put_recovery_key))
+        .route("/v1/w/{ws}/key/passphrase", axum::routing::put(put_passphrase_key))
         .route("/v1/w/{ws}/push", post(push))
         .route("/v1/w/{ws}/pull", get(pull))
         .route("/v1/w/{ws}/live", get(live))
@@ -122,6 +124,31 @@ async fn get_key(State(s): State<Arc<Server>>, Path(ws): Path<String>, headers: 
     check_workspace(&ws)?;
     let key = blocking(move || s.relay.wrapped_key(&ws)).await?;
     key.map(Json).ok_or_else(|| Failure(StatusCode::NOT_FOUND, "no such workspace".into()))
+}
+
+async fn get_recovery_key(State(s): State<Arc<Server>>, Path(ws): Path<String>, headers: HeaderMap) -> Result<Json<WrappedKey>, Failure> {
+    authorize(&s, &headers)?;
+    check_workspace(&ws)?;
+    let key = blocking(move || s.relay.recovery_key(&ws)).await?;
+    key.map(Json).ok_or_else(|| Failure(StatusCode::NOT_FOUND, "no recovery code".into()))
+}
+
+/// The workspace key wrapped under a new recovery code (replacing any
+/// before), from a device of the workspace.
+async fn put_recovery_key(State(s): State<Arc<Server>>, Path(ws): Path<String>, headers: HeaderMap, Json(key): Json<WrappedKey>) -> Result<StatusCode, Failure> {
+    let device = authorize(&s, &headers)?;
+    check_workspace(&ws)?;
+    blocking(move || s.relay.set_recovery_key(&ws, &device, &key)).await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+/// The workspace key wrapped under a new passphrase, from a device of the
+/// workspace.
+async fn put_passphrase_key(State(s): State<Arc<Server>>, Path(ws): Path<String>, headers: HeaderMap, Json(key): Json<WrappedKey>) -> Result<StatusCode, Failure> {
+    let device = authorize(&s, &headers)?;
+    check_workspace(&ws)?;
+    blocking(move || s.relay.set_wrapped_key(&ws, &device, &key)).await?;
+    Ok(StatusCode::NO_CONTENT)
 }
 
 async fn put_key(State(s): State<Arc<Server>>, Path(ws): Path<String>, headers: HeaderMap, Json(key): Json<WrappedKey>) -> Result<StatusCode, Failure> {

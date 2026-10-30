@@ -112,8 +112,12 @@ fn device_name(s: &SyncSettings) -> String {
 }
 
 fn keys_of(s: &SyncSettings) -> Option<Keys> {
+    Some(Keys::derive(&key_of(s)?))
+}
+
+fn key_of(s: &SyncSettings) -> Option<WorkspaceKey> {
     let key = crypto::unb64(&s.key).ok().and_then(|k| <[u8; 32]>::try_from(k).ok())?;
-    Some(Keys::derive(&WorkspaceKey(key)))
+    Some(WorkspaceKey(key))
 }
 
 #[derive(Clone, Debug, Default, Serialize)]
@@ -681,6 +685,94 @@ pub async fn sync_join(app: tauri::AppHandle, code: String, passphrase: String) 
     .map_err(other)??;
     let name = remembered_name(&app.state::<AppState>());
     enable(&app, SyncSettings { server: code.server, token: code.token, workspace: code.workspace, device, key: crypto::b64(&key.0), name })
+}
+
+/// Another device, without the passphrase (forgotten): joins with the sync
+/// code and the recovery code, and sets a new passphrase for the devices
+/// after it.
+#[tauri::command]
+pub async fn sync_join_recovery(app: tauri::AppHandle, code: String, recovery: String, passphrase: String) -> CmdResult<SyncStatus> {
+    check_passphrase(&passphrase)?;
+    let code = SyncCode::decode(&code).map_err(|_| tagged("bad-code", "this is not a sync code"))?;
+    let recovery = crypto::normalize_recovery_code(&recovery).ok_or_else(|| tagged("bad-recovery-code", "this is not a recovery code"))?;
+    let device = crypto::random_bytes::<8>().iter().map(|b| format!("{b:02x}")).collect::<String>();
+    let http = Http::new(&code.server, &code.token, &code.workspace, &device);
+    let key = tauri::async_runtime::spawn_blocking(move || -> CmdResult<WorkspaceKey> {
+        if http.get_key().map_err(|e| failed(&e))?.is_none() {
+            return Err(tagged("no-workspace", "the server has no such workspace"));
+        }
+        let wrapped = http.get_recovery_key().map_err(|e| failed(&e))?.ok_or_else(|| tagged("no-recovery-code", "this sync space has no recovery code"))?;
+        let key = crypto::unwrap(&wrapped, &recovery).map_err(|e| match e {
+            SyncError::WrongPassphrase => tagged("wrong-recovery-code", "the recovery code does not open this sync space"),
+            e => failed(&e),
+        })?;
+        let rewrapped = crypto::wrap(&key, &passphrase, crypto::DEFAULT_COST).map_err(other)?;
+        http.put_passphrase_key(&rewrapped).map_err(|e| failed(&e))?;
+        Ok(key)
+    })
+    .await
+    .map_err(other)??;
+    tracing::warn!(workspace = %code.workspace, "joined with the recovery code and set a new passphrase");
+    let name = remembered_name(&app.state::<AppState>());
+    enable(&app, SyncSettings { server: code.server, token: code.token, workspace: code.workspace, device, key: crypto::b64(&key.0), name })
+}
+
+/// Makes a recovery code (replacing any before) and returns it, to show
+/// once: the server keeps only the key wrapped under it.
+#[tauri::command]
+pub async fn sync_recovery_create(app: tauri::AppHandle) -> CmdResult<String> {
+    let settings = load(&app.state::<AppState>()).ok_or_else(|| other("sync is not set up"))?;
+    let key = key_of(&settings).ok_or_else(|| other("sync settings hold no usable key"))?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let code = crypto::new_recovery_code();
+        let wrapped = crypto::wrap(&key, &code, crypto::DEFAULT_COST).map_err(other)?;
+        let http = Http::new(&settings.server, &settings.token, &settings.workspace, &settings.device);
+        http.put_recovery_key(&wrapped).map_err(|e| key_failed(&e))?;
+        tracing::info!("made a recovery code");
+        Ok(code)
+    })
+    .await
+    .map_err(other)?
+}
+
+/// Whether the sync space has a recovery code (false too from a server
+/// from before them).
+#[tauri::command]
+pub async fn sync_recovery_exists(app: tauri::AppHandle) -> CmdResult<bool> {
+    let settings = load(&app.state::<AppState>()).ok_or_else(|| other("sync is not set up"))?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let http = Http::new(&settings.server, &settings.token, &settings.workspace, &settings.device);
+        Ok(http.get_recovery_key().map_err(|e| failed(&e))?.is_some())
+    })
+    .await
+    .map_err(other)?
+}
+
+/// Sets a new passphrase for devices joining later; this device and those
+/// already syncing are not affected.
+#[tauri::command]
+pub async fn sync_change_passphrase(app: tauri::AppHandle, passphrase: String) -> CmdResult<()> {
+    check_passphrase(&passphrase)?;
+    let settings = load(&app.state::<AppState>()).ok_or_else(|| other("sync is not set up"))?;
+    let key = key_of(&settings).ok_or_else(|| other("sync settings hold no usable key"))?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let wrapped = crypto::wrap(&key, &passphrase, crypto::DEFAULT_COST).map_err(other)?;
+        let http = Http::new(&settings.server, &settings.token, &settings.workspace, &settings.device);
+        http.put_passphrase_key(&wrapped).map_err(|e| key_failed(&e))?;
+        tracing::warn!("changed the sync passphrase");
+        Ok(())
+    })
+    .await
+    .map_err(other)?
+}
+
+/// A key request failing: a server from before recovery codes and new
+/// passphrases has no such address.
+fn key_failed(e: &SyncError) -> CommandError {
+    match e {
+        SyncError::NotFound(_) => tagged("old-server", "the sync server is too old for this; update it first"),
+        e => failed(e),
+    }
 }
 
 #[tauri::command]

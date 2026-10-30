@@ -51,3 +51,11 @@
   font: 13px var(--font-ui);
   outline: none;
 }
+
+/* "Forgot the passphrase?": a quiet switch at the start of the actions row. */
+.sync-link { margin-right: auto; padding: 0; border: 0; background: none; color: var(--accent); font: 13px var(--font-ui); cursor: pointer; }
+.sync-link:hover { text-decoration: underline; }
+
+/* Recovery code and passphrase change (sync/Recovery.tsx). */
+.sync-section { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; margin-top: 6px; padding-top: 10px; border-top: 1px solid var(--border); }
+.sync-done { margin: 0; color: var(--accent); font-size: 12.5px; }

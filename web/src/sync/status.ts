@@ -47,6 +47,14 @@ function kindText(t: TFunction, kind: string | null): string | null {
       return t("sync.errorFileTooLarge");
     case "server-full":
       return t("sync.errorServerFull");
+    case "bad-recovery-code":
+      return t("sync.errorRecoveryFormat");
+    case "wrong-recovery-code":
+      return t("sync.errorRecoveryWrong");
+    case "no-recovery-code":
+      return t("sync.errorNoRecovery");
+    case "old-server":
+      return t("sync.errorOldServer");
     case "short-passphrase":
       return t("sync.passphraseShort", { n: MIN_PASSPHRASE });
     default:

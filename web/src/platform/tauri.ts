@@ -72,6 +72,11 @@ export function tauriBackend(): Backend {
     syncStatus: () => invoke<SyncStatus>("sync_status"),
     syncCreate: (server, token, passphrase) => invoke<SyncStatus>("sync_create", { server, token, passphrase }),
     syncJoin: (code, passphrase) => invoke<SyncStatus>("sync_join", { code, passphrase }),
+    syncJoinRecovery: (code, recovery, passphrase) =>
+      invoke<SyncStatus>("sync_join_recovery", { code, recovery, passphrase }),
+    syncRecoveryCreate: () => invoke<string>("sync_recovery_create"),
+    syncRecoveryExists: () => invoke<boolean>("sync_recovery_exists"),
+    syncChangePassphrase: (passphrase) => invoke<void>("sync_change_passphrase", { passphrase }),
     syncNow: () => invoke<void>("sync_now"),
     syncDisable: () => invoke<SyncStatus>("sync_disable"),
     syncDevices: () => invoke<SyncDevice[]>("sync_devices"),

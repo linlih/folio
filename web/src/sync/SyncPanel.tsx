@@ -8,6 +8,7 @@ import { CopyBlock } from "../mcp/McpDialogs";
 import { backend } from "../platform";
 import { useShell } from "../shell/tabs";
 import { DeviceList } from "./DeviceList";
+import { ChangePassphrase, RecoveryCode } from "./Recovery";
 import { commandErrorText, errorText, MIN_PASSPHRASE, useSyncStatus } from "./status";
 import "./sync.css";
 
@@ -31,22 +32,35 @@ function Setup({ onDone }: { onDone: (s: SyncStatus) => void }) {
   const [server, setServer] = useState("http://127.0.0.1:8787");
   const [token, setToken] = useState("");
   const [code, setCode] = useState("");
+  // Joining with the recovery code when the passphrase is forgotten.
+  const [recover, setRecover] = useState(false);
+  const [recovery, setRecovery] = useState("");
   const [passphrase, setPassphrase] = useState("");
   const [again, setAgain] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const recovering = mode === "join" && recover;
+  const twice = mode === "create" || recovering;
   const short = passphrase.length > 0 && passphrase.length < MIN_PASSPHRASE;
-  const mismatch = mode === "create" && again.length > 0 && again !== passphrase;
+  const mismatch = twice && again.length > 0 && again !== passphrase;
   const ready =
-    passphrase.length >= MIN_PASSPHRASE && (mode === "create" ? server.trim() !== "" && token.trim() !== "" && again === passphrase : code.trim() !== "");
+    passphrase.length >= MIN_PASSPHRASE &&
+    (!twice || again === passphrase) &&
+    (mode === "create" ? server.trim() !== "" && token.trim() !== "" : code.trim() !== "" && (!recover || recovery.trim() !== ""));
 
   async function submit() {
     if (!ready || busy) return;
     setBusy(true);
     setError(null);
     try {
-      onDone(mode === "create" ? await backend.syncCreate(server, token, passphrase) : await backend.syncJoin(code, passphrase));
+      onDone(
+        mode === "create"
+          ? await backend.syncCreate(server, token, passphrase)
+          : recover
+            ? await backend.syncJoinRecovery(code, recovery, passphrase)
+            : await backend.syncJoin(code, passphrase),
+      );
     } catch (e) {
       setError(commandErrorText(t, e));
     } finally {
@@ -69,7 +83,7 @@ function Setup({ onDone }: { onDone: (s: SyncStatus) => void }) {
           </button>
         ))}
       </div>
-      <p className="sync-hint">{t(mode === "create" ? "sync.createHint" : "sync.joinHint")}</p>
+      <p className="sync-hint">{t(mode === "create" ? "sync.createHint" : recover ? "sync.recoverHint" : "sync.joinHint")}</p>
       {mode === "create" ? (
         <>
           <label className="sync-field">
@@ -82,16 +96,24 @@ function Setup({ onDone }: { onDone: (s: SyncStatus) => void }) {
           </label>
         </>
       ) : (
-        <label className="sync-field">
-          <span>{t("sync.code")}</span>
-          <input value={code} onChange={(e) => setCode(e.target.value)} spellCheck={false} autoComplete="off" placeholder="folio-sync:…" />
-        </label>
+        <>
+          <label className="sync-field">
+            <span>{t("sync.code")}</span>
+            <input value={code} onChange={(e) => setCode(e.target.value)} spellCheck={false} autoComplete="off" placeholder="folio-sync:…" />
+          </label>
+          {recover && (
+            <label className="sync-field">
+              <span>{t("sync.recoveryCode")}</span>
+              <input value={recovery} onChange={(e) => setRecovery(e.target.value)} spellCheck={false} autoComplete="off" placeholder="XXXX-XXXX-…" />
+            </label>
+          )}
+        </>
       )}
       <label className="sync-field">
-        <span>{t("sync.passphrase")}</span>
+        <span>{t(recovering ? "sync.newPassphrase" : "sync.passphrase")}</span>
         <input type="password" value={passphrase} onChange={(e) => setPassphrase(e.target.value)} autoComplete="new-password" />
       </label>
-      {mode === "create" && (
+      {twice && (
         <label className="sync-field">
           <span>{t("sync.passphraseAgain")}</span>
           <input type="password" value={again} onChange={(e) => setAgain(e.target.value)} autoComplete="new-password" />
@@ -100,8 +122,14 @@ function Setup({ onDone }: { onDone: (s: SyncStatus) => void }) {
       {short && <p className="sync-note">{t("sync.passphraseShort", { n: MIN_PASSPHRASE })}</p>}
       {mismatch && <p className="sync-note">{t("sync.passphraseMismatch")}</p>}
       {mode === "create" && <p className="sync-note">{t("sync.passphraseWarning")}</p>}
+      {recovering && <p className="sync-note">{t("sync.recoverNote")}</p>}
       {error && <p className="mcp-error">{error}</p>}
       <div className="sync-actions">
+        {mode === "join" && (
+          <button type="button" className="sync-link" onClick={() => setRecover(!recover)}>
+            {t(recover ? "sync.useAPassphrase" : "sync.forgotPassphrase")}
+          </button>
+        )}
         <button type="submit" className="button primary" disabled={!ready || busy}>
           {busy ? t("sync.working") : t(mode === "create" ? "sync.createNow" : "sync.joinNow")}
         </button>
@@ -159,7 +187,13 @@ function Enabled({ status, onChange }: { status: SyncStatus; onChange: (s: SyncS
       </div>
       <CopyBlock label={t("sync.codeLabel")} text={status.code} />
       <p className="sync-hint">{t("sync.codeHint")}</p>
-      {status.errorKind !== "removed" && <DeviceList lastSync={status.lastSync} />}
+      {status.errorKind !== "removed" && (
+        <>
+          <DeviceList lastSync={status.lastSync} />
+          <RecoveryCode />
+          <ChangePassphrase />
+        </>
+      )}
       <div className="sync-actions">
         {confirmStop ? (
           <>
