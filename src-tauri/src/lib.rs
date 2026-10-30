@@ -226,6 +226,83 @@ fn open_release_download(app: tauri::AppHandle, url: String) -> CmdResult<()> {
     app.opener().open_url(url, None::<&str>).map_err(|e| CommandError::Other(e.to_string()))
 }
 
+/// Opens a web link in the system's browser (a clipped card's source).
+#[tauri::command]
+fn open_link(app: tauri::AppHandle, url: String) -> CmdResult<()> {
+    use tauri_plugin_opener::OpenerExt;
+    if folio_clip::host(url.trim()).is_none() {
+        return Err(CommandError::Other("not a web link".into()));
+    }
+    app.opener().open_url(url.trim(), None::<&str>).map_err(|e| CommandError::Other(e.to_string()))
+}
+
+/// A link's title, site and summary, read from the site on this device
+/// (design/inbox-and-tags.md §2). When the page cannot be read, the bare
+/// link with `fetched: false`.
+#[tauri::command]
+async fn clip_preview(url: String) -> CmdResult<ClipPreview> {
+    let found = tauri::async_runtime::spawn_blocking(move || match folio_clip::fetch(&url) {
+        Ok(p) => Ok(ClipPreview { preview: p, fetched: true }),
+        Err(folio_clip::ClipError::NotALink) => Err(CommandError::Other("[not-a-link] not a web address".into())),
+        Err(e) => {
+            tracing::info!(error = %e, "link preview failed");
+            Ok(ClipPreview { preview: folio_clip::fallback(&url), fetched: false })
+        }
+    });
+    found.await.map_err(|e| CommandError::Other(e.to_string()))?
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ClipPreview {
+    #[serde(flatten)]
+    preview: folio_clip::LinkPreview,
+    fetched: bool,
+}
+
+/// Keeps a link in the inbox as a new card; answers its id.
+#[tauri::command]
+fn clip_create(app: tauri::AppHandle, state: tauri::State<AppState>, title: String, clip: folio_core::card::Clip, note: String) -> CmdResult<String> {
+    let id = lock(&state)?.create_clip(&title, &clip, &note, now_ms())?;
+    sync::poke(&app);
+    Ok(id.to_string())
+}
+
+#[tauri::command]
+fn inbox(state: tauri::State<AppState>) -> CmdResult<Vec<folio_store::InboxItem>> {
+    Ok(lock(&state)?.inbox()?)
+}
+
+/// Takes a card out of the inbox (dealt with) or puts it back.
+#[tauri::command]
+fn set_inbox(app: tauri::AppHandle, state: tauri::State<AppState>, id: String, inbox: bool) -> CmdResult<()> {
+    lock(&state)?.set_inbox(&DocId::parse(&id)?, inbox, now_ms())?;
+    sync::poke(&app);
+    Ok(())
+}
+
+/// What another app shared to this one (Android's share sheet) since it
+/// was last asked; None elsewhere.
+#[tauri::command]
+fn take_shared(app: tauri::AppHandle) -> CmdResult<Option<String>> {
+    #[cfg(target_os = "android")]
+    {
+        use tauri_plugin_folio_apk::ApkExt;
+        return app.apk().take_shared().map_err(CommandError::Other);
+    }
+    #[cfg(not(target_os = "android"))]
+    {
+        let _ = app;
+        Ok(None)
+    }
+}
+
+/// The cards of a tag's database with their field values.
+#[tauri::command]
+fn tag_cards(state: tauri::State<AppState>, tag: String) -> CmdResult<Vec<folio_store::TagCard>> {
+    Ok(lock(&state)?.tag_cards(&tag)?)
+}
+
 #[tauri::command]
 fn list_cards(state: tauri::State<AppState>, limit: Option<u32>) -> CmdResult<Vec<CardRow>> {
     Ok(lock(&state)?.list_cards(limit.unwrap_or(200))?)
@@ -1101,6 +1178,13 @@ pub fn run() {
             list_trash,
             empty_trash,
             pin_card,
+            open_link,
+            clip_preview,
+            clip_create,
+            inbox,
+            set_inbox,
+            take_shared,
+            tag_cards,
             topic_cards,
             topic_counts,
             card_topic_pairs,

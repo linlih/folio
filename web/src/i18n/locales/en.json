@@ -18,7 +18,8 @@
     "itemMenu": "More",
     "pin": "Pin",
     "unpin": "Unpin",
-    "topics": "Topics"
+    "topics": "Topics",
+    "inbox": "Inbox"
   },
   "library": {
     "title": "Card library",
@@ -538,7 +539,8 @@
     "syncStarted": "Sync started",
     "backupDone": "Backed up",
     "newBoard": "New whiteboard",
-    "boards": "Open whiteboards"
+    "boards": "Open whiteboards",
+    "inbox": "Open inbox"
   },
   "topics": {
     "add": "Add to topic",
@@ -733,5 +735,25 @@
     "autoHint": "Once a day; you are asked before anything installs.",
     "on": "On",
     "off": "Off"
+  },
+  "inbox": {
+    "title": "Inbox",
+    "count_one": "{{count}} to go through",
+    "count_other": "{{count}} to go through",
+    "placeholder": "Paste a link or write a line, then press Enter",
+    "paste": "Paste",
+    "save": "Save",
+    "saving": "Reading…",
+    "saved": "Saved to the inbox",
+    "savedBare": "Saved to the inbox. The page's title and summary could not be read; open the card to add them.",
+    "notALink": "Nothing to save",
+    "clipboardEmpty": "The clipboard is empty",
+    "clipboardBlocked": "Can't read the clipboard. Paste the link into the box instead.",
+    "empty": "The inbox is empty",
+    "emptyHint": "When you find something worth keeping, tap Share in another app and pick Folio (Android), or copy the link and paste it above. Only the title, summary and link are kept; once read, tap ✓ to mark it dealt with and it stays in the card library.",
+    "openSource": "Open the original",
+    "markDone": "Dealt with",
+    "done": "“{{title}}” dealt with; it stays in the card library ({{undo}} to undo)",
+    "inInbox": "In the inbox"
   }
 }

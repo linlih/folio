@@ -1,5 +1,6 @@
 import { Menu } from "@base-ui/react/menu";
-import { CalendarDays, ChevronRight, FileText, Layers, LayoutDashboard, Plus, Hash, LibraryBig, MoreHorizontal, PanelLeftClose, PanelLeftOpen, Search, SquarePen, Trash2 } from "lucide-react";
+import { CalendarDays, ChevronRight, FileText, Layers, LayoutDashboard, Plus, Hash, LibraryBig, MoreHorizontal, PanelLeftClose, PanelLeftOpen, Search, SquarePen, Trash2, Inbox } from "lucide-react";
+import { useInboxCount } from "../inbox/clip";
 import { useEffect, useState, type ReactNode } from "react";
 import type { TagInfo } from "../bindings/commands";
 import { CARDS_CHANGED, moveToTrash } from "../card/actions";
@@ -104,6 +105,7 @@ export function Sidebar() {
   const { recent, open } = useShell();
   const sidebarOpen = useShell((s) => s.sidebarOpen);
   const active = useShell((s) => focusedPane(s).active);
+  const inboxCount = useInboxCount((s) => s.count);
 
   const navItem = (target: TabTarget, icon: ReactNode, label: string) => (
     <button className="nav-item" aria-current={active === tabKey(target) ? "page" : undefined} onClick={(e) => open(target, null, toSide(e))}>
@@ -145,6 +147,11 @@ export function Sidebar() {
         </button>
       </div>
       {navItem({ kind: "journal" }, <CalendarDays size={15} strokeWidth={1.75} />, t("nav.journal"))}
+      <button className="nav-item" aria-current={active === "inbox" ? "page" : undefined} onClick={(e) => open({ kind: "inbox" }, null, toSide(e))}>
+        <Inbox size={15} strokeWidth={1.75} />
+        <span>{t("nav.inbox")}</span>
+        {inboxCount > 0 && <span className="nav-count">{inboxCount}</span>}
+      </button>
       {/* The library itself means all cards: leave any topic it was showing. */}
       <button
         className="nav-item"

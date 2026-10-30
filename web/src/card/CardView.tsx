@@ -2,6 +2,7 @@ import { Menu } from "@base-ui/react/menu";
 import { MoreHorizontal } from "lucide-react";
 import { isPinned, setPin, usePins } from "./pins";
 import { TopicRow } from "./TopicRow";
+import { ClipSource } from "./ClipSource";
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { Extension, type Editor } from "@tiptap/core";
@@ -198,6 +199,7 @@ export function CardView({ cardId, pane, active = true }: { cardId: string; pane
         </div>
       )}
       {handle && <TopicRow handle={handle} />}
+      {handle && <ClipSource handle={handle} />}
       <div className="card-body-area" onMouseDown={clickBelow}>
         <CardEditor
           docId={cardId}

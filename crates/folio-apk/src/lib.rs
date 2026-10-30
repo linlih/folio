@@ -2,7 +2,9 @@
 //! app downloads the new APK into [`Apk::updates_dir`] and hands it to the
 //! system installer with [`Apk::install`]. The installer only accepts a
 //! package signed with the same key as the installed app, so a wrong file
-//! cannot replace it. On other platforms the plugin does nothing.
+//! cannot replace it. It also keeps what other apps share to Folio from
+//! their share sheets, for the inbox ([`Apk::take_shared`]). On other
+//! platforms the plugin does nothing.
 
 use tauri::plugin::{Builder, TauriPlugin};
 use tauri::Runtime;
@@ -44,6 +46,11 @@ mod android {
     }
 
     #[derive(Deserialize)]
+    struct Shared {
+        text: Option<String>,
+    }
+
+    #[derive(Deserialize)]
     struct Started {
         started: bool,
     }
@@ -63,6 +70,14 @@ mod android {
             let path = path.to_str().ok_or("not a UTF-8 path")?;
             let started: Started = self.0.run_mobile_plugin("install", InstallArgs { path }).map_err(|e| e.to_string())?;
             Ok(started.started)
+        }
+    }
+
+    impl<R: Runtime> Apk<R> {
+        /// Text another app shared to Folio since the last call, once.
+        pub fn take_shared(&self) -> Result<Option<String>, String> {
+            let shared: Shared = self.0.run_mobile_plugin("takeShared", ()).map_err(|e| e.to_string())?;
+            Ok(shared.text)
         }
     }
 

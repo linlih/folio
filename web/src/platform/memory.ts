@@ -1,6 +1,6 @@
 import { LoroDoc } from "loro-crdt";
 import type { AssetEvent, BackupInfo, Backlink, CardRow, JournalDay, SearchHit } from "../bindings/commands";
-import { bodyLines, initCard, preview, readCardTopics, readMeta, setDeleted, setPinned } from "../docs/card";
+import { appendBlocks, bodyLines, initCard, preview, readCardTopics, readMeta, readProps, setClip, setDeleted, setInbox, setPinned } from "../docs/card";
 import { isJournalId, journalDate, uuidv7 } from "../docs/ids";
 import { extractIndex } from "../docs/index";
 import { isBoardId } from "../docs/board";
@@ -34,8 +34,11 @@ export function memoryBackend(now: () => number = Date.now): Backend {
 
   const row = (id: string, e: { doc: LoroDoc; updatedAt: number }): CardRow => {
     const m = readMeta(e.doc);
-    return { id, kind: m.kind, title: m.title, preview: preview(bodyLines(e.doc)), createdAt: m.createdAt, updatedAt: e.updatedAt };
+    return { id, kind: m.kind, title: m.title, preview: cardPreview(e.doc), createdAt: m.createdAt, updatedAt: e.updatedAt };
   };
+
+  /** The body's start; a clipped link with no notes shows its summary. */
+  const cardPreview = (doc: LoroDoc) => preview(bodyLines(doc)) || preview([readMeta(doc).clip?.excerpt ?? ""]);
 
   /** Card documents: not the workspace document or whiteboards. */
   const cards = () => [...docs].filter(([id]) => id !== WORKSPACE_ID && !isBoardId(id));
@@ -78,6 +81,48 @@ export function memoryBackend(now: () => number = Date.now): Backend {
     trashCard: async (id) => edit(id, (d) => setDeleted(d, now())),
     restoreCard: async (id) => edit(id, (d) => setDeleted(d, null)),
     pinCard: async (id, pinned) => edit(id, (d) => setPinned(d, pinned ? now() : null)),
+    openLink: async (url) => {
+      window.open(url, "_blank", "noopener");
+    },
+    // A page cannot read other sites (CORS): web mode keeps the bare link.
+    clipPreview: async (url) => {
+      const u = url.trim();
+      if (!/^https?:\/\/[^/?#\s]+/i.test(u)) throw new Error("[not-a-link] not a web address");
+      const host = new URL(u).hostname.replace(/^www\./, "");
+      return { url: u, title: host, site: host, excerpt: "", author: "", fetched: false };
+    },
+    clipCreate: async (title, clip, note) => {
+      const id = uuidv7(now());
+      const doc = hostDoc();
+      initCard(doc, "note", title, now());
+      setClip(doc, clip, now());
+      if (note.trim()) {
+        appendBlocks(doc, [note.trim()], false, null);
+        doc.commit();
+      }
+      docs.set(id, { doc, updatedAt: now() });
+      return id;
+    },
+    inbox: async () =>
+      live()
+        .filter(([, e]) => readMeta(e.doc).inboxAt !== null)
+        .map(([id, e]) => {
+          const m = readMeta(e.doc);
+          return { id, title: m.title, preview: cardPreview(e.doc), clip: m.clip, inboxAt: m.inboxAt!, updatedAt: e.updatedAt };
+        })
+        .sort((a, b) => b.inboxAt - a.inboxAt),
+    setInbox: async (id, inbox) => edit(id, (d) => setInbox(d, inbox ? now() : null)),
+    takeShared: async () => null,
+    tagCards: async (tag) => {
+      const key = tag.trim().toLowerCase();
+      return live()
+        .filter(([id, e]) => !isJournalId(id) && extractIndex(e.doc).tags.some(([, name]) => name.trim().toLowerCase() === key))
+        .sort((a, b) => b[1].updatedAt - a[1].updatedAt)
+        .map(([id, e]) => {
+          const m = readMeta(e.doc);
+          return { id, title: m.title, preview: cardPreview(e.doc), createdAt: m.createdAt, updatedAt: e.updatedAt, props: JSON.stringify(readProps(e.doc)), url: m.clip?.url ?? null };
+        });
+    },
     pinnedCards: async () =>
       cards()
         .filter(([, e]) => readMeta(e.doc).pinnedAt !== null && readMeta(e.doc).deletedAt === null)
@@ -145,7 +190,8 @@ export function memoryBackend(now: () => number = Date.now): Backend {
       const blocks: SearchHit[] = [];
       for (const [cid, e] of live()) {
         const m = readMeta(e.doc);
-        if (all(m.title)) titles.push({ cardId: cid, cardTitle: m.title, cardKind: m.kind, bid: null, text: m.title });
+        const clip = m.clip ? `\n${m.clip.site}\n${m.clip.author}\n${m.clip.excerpt}` : "";
+        if (all(m.title + clip)) titles.push({ cardId: cid, cardTitle: m.title, cardKind: m.kind, bid: null, text: m.title });
         for (const b of extractIndex(e.doc).blocks) if (all(b.text)) blocks.push({ cardId: cid, cardTitle: m.title, cardKind: m.kind, bid: b.bid, text: b.text });
       }
       return [...titles, ...blocks].slice(0, limit);

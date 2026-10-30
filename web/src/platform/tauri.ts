@@ -2,6 +2,7 @@ import { Channel, convertFileSrc, invoke } from "@tauri-apps/api/core";
 import type { AppInfo, AssetInfo, BackupInfo, Backlink, BlockText, CardRow, JournalDay, McpStatus, SearchHit, SyncDevice, SyncStatus, TagInfo, TopicCount, CardText } from "../bindings/commands";
 import type { Backend, ExportResult } from "./backend";
 import type { LatestRelease, LibraryLocation, PickedFolder } from "../bindings/commands";
+import type { InboxItem, LinkPreview, TagCard } from "../bindings/commands";
 
 const ANDROID = typeof navigator !== "undefined" && /Android/i.test(navigator.userAgent);
 
@@ -69,6 +70,13 @@ export function tauriBackend(): Backend {
     regenerateMcpToken: () => invoke<McpStatus>("regenerate_mcp_token"),
     revokeMcpClient: (client) => invoke<McpStatus>("revoke_mcp_client", { client }),
     answerMcpApproval: (id, allow) => invoke<void>("answer_mcp_approval", { id, allow }),
+    openLink: (url) => invoke<void>("open_link", { url }),
+    clipPreview: (url) => invoke<LinkPreview>("clip_preview", { url }),
+    clipCreate: (title, clip, note) => invoke<string>("clip_create", { title, clip, note }),
+    inbox: () => invoke<InboxItem[]>("inbox"),
+    setInbox: (id, inbox) => invoke<void>("set_inbox", { id, inbox }),
+    takeShared: () => invoke<string | null>("take_shared"),
+    tagCards: (tag) => invoke<TagCard[]>("tag_cards", { tag }),
     syncStatus: () => invoke<SyncStatus>("sync_status"),
     syncCreate: (server, token, passphrase) => invoke<SyncStatus>("sync_create", { server, token, passphrase }),
     syncJoin: (code, passphrase) => invoke<SyncStatus>("sync_join", { code, passphrase }),

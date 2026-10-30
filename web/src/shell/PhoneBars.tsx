@@ -1,5 +1,6 @@
 import type { Editor } from "@tiptap/core";
-import { ArrowDown, ArrowUp, CalendarDays, ChevronLeft, ChevronsDownUp, Hash, ImagePlus, IndentDecrease, IndentIncrease, Keyboard, LayoutDashboard, LibraryBig, Redo2, Search, Settings, Slash, SquareCheck, SquarePen, Undo2 } from "lucide-react";
+import { ArrowDown, ArrowUp, CalendarDays, ChevronLeft, ChevronsDownUp, Hash, ImagePlus, IndentDecrease, IndentIncrease, Keyboard, LayoutDashboard, LibraryBig, Redo2, Search, Settings, Slash, SquareCheck, SquarePen, Undo2, Inbox } from "lucide-react";
+import { useInboxCount } from "../inbox/clip";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { openQuickCapture } from "../capture/QuickCapture";
@@ -10,7 +11,7 @@ import { focusedPane, useShell, type Pane, type TabTarget } from "./tabs";
 import "./phone.css";
 
 /** The pages the bottom bar leads to; everything else is opened from them. */
-const ROOTS: TabTarget["kind"][] = ["journal", "library", "boards"];
+const ROOTS: TabTarget["kind"][] = ["journal", "inbox", "library", "boards"];
 const isRoot = (kind: TabTarget["kind"]) => ROOTS.includes(kind);
 /** Every open tab stays mounted (its editors keep their state); on a phone
  *  only this many are kept, the longest unused closing first. */
@@ -94,7 +95,7 @@ function section(pane: Pane): TabTarget["kind"] | null {
   return active === "board" ? "boards" : null;
 }
 
-/** The four entries at the bottom of a phone (§0.2), and the button that
+/** The five entries at the bottom of a phone (§0.2), and the button that
  *  writes a quick note to today's journal. */
 export function PhoneNav() {
   const { t } = useTranslation();
@@ -103,8 +104,19 @@ export function PhoneNav() {
   const setSearchOpen = useShell((s) => s.setSearchOpen);
   const current = section(pane);
   const activeKind = pane.tabs.find((x) => x.key === pane.active)?.target.kind;
+  const inboxCount = useInboxCount((s) => s.count);
   const items: { kind: TabTarget["kind"]; label: string; icon: React.ReactNode }[] = [
     { kind: "journal", label: t("nav.journal"), icon: <CalendarDays size={21} strokeWidth={1.75} /> },
+    {
+      kind: "inbox",
+      label: t("nav.inbox"),
+      icon: (
+        <span className="phone-nav-icon">
+          <Inbox size={21} strokeWidth={1.75} />
+          {inboxCount > 0 && <span className="phone-nav-badge">{inboxCount > 99 ? "99+" : inboxCount}</span>}
+        </span>
+      ),
+    },
     { kind: "library", label: t("nav.library"), icon: <LibraryBig size={21} strokeWidth={1.75} /> },
     { kind: "boards", label: t("nav.boards"), icon: <LayoutDashboard size={21} strokeWidth={1.75} /> },
   ];

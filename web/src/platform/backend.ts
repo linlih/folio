@@ -1,6 +1,7 @@
 import type { AssetEvent, AssetInfo, BackupInfo, McpStatus, SyncDevice, SyncStatus, TagInfo, TopicCount, CardText } from "../bindings/commands";
 import type { LatestRelease, LibraryLocation, PickedFolder } from "../bindings/commands";
 import type { AppInfo, Backlink, BlockText, CardRow, DocKind, JournalDay, SearchHit } from "../bindings/commands";
+import type { ClipInfo, InboxItem, LinkPreview, TagCard } from "../bindings/commands";
 
 /** Everything the UI may ask of the host. The Tauri app and web mode each
  *  implement it; UI code never imports `@tauri-apps/api` directly. */
@@ -26,6 +27,23 @@ export interface Backend {
   pinCard(id: string, pinned: boolean): Promise<void>;
   /** Pinned cards not in the trash, in the order they were pinned. */
   pinnedCards(): Promise<CardRow[]>;
+  /** Opens a web link in the system's browser. */
+  openLink(url: string): Promise<void>;
+  /** A link's title, site and summary, read from the site by this device
+   *  (design/inbox-and-tags.md §2); the bare link when it cannot be read.
+   *  Fails with "[not-a-link]" for anything but an http(s) address. */
+  clipPreview(url: string): Promise<LinkPreview>;
+  /** A new card for a link, in the inbox; `note` becomes its first line. */
+  clipCreate(title: string, clip: ClipInfo, note: string): Promise<string>;
+  /** Clipped links not dealt with yet, newest first. */
+  inbox(): Promise<InboxItem[]>;
+  /** Takes a card out of the inbox (dealt with), or puts it back. */
+  setInbox(id: string, inbox: boolean): Promise<void>;
+  /** Text another app shared to Folio since the last call (Android's share
+   *  sheet); null where there is none or no such thing. */
+  takeShared(): Promise<string | null>;
+  /** The cards of a tag's database with their field values (§3). */
+  tagCards(tag: string): Promise<TagCard[]>;
   /** Written journal days between two dates (inclusive), newest first. */
   journalDays(from: string, to: string): Promise<JournalDay[]>;
   /** Blocks in other cards that link to this card or reference its blocks. */

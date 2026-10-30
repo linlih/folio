@@ -3,6 +3,16 @@
     <!-- Merged into the app: installing its own updates. -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <application>
+        <!-- Folio in other apps' share sheets: shared text and links go to
+             the inbox (ApkPlugin.receive). Merged into the app's own
+             activity, which Tauri generates. -->
+        <activity android:name="dev.folio.app.MainActivity" android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+        </activity>
         <provider
             android:name="dev.folio.apk.ApkFileProvider"
             android:authorities="${applicationId}.folio.apk"

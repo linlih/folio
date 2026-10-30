@@ -54,6 +54,43 @@ export interface CardRow {
   updatedAt: number;
 }
 
+/** A link clipped into the inbox (folio_core::card::Clip). */
+export interface ClipInfo {
+  url: string;
+  site: string;
+  excerpt: string;
+  author: string;
+}
+
+/** What a link's page says of itself; `fetched` false: the page could not
+ *  be read and this is the bare link. */
+export interface LinkPreview extends ClipInfo {
+  title: string;
+  fetched: boolean;
+}
+
+export interface InboxItem {
+  id: string;
+  title: string;
+  /** The notes on it, or the page's summary. */
+  preview: string;
+  clip: ClipInfo | null;
+  inboxAt: number;
+  updatedAt: number;
+}
+
+/** A row of a tag's database. */
+export interface TagCard {
+  id: string;
+  title: string;
+  preview: string;
+  createdAt: number | null;
+  updatedAt: number;
+  /** Field values by field id, a JSON object. */
+  props: string;
+  url: string | null;
+}
+
 export interface JournalDay {
   id: string;
   /** YYYY-MM-DD */

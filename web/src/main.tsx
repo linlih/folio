@@ -10,6 +10,7 @@ import { backend } from "./platform";
 import { AppShell } from "./shell/AppShell";
 import { useShell } from "./shell/tabs";
 import { ErrorBoundary } from "./shell/ErrorBoundary";
+import { receiveShares } from "./inbox/clip";
 
 /** The desktop app on macOS draws into the title bar (tauri.macos.conf.json):
  *  the traffic lights sit in the sidebar's top row, the tabs beside them. */
@@ -36,6 +37,8 @@ async function start() {
       </ErrorBoundary>
     </StrictMode>,
   );
+  // Links shared to Folio from other apps go to the inbox.
+  receiveShares();
 }
 
 void start();

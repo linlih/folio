@@ -18,7 +18,8 @@
     "itemMenu": "更多操作",
     "pin": "置顶",
     "unpin": "取消置顶",
-    "topics": "主题"
+    "topics": "主题",
+    "inbox": "收集箱"
   },
   "library": {
     "title": "卡片库",
@@ -538,7 +539,8 @@
     "syncStarted": "已开始同步",
     "backupDone": "已备份",
     "newBoard": "新建白板",
-    "boards": "打开白板列表"
+    "boards": "打开白板列表",
+    "inbox": "打开收集箱"
   },
   "topics": {
     "add": "添加到主题",
@@ -733,5 +735,25 @@
     "autoHint": "每天检查一次，有新版本时提示。",
     "on": "开",
     "off": "关"
+  },
+  "inbox": {
+    "title": "收集箱",
+    "count_one": "{{count}} 条待整理",
+    "count_other": "{{count}} 条待整理",
+    "placeholder": "粘贴链接或写一句，回车保存",
+    "paste": "粘贴",
+    "save": "保存",
+    "saving": "正在读取…",
+    "saved": "已存到收集箱",
+    "savedBare": "已存到收集箱。没能读到页面的标题和摘要，可以打开卡片自己补上。",
+    "notALink": "没有可以保存的内容",
+    "clipboardEmpty": "剪贴板里没有内容",
+    "clipboardBlocked": "读不到剪贴板。请把链接粘贴到输入框里。",
+    "empty": "收集箱是空的",
+    "emptyHint": "看到值得留下的内容，在其他 App 里点「分享」选 Folio（Android），或复制链接粘贴到上面。这里只保存标题、摘要和链接；读完后点 ✓ 标为已整理，它会留在卡片库里。",
+    "openSource": "打开原文",
+    "markDone": "已整理",
+    "done": "「{{title}}」已整理，仍在卡片库里（{{undo}} 撤销）",
+    "inInbox": "在收集箱中"
   }
 }

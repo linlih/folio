@@ -1363,6 +1363,7 @@ checksum = "77ce24cb58228fbb8aa041425bb1050850ac19177686ea6e0f41a70416f56fdb"
 name = "folio"
 version = "0.1.7"
 dependencies = [
+ "folio-clip",
  "folio-core",
  "folio-io",
  "folio-mcp",
@@ -1387,11 +1388,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "folio-clip"
+version = "0.1.7"
+dependencies = [
+ "serde",
+ "serde_json",
+ "ureq",
+]
+
+[[package]]
 name = "folio-core"
 version = "0.1.7"
 dependencies = [
  "loro",
  "serde",
+ "serde_json",
  "thiserror 2.0.21",
  "uuid",
 ]

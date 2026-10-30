@@ -1,0 +1,13 @@
+[package]
+name = "folio-clip"
+description = "The inbox (design/inbox-and-tags.md): a link's title, site and summary, read from its page on this device."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+# Blocking HTTP; the app calls it off the main thread.
+ureq = { version = "2", features = ["json"] }

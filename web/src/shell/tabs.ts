@@ -4,6 +4,7 @@ export type TabTarget =
   | { kind: "library" }
   | { kind: "journal" }
   | { kind: "trash" }
+  | { kind: "inbox" }
   | { kind: "card"; cardId: string }
   | { kind: "tag"; name: string }
   | { kind: "boards" }

@@ -58,13 +58,19 @@ pub fn has_pending_migrations(conn: &Connection) -> rusqlite::Result<bool> {
 }
 
 /// Bump whenever `INDEX_TABLES` changes.
-const INDEX_VERSION: i64 = 8;
+const INDEX_VERSION: i64 = 9;
 
 const INDEX_TABLES: &str = "
   CREATE TABLE idx.cards (
     card_id TEXT PRIMARY KEY, kind TEXT, title TEXT, preview TEXT, text TEXT,
-    created_at INTEGER, updated_at INTEGER, deleted_at INTEGER, pinned_at INTEGER
+    created_at INTEGER, updated_at INTEGER, deleted_at INTEGER, pinned_at INTEGER,
+    -- The inbox (design/inbox-and-tags.md): in it since; the clipped link
+    -- as JSON; the link's site, author and summary for substring search.
+    inbox_at INTEGER, clip TEXT, clip_text TEXT,
+    -- Database field values by field id, JSON (design/inbox-and-tags.md §3).
+    props TEXT
   );
+  CREATE INDEX idx.cards_by_inbox ON cards(inbox_at);
   CREATE INDEX idx.cards_by_updated ON cards(updated_at);
   CREATE TABLE idx.blocks (
     bid TEXT, card_id TEXT, parent_bid TEXT, ord INTEGER, text TEXT, type TEXT,

@@ -10,6 +10,7 @@ import { ShellDialogs } from "./ShellDialogs";
 import { useMcpApprovals } from "../mcp/McpDialogs";
 import { handleGlobalKey } from "./shortcuts";
 import { TrashView } from "../trash/TrashView";
+import { InboxView } from "../inbox/InboxView";
 import { TagView } from "../tags/TagView";
 import { BoardView } from "../board/BoardView";
 import { BoardsView } from "../board/BoardsView";
@@ -35,6 +36,8 @@ function View({ tab, pane, active }: { tab: Tab; pane: string; active: boolean }
       return <JournalView />;
     case "trash":
       return <TrashView />;
+    case "inbox":
+      return <InboxView active={active} />;
     case "card":
       return <CardView cardId={tab.target.cardId} pane={pane} active={active} />;
     case "tag":

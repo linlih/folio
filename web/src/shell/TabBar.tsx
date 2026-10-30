@@ -19,6 +19,8 @@ export function useTabLabel() {
         return t("nav.journal");
       case "trash":
         return t("trash.title");
+      case "inbox":
+        return t("inbox.title");
       case "card":
         return tab.title || t("library.untitled");
       case "tag":

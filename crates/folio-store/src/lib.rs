@@ -131,6 +131,34 @@ pub struct CardRow {
     pub updated_at: i64,
 }
 
+/// A link in the inbox.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InboxItem {
+    pub id: String,
+    pub title: String,
+    /// The notes written on it, or the page's summary.
+    pub preview: String,
+    pub clip: Option<folio_core::card::Clip>,
+    pub inbox_at: i64,
+    pub updated_at: i64,
+}
+
+/// A row of a tag's database.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TagCard {
+    pub id: String,
+    pub title: String,
+    pub preview: String,
+    pub created_at: Option<i64>,
+    pub updated_at: i64,
+    /// Field values by field id, a JSON object.
+    pub props: String,
+    /// The link, for a clipped card.
+    pub url: Option<String>,
+}
+
 /// A block that links to a card or references one of its blocks.
 #[derive(Clone, Debug, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -179,6 +207,12 @@ pub fn has_documents(dir: &Path) -> Result<bool> {
         return Ok(false);
     }
     Ok(conn.query_row("SELECT EXISTS(SELECT 1 FROM docs)", [], |r| r.get(0))?)
+}
+
+/// What substring search sees of a clipped link besides its title.
+fn clip_text(s: &CardSummary) -> Option<String> {
+    let c = s.clip.as_ref()?;
+    Some([c.site.as_str(), c.author.as_str(), c.excerpt.as_str()].into_iter().filter(|x| !x.is_empty()).collect::<Vec<_>>().join("\n"))
 }
 
 /// A tag's key: tags match case-insensitively.
@@ -473,6 +507,28 @@ impl Store {
         Ok(id)
     }
 
+    /// A card for a clipped link, in the inbox (design/inbox-and-tags.md §2):
+    /// the page's title, the link and its summary, and the person's note
+    /// as the first paragraph when there is one.
+    pub fn create_clip(&mut self, title: &str, clip: &card::Clip, note: &str, now_ms: i64) -> Result<DocId> {
+        let id = DocId::new_card();
+        let doc = LoroDoc::new();
+        doc.set_peer_id(self.peer).map_err(loro_err)?;
+        card::init_card(&doc, CardKind::Note, title, now_ms).map_err(loro_err)?;
+        card::set_clip(&doc, clip, now_ms).map_err(loro_err)?;
+        if !note.trim().is_empty() {
+            card::append_paragraph(&doc, note.trim()).map_err(loro_err)?;
+        }
+        let bytes = doc.export(ExportMode::all_updates()).map_err(loro_err)?;
+        self.apply_update(&id, DocKind::Card, &bytes, Origin::Local, now_ms)?;
+        Ok(id)
+    }
+
+    /// Puts a card back in the inbox or takes it out (dealt with).
+    pub fn set_inbox(&mut self, id: &DocId, inbox: bool, now_ms: i64) -> Result<()> {
+        self.edit(id, DocKind::Card, now_ms, |doc| card::set_inbox(doc, inbox.then_some(now_ms)))
+    }
+
     /// Everything a replica needs to load the document (snapshot form).
     pub fn doc_snapshot(&mut self, id: &DocId) -> Result<Vec<u8>> {
         self.doc_snapshot_if_exists(id)?.ok_or_else(|| StoreError::NotFound(id.to_string()))
@@ -667,6 +723,51 @@ impl Store {
         )
     }
 
+    /// The inbox: clipped links not dealt with yet, newest first.
+    pub fn inbox(&self) -> Result<Vec<InboxItem>> {
+        let mut stmt = self.conn.prepare_cached(
+            "SELECT card_id, title, preview, clip, inbox_at, updated_at FROM idx.cards
+              WHERE inbox_at IS NOT NULL AND deleted_at IS NULL ORDER BY inbox_at DESC",
+        )?;
+        let rows = stmt.query_map([], |r| {
+            let clip: Option<String> = r.get(3)?;
+            Ok(InboxItem {
+                id: r.get(0)?,
+                title: r.get(1)?,
+                preview: r.get(2)?,
+                clip: clip.and_then(|c| serde_json::from_str(&c).ok()),
+                inbox_at: r.get(4)?,
+                updated_at: r.get(5)?,
+            })
+        })?;
+        Ok(rows.collect::<std::result::Result<_, _>>()?)
+    }
+
+    /// The cards of a tag's database (design/inbox-and-tags.md §3): cards,
+    /// not journal days, with the tag anywhere in them, and their field
+    /// values; most recently changed first.
+    pub fn tag_cards(&self, tag: &str) -> Result<Vec<TagCard>> {
+        let mut stmt = self.conn.prepare_cached(
+            "SELECT c.card_id, c.title, c.preview, c.created_at, c.updated_at, c.props, c.clip FROM idx.cards c
+              WHERE c.deleted_at IS NULL AND c.kind != 'journal'
+                AND c.card_id IN (SELECT card_id FROM idx.tags WHERE tag = ?1)
+              ORDER BY c.updated_at DESC",
+        )?;
+        let rows = stmt.query_map([tag_key(tag)], |r| {
+            let clip: Option<String> = r.get(6)?;
+            Ok(TagCard {
+                id: r.get(0)?,
+                title: r.get(1)?,
+                preview: r.get(2)?,
+                created_at: r.get(3)?,
+                updated_at: r.get(4)?,
+                props: r.get::<_, Option<String>>(5)?.unwrap_or_else(|| "{}".into()),
+                url: clip.and_then(|c| serde_json::from_str::<folio_core::card::Clip>(&c).ok()).map(|c| c.url),
+            })
+        })?;
+        Ok(rows.collect::<std::result::Result<_, _>>()?)
+    }
+
     /// Cards in the trash, most recently trashed first.
     pub fn list_trash(&self, limit: u32) -> Result<Vec<CardRow>> {
         self.query_cards(
@@ -838,7 +939,7 @@ impl Store {
                  FROM idx.blocks b JOIN idx.cards c ON c.card_id = b.card_id
                 WHERE {} AND c.deleted_at IS NULL
              ) ORDER BY rank, updated_at DESC LIMIT ?{}",
-            all("title"),
+            all("(title || char(10) || ifnull(clip_text, ''))"),
             all("b.text"),
             terms.len() + 1
         );
@@ -1067,12 +1168,28 @@ impl Store {
     fn reindex_card(&mut self, id: &DocId, updated_at: i64) -> Result<()> {
         let s = card::summarize(self.doc_mut(id, DocKind::Card)?);
         self.conn.execute(
-            "INSERT INTO idx.cards(card_id, kind, title, preview, text, created_at, updated_at, deleted_at, pinned_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+            "INSERT INTO idx.cards(card_id, kind, title, preview, text, created_at, updated_at, deleted_at, pinned_at,
+                                   inbox_at, clip, clip_text, props)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)
              ON CONFLICT(card_id) DO UPDATE SET kind = excluded.kind, title = excluded.title, preview = excluded.preview,
                text = excluded.text, created_at = excluded.created_at, updated_at = excluded.updated_at,
-               deleted_at = excluded.deleted_at, pinned_at = excluded.pinned_at",
-            params![id.as_str(), s.kind, s.title, s.preview, s.text, s.created_at, updated_at, s.deleted_at, s.pinned_at],
+               deleted_at = excluded.deleted_at, pinned_at = excluded.pinned_at, inbox_at = excluded.inbox_at,
+               clip = excluded.clip, clip_text = excluded.clip_text, props = excluded.props",
+            params![
+                id.as_str(),
+                s.kind,
+                s.title,
+                s.preview,
+                s.text,
+                s.created_at,
+                updated_at,
+                s.deleted_at,
+                s.pinned_at,
+                s.inbox_at,
+                s.clip.as_ref().map(|c| serde_json::to_string(c).expect("plain struct")),
+                clip_text(&s),
+                s.props
+            ],
         )?;
         let x = folio_core::index::extract(self.doc_mut(id, DocKind::Card)?);
         let topics = card::card_topics(self.doc_mut(id, DocKind::Card)?);
@@ -1086,6 +1203,10 @@ impl Store {
             tx.execute(&format!("DELETE FROM idx.{table} WHERE {column} = ?1"), [id.as_str()])?;
         }
         tx.execute("INSERT INTO idx.fts(card_id, bid, text) VALUES (?1, '', ?2)", params![id.as_str(), s.title])?;
+        // A clipped link is found by its site and summary too, as a title is.
+        if let Some(extra) = clip_text(&s) {
+            tx.execute("INSERT INTO idx.fts(card_id, bid, text) VALUES (?1, '', ?2)", params![id.as_str(), extra])?;
+        }
         for b in &x.blocks {
             tx.execute(
                 "INSERT OR REPLACE INTO idx.blocks(bid, card_id, parent_bid, ord, text, type) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
@@ -1522,6 +1643,71 @@ mod tests {
         assert_eq!(todo, vec![(b.to_string(), "b1".to_owned(), "tag".to_owned()), (a.to_string(), "a1".to_owned(), "tag".to_owned())]);
         // Tags are part of the block's text, so search finds them too.
         assert!(s.search("#会议", 10).unwrap().iter().any(|h| h.bid.as_deref() == Some("a1")));
+    }
+
+    #[test]
+    fn the_inbox_keeps_clipped_links_until_dealt_with() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut s = Store::open(dir.path()).unwrap();
+        let clip = card::Clip { url: "https://github.com/loro-dev/loro".into(), site: "GitHub".into(), excerpt: "CRDT 协同数据结构".into(), author: String::new() };
+        let a = s.create_clip("loro-dev/loro", &clip, "", 1).unwrap();
+        let b = s.create_clip("另一篇", &card::Clip { url: "https://a.com".into(), ..Default::default() }, " 值得一读 ", 2).unwrap();
+        let ids = |s: &Store| s.inbox().unwrap().into_iter().map(|i| i.id).collect::<Vec<_>>();
+        assert_eq!(ids(&s), vec![b.to_string(), a.to_string()]);
+        let first = &s.inbox().unwrap()[1];
+        assert_eq!((first.preview.as_str(), first.clip.as_ref()), ("CRDT 协同数据结构", Some(&clip)));
+        assert_eq!(s.inbox().unwrap()[0].preview, "值得一读");
+        // Found by its summary and site, with the full-text index and without.
+        assert!(s.search("协同数据", 10).unwrap().iter().any(|h| h.card_id == a.as_str()));
+        assert!(s.search("协同", 10).unwrap().iter().any(|h| h.card_id == a.as_str()));
+        assert!(s.search("GitHub", 10).unwrap().iter().any(|h| h.card_id == a.as_str()));
+        s.set_inbox(&a, false, 3).unwrap();
+        assert_eq!(ids(&s), vec![b.to_string()]);
+        // Still a card in the library, with its link.
+        assert!(s.list_cards(10).unwrap().iter().any(|c| c.id == a.as_str()));
+        s.trash_card(&b, 4).unwrap();
+        assert!(ids(&s).is_empty());
+        s.rebuild_index().unwrap();
+        assert!(ids(&s).is_empty());
+        s.restore_card(&b, 5).unwrap();
+        assert_eq!(ids(&s), vec![b.to_string()]);
+    }
+
+    #[test]
+    fn a_tags_database_has_its_cards_and_their_fields() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut s = Store::open(dir.path()).unwrap();
+        let book = write_tagged(&mut s, "三体", &[("a1", "科幻 ", &["书"])], 1);
+        let other = write_tagged(&mut s, "Rust 编程", &[("b1", "", &["书", "编程"]), ("b2", "again ", &["书"])], 2);
+        let day = DocId::journal(2026, 10, 31).unwrap();
+        s.apply_update(&day, DocKind::Card, &journal_with_tag(&s, "书"), Origin::Local, 3).unwrap();
+        s.edit(&book, DocKind::Card, 4, |doc| {
+            let props = doc.get_map(card::META).ensure_mergeable_map(card::CARD_PROPS)?;
+            props.insert("status", "在读")?;
+            props.insert("rating", 5)?;
+            doc.commit();
+            Ok(())
+        })
+        .unwrap();
+        let rows = s.tag_cards("书").unwrap();
+        assert_eq!(rows.iter().map(|r| r.id.as_str()).collect::<Vec<_>>(), vec![book.as_str(), other.as_str()], "no journal days, each card once");
+        let props: serde_json::Value = serde_json::from_str(&rows[0].props).unwrap();
+        assert_eq!(props, serde_json::json!({ "status": "在读", "rating": 5 }));
+        assert_eq!(rows[1].props, "{}");
+        s.trash_card(&other, 5).unwrap();
+        assert_eq!(s.tag_cards("书").unwrap().len(), 1);
+    }
+
+    /// A journal day with one paragraph holding a tag.
+    fn journal_with_tag(s: &Store, name: &str) -> Vec<u8> {
+        use folio_core::body::{add_block, push_inline};
+        let doc = LoroDoc::new();
+        doc.set_peer_id(s.peer + 1).unwrap();
+        card::init_card(&doc, CardKind::Journal, "2026-10-31", 3).unwrap();
+        let p = add_block(&doc, None, "paragraph", &[("bid", "j1".into())]).unwrap();
+        push_inline(&doc, p, "tag", &[("name", name)]).unwrap();
+        doc.commit();
+        doc.export(ExportMode::all_updates()).unwrap()
     }
 
     #[test]

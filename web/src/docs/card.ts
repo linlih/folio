@@ -38,6 +38,19 @@ export interface CardMeta {
   pinnedAt: number | null;
   /** "human", "ai:<model>" or "import:<source>" (§0.3 provenance). */
   source: string;
+  /** In the inbox since (design/inbox-and-tags.md §2). */
+  inboxAt: number | null;
+  /** The link it keeps, when it is a clipped one. */
+  clip: Clip | null;
+}
+
+/** A clipped link: the page's own summary, never the page. Same fields as
+ *  `folio_core::card::Clip`, stored flat in `meta` as `clip_*`. */
+export interface Clip {
+  url: string;
+  site: string;
+  excerpt: string;
+  author: string;
 }
 
 /** Writes the card's metadata. Safe on two devices at once for the same
@@ -64,7 +77,46 @@ export function readMeta(doc: LoroDoc): CardMeta {
     deletedAt: num("deleted_at"),
     pinnedAt: num("pinned_at"),
     source: str("source") || "human",
+    inboxAt: num("inbox_at"),
+    clip: str("clip_url") ? { url: str("clip_url"), site: str("clip_site"), excerpt: str("clip_excerpt"), author: str("clip_author") } : null,
   };
+}
+
+/** Puts a link on a new card and the card in the inbox (made once, by one
+ *  device). Same as `folio_core::card::set_clip`. */
+export function setClip(doc: LoroDoc, clip: Clip, inboxAt: number) {
+  const meta = doc.getMap(META);
+  for (const k of ["url", "site", "excerpt", "author"] as const) if (clip[k]) meta.set(`clip_${k}`, clip[k]);
+  meta.set("inbox_at", inboxAt);
+  doc.commit({ origin: `${META_ORIGIN}clip` });
+}
+
+/** In the inbox since `at`, or out of it (dealt with) with null. */
+export function setInbox(doc: LoroDoc, at: number | null) {
+  const meta = doc.getMap(META);
+  if (at === null) meta.delete("inbox_at");
+  else meta.set("inbox_at", at);
+  doc.commit({ origin: `${META_ORIGIN}inbox` });
+}
+
+/** A database field's value (design/inbox-and-tags.md §3). */
+export type PropValue = string | number | boolean | string[] | null;
+
+/** `meta.props`: a mergeable map from field id to value, so two devices
+ *  filling different fields keep both. Same as `folio_core::card::CARD_PROPS`. */
+const CARD_PROPS = "props";
+
+export function readProps(doc: LoroDoc): Record<string, PropValue> {
+  const m = doc.getMap(META).get(CARD_PROPS);
+  return m instanceof LoroMap ? (m.toJSON() as Record<string, PropValue>) : {};
+}
+
+/** Sets a field; null or "" clears it. */
+export function setProp(doc: LoroDoc, field: string, value: PropValue) {
+  const m = doc.getMap(META).ensureMergeableMap(CARD_PROPS);
+  if (value === null || value === "" || (Array.isArray(value) && value.length === 0)) m.delete(field);
+  else m.set(field, value);
+  doc.commit({ origin: `${META_ORIGIN}props` });
 }
 
 export function setTitle(doc: LoroDoc, title: string) {

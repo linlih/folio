@@ -37,6 +37,7 @@ export const COMMANDS: Command[] = [
   { id: "journal", label: "journal", combo: "Mod+Shift+J", run: () => shell().open({ kind: "journal" }) },
   { id: "library", label: "library", combo: "Mod+Shift+L", run: () => shell().open({ kind: "library" }) },
   { id: "trash", label: "trash", run: () => shell().open({ kind: "trash" }) },
+  { id: "inbox", label: "inbox", run: () => shell().open({ kind: "inbox" }) },
   { id: "boards", label: "boards", run: () => shell().open({ kind: "boards" }) },
   { id: "newBoard", label: "newBoard", run: async () => shell().open({ kind: "board", boardId: await newBoard(i18n.t("board.untitled")) }) },
   { id: "sidebar", label: "sidebar", combo: SIDEBAR_COMBO, run: toggleSidebar },

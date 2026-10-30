@@ -20,6 +20,7 @@ folio-store.workspace = true
 folio-io = { path = "../crates/folio-io" }
 folio-mcp = { path = "../crates/folio-mcp" }
 folio-sync = { path = "../crates/folio-sync" }
+folio-clip = { path = "../crates/folio-clip" }
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true

@@ -144,6 +144,50 @@ pub fn set_pinned(doc: &LoroDoc, at: Option<i64>) -> LoroResult<()> {
     Ok(())
 }
 
+/// A link kept in the inbox (design/inbox-and-tags.md §2): where it came
+/// from and the page's own summary, in meta fields beside the title. The
+/// body stays the person's notes on it.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Clip {
+    pub url: String,
+    pub site: String,
+    pub excerpt: String,
+    pub author: String,
+}
+
+const CLIP_FIELDS: [&str; 4] = ["clip_url", "clip_site", "clip_excerpt", "clip_author"];
+
+/// Puts a link on the card and the card in the inbox. Done once, when the
+/// card is made, by the device that made it.
+pub fn set_clip(doc: &LoroDoc, clip: &Clip, inbox_at: i64) -> LoroResult<()> {
+    let meta = doc.get_map(META);
+    for (key, value) in CLIP_FIELDS.iter().zip([&clip.url, &clip.site, &clip.excerpt, &clip.author]) {
+        if !value.is_empty() {
+            meta.insert(key, value.as_str())?;
+        }
+    }
+    meta.insert("inbox_at", inbox_at)?;
+    doc.commit();
+    Ok(())
+}
+
+/// Takes the card out of the inbox (dealt with); the link stays on it.
+pub fn set_inbox(doc: &LoroDoc, at: Option<i64>) -> LoroResult<()> {
+    let meta = doc.get_map(META);
+    match at {
+        Some(t) => meta.insert("inbox_at", t)?,
+        None => meta.delete("inbox_at")?,
+    }
+    doc.commit();
+    Ok(())
+}
+
+/// A card's database fields (design/inbox-and-tags.md §3): `meta.props`, a
+/// mergeable map from a field's id (defined in the workspace document, per
+/// tag) to its value, so two devices filling different fields keep both.
+pub const CARD_PROPS: &str = "props";
+
 /// Moves a layout-1 body (`doc` root, plain lists) into the layout-2 root
 /// (`body`, movable lists), keeping every node, attribute (block ids
 /// included) and text style, then empties the old root. Returns false when
@@ -230,6 +274,12 @@ pub struct CardSummary {
     pub created_at: Option<i64>,
     pub deleted_at: Option<i64>,
     pub pinned_at: Option<i64>,
+    /// In the inbox since.
+    pub inbox_at: Option<i64>,
+    /// The link it keeps, when it is a clipped one.
+    pub clip: Option<Clip>,
+    /// Database field values by field id, as a JSON object (`{}` for none).
+    pub props: String,
     /// The first characters of the body text, for lists and search results.
     pub preview: String,
     /// All body text, one line per block.
@@ -252,7 +302,15 @@ pub fn summarize(doc: &LoroDoc) -> CardSummary {
     let mut lines = Vec::new();
     collect_blocks(&crate::body::body_value(doc), 0, &mut lines);
     let text = lines.join("\n");
-    let preview: String = lines.iter().map(|l| l.trim_start()).collect::<Vec<_>>().join(" ").chars().take(PREVIEW_CHARS).collect();
+    let [url, site, excerpt, author] = CLIP_FIELDS.map(string);
+    let clip = (!url.is_empty()).then_some(Clip { url, site, excerpt, author });
+    let mut preview: String = lines.iter().map(|l| l.trim_start()).collect::<Vec<_>>().join(" ").chars().take(PREVIEW_CHARS).collect();
+    // A clipped link with no notes yet shows the page's summary.
+    if preview.trim().is_empty()
+        && let Some(c) = &clip
+    {
+        preview = c.excerpt.chars().take(PREVIEW_CHARS).collect();
+    }
     CardSummary {
         kind: string("kind"),
         title: string("title"),
@@ -260,9 +318,40 @@ pub fn summarize(doc: &LoroDoc) -> CardSummary {
         created_at: int("created_at"),
         deleted_at: int("deleted_at"),
         pinned_at: int("pinned_at"),
+        inbox_at: int("inbox_at"),
+        clip,
+        props: props_json(doc),
         preview,
         text,
     }
+}
+
+/// `meta.props` as a JSON object; values that are not plain (a container)
+/// are left out.
+fn props_json(doc: &LoroDoc) -> String {
+    let Some(ValueOrContainer::Container(Container::Map(m))) = doc.get_map(META).get(CARD_PROPS) else { return "{}".into() };
+    let mut out = serde_json::Map::new();
+    m.for_each(|k, v| {
+        if let ValueOrContainer::Value(v) = v
+            && let Some(j) = json_of(&v)
+        {
+            out.insert(k.to_string(), j);
+        }
+    });
+    serde_json::Value::Object(out).to_string()
+}
+
+fn json_of(v: &LoroValue) -> Option<serde_json::Value> {
+    use serde_json::Value;
+    Some(match v {
+        LoroValue::Null => Value::Null,
+        LoroValue::Bool(b) => Value::Bool(*b),
+        LoroValue::I64(n) => Value::from(*n),
+        LoroValue::Double(n) => serde_json::Number::from_f64(*n).map(Value::Number)?,
+        LoroValue::String(s) => Value::String(s.to_string()),
+        LoroValue::List(l) => Value::Array(l.iter().filter_map(json_of).collect()),
+        _ => return None,
+    })
 }
 
 /// Walks the deep value of the body tree; a text container's deep value is a
@@ -466,6 +555,30 @@ mod tests {
         assert_eq!(summarize(&doc).pinned_at, Some(7));
         set_pinned(&doc, None).unwrap();
         assert_eq!(summarize(&doc).pinned_at, None);
+    }
+
+    #[test]
+    fn clipped_links_and_fields() {
+        let doc = LoroDoc::new();
+        init_card(&doc, CardKind::Note, "A page", 1).unwrap();
+        let s = summarize(&doc);
+        assert_eq!((s.inbox_at, s.clip, s.props.as_str()), (None, None, "{}"));
+        let clip = Clip { url: "https://a.com/x".into(), site: "a.com".into(), excerpt: "What it says".into(), author: String::new() };
+        set_clip(&doc, &clip, 5).unwrap();
+        let s = summarize(&doc);
+        assert_eq!((s.inbox_at, s.clip.as_ref(), s.preview.as_str()), (Some(5), Some(&clip), "What it says"));
+        append_paragraph(&doc, "my note").unwrap();
+        assert_eq!(summarize(&doc).preview, "my note");
+        set_inbox(&doc, None).unwrap();
+        assert_eq!(summarize(&doc).inbox_at, None);
+        assert_eq!(summarize(&doc).clip, Some(clip));
+        let props = doc.get_map(META).ensure_mergeable_map(CARD_PROPS).unwrap();
+        props.insert("p1", "在读").unwrap();
+        props.insert("p2", 4.5).unwrap();
+        props.insert("p3", true).unwrap();
+        doc.commit();
+        let v: serde_json::Value = serde_json::from_str(&summarize(&doc).props).unwrap();
+        assert_eq!(v, serde_json::json!({ "p1": "在读", "p2": 4.5, "p3": true }));
         add_card_topic(&doc, "t2", 1).unwrap();
         add_card_topic(&doc, "t1", 2).unwrap();
         add_card_topic(&doc, "t2", 3).unwrap();
