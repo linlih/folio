@@ -5,7 +5,7 @@ use std::time::Duration;
 
 use crate::client::Transport;
 use crate::crypto::WrappedKey;
-use crate::protocol::{AcksResponse, BlobDone, BlobIds, BlobsResponse, DeviceInfo, DeviceName, DevicesResponse, HeavyDoc, HeavyResponse, Live, PullResponse, PushItem, PushRequest, AcksRequest, AcksStored, Round, PushResponse, RefsResponse, SnapshotRequest, SnapshotResponse, DEVICE_HEADER};
+use crate::protocol::{AcksResponse, BlobDone, BlobIds, BlobsResponse, DeviceInfo, DeviceName, DevicesResponse, HeavyDoc, HeavyResponse, Live, PullResponse, PurgeRequest, PushItem, PushRequest, AcksRequest, AcksStored, Round, PushResponse, RefsResponse, SnapshotRequest, SnapshotResponse, DEVICE_HEADER};
 use crate::{Result, SyncError};
 
 /// Where and as whom: the server's address and token, the workspace, this
@@ -160,6 +160,11 @@ impl Transport for Http {
 
     fn finish_blob(&self, id: &str, chunks: u32) -> Result<()> {
         self.req("POST", &format!("blobs/{id}/done")).send_json(BlobDone { chunks }).map_err(err)?;
+        Ok(())
+    }
+
+    fn purge(&self, docs: &[String]) -> Result<()> {
+        self.req("POST", "purge").send_json(PurgeRequest { docs: docs.to_vec() }).map_err(err)?;
         Ok(())
     }
 

@@ -169,8 +169,8 @@
 .library-tile-foot .library-tile-topic::before { content: "· "; }
 .topic-confirm.choose select { max-width: 40%; }
 /* Asking about the topic (delete, move, merge): a row under its name. */
-.library .page-header:has(> .topic-confirm) { flex-wrap: wrap; }
-.library .page-header > .topic-confirm { order: 1; flex: 1 0 100%; margin: 4px 0 0; }
+.page-header:has(> .topic-confirm) { flex-wrap: wrap; }
+.page-header > .topic-confirm { order: 1; flex: 1 0 100%; margin: 4px 0 0; }
 .page-header .topic-confirm .button { margin-left: 0; }
 .topic-grid-section { margin-bottom: 22px; }
 .topic-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }

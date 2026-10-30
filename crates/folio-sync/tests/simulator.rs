@@ -135,6 +135,10 @@ impl Transport for Direct<'_> {
     fn finish_blob(&self, id: &str, chunks: u32) -> folio_sync::Result<()> {
         self.relay.finish_blob(WS, &self.device, id, chunks)
     }
+    fn purge(&self, docs: &[String]) -> folio_sync::Result<()> {
+        self.arrive()?;
+        self.reply(self.relay.purge(WS, &self.device, docs))
+    }
     fn report_refs(&self, ids: &[String]) -> folio_sync::Result<Vec<String>> {
         self.relay.report_refs(WS, &self.device, ids)
     }
@@ -153,6 +157,8 @@ struct Device {
     restores: usize,
     /// Documents the convergence check sent again.
     resent: usize,
+    /// Cards it deleted for good (emptying the trash, or after a while there).
+    purged: Vec<DocId>,
     /// The editor's replicas, kept between edits like open cards.
     replicas: RefCell<HashMap<DocId, LoroDoc>>,
     /// Edits made in an open editor and not saved yet: the version before
@@ -171,6 +177,7 @@ impl Device {
             joins: 0,
             restores: 0,
             resent: 0,
+            purged: Vec::new(),
             replicas: RefCell::default(),
             unsaved: RefCell::default(),
             dir,
@@ -370,7 +377,7 @@ fn step(devices: &mut [Device], relay: &Relay, engine: &Engine, rng: &mut Rng, n
         // snapshot, a backup, or (rarely) restoring the library from one.
         80..=84 => {
             let dev = &mut devices[d];
-            match rng.below(20) {
+            match rng.below(30) {
                 0..=11 if !docs.is_empty() => {
                     let id = &docs[rng.below(docs.len())];
                     dev.store.lock().unwrap().compact_doc(id).unwrap();
@@ -380,6 +387,30 @@ fn step(devices: &mut [Device], relay: &Relay, engine: &Engine, rng: &mut Rng, n
                 }
                 19 => {
                     dev.restore(rng, now);
+                }
+                // The trash: a card in, one back out, emptying it, or what
+                // has been there a while deleted for good.
+                20..=24 if !docs.is_empty() => {
+                    let id = &docs[rng.below(docs.len())];
+                    dev.store.lock().unwrap().trash_card(id, now).unwrap();
+                }
+                25..=26 => {
+                    let mut s = dev.store.lock().unwrap();
+                    if let Some(c) = s.list_trash(100).unwrap().first().cloned() {
+                        s.restore_card(&DocId::parse(&c.id).unwrap(), now).unwrap();
+                    }
+                }
+                27 => {
+                    let mut s = dev.store.lock().unwrap();
+                    let all: Vec<DocId> = s.list_trash(1000).unwrap().iter().map(|c| DocId::parse(&c.id).unwrap()).collect();
+                    let gone = s.purge_cards(&all, now).unwrap();
+                    dev.purged.extend(gone);
+                }
+                28..=29 => {
+                    let mut s = dev.store.lock().unwrap();
+                    let old = s.trashed_before(now - 100).unwrap();
+                    let gone = s.purge_cards(&old, now).unwrap();
+                    dev.purged.extend(gone);
                 }
                 _ => {}
             }
@@ -453,13 +484,40 @@ fn settle(devices: &mut [Device], relay: &Relay, engine: &Engine) {
         let mut quiet = true;
         for d in devices.iter_mut() {
             let r = sync(d, relay, engine, None);
-            quiet &= r.pushed == 0 && r.applied.is_empty() && r.resent == 0;
+            quiet &= r.pushed == 0 && r.applied.is_empty() && r.resent == 0 && d.store.lock().unwrap().purges_unsent().unwrap().is_empty();
         }
         if quiet {
             return;
         }
     }
     panic!("sync did not settle");
+}
+
+/// A card deleted for good on one device is gone from every device, and
+/// the server holds nothing of it. (A deletion can be undone before it
+/// syncs: by restoring the library from an earlier backup.)
+fn assert_purged(devices: &[Device], relay: &Relay, keys: &Keys) -> usize {
+    let purged: BTreeSet<DocId> =
+        devices.iter().flat_map(|d| d.purged.iter().cloned()).filter(|id| devices.iter().any(|d| d.store.lock().unwrap().is_purged(id).unwrap())).collect();
+    for d in devices {
+        let mut s = d.store.lock().unwrap();
+        for id in &purged {
+            assert!(s.is_purged(id).unwrap(), "{}: {id} is not deleted", d.name);
+            assert!(s.doc_snapshot_if_exists(id).unwrap().is_none(), "{}: {id} is still here", d.name);
+        }
+    }
+    let tags: BTreeSet<String> = purged.iter().map(|id| keys.doc_tag(id.as_str())).collect();
+    let mut after = 0;
+    loop {
+        let r = relay.pull(WS, "check", after, 1000).unwrap();
+        for u in &r.updates {
+            assert!(!tags.contains(&u.doc), "the server still has an update of a deleted card (seq {})", u.seq);
+        }
+        match r.updates.last() {
+            Some(u) if u.seq < r.head => after = u.seq,
+            _ => return purged.len(),
+        }
+    }
 }
 
 fn assert_converged(devices: &[Device]) -> usize {
@@ -578,12 +636,13 @@ fn run(seed: u64, devices: usize, steps: usize) -> usize {
     settle(&mut devices, &relay, &engine);
     let docs = assert_converged(&devices);
     assert_acks_agree(&devices, &relay, &engine);
+    let purged = assert_purged(&devices, &relay, &Keys::derive(&key));
     let (updates, snapshots) = relay.log_stats(WS).unwrap();
     assert!(snapshots > 0, "seed {seed}: no log was replaced ({updates} updates)");
     let rejoined: usize = devices.iter().map(|d| d.joins).sum();
     let restored: usize = devices.iter().map(|d| d.restores).sum();
     let resent: usize = devices.iter().map(|d| d.resent).sum();
-    println!("seed {seed}: {docs} documents; server log {updates} updates + {snapshots} snapshots; {rejoined} rejoins after removal; {restored} restores from a backup; {resent} documents sent again by the convergence check");
+    println!("seed {seed}: {docs} documents; server log {updates} updates + {snapshots} snapshots; {rejoined} rejoins after removal; {restored} restores from a backup; {resent} documents sent again by the convergence check; {purged} cards deleted for good");
     docs
 }
 

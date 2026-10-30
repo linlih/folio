@@ -266,6 +266,52 @@ fn restore_card(app: tauri::AppHandle, state: tauri::State<AppState>, id: String
     Ok(())
 }
 
+/// Deletes every card in the trash for good, on every device (§5.4).
+/// Returns their ids.
+#[tauri::command]
+fn empty_trash(app: tauri::AppHandle, state: tauri::State<AppState>) -> CmdResult<Vec<String>> {
+    let gone = {
+        let mut s = lock(&state)?;
+        let ids = s.list_trash(u32::MAX)?.iter().map(|c| DocId::parse(&c.id)).collect::<Result<Vec<_>, _>>()?;
+        s.purge_cards(&ids, now_ms())?
+    };
+    tracing::info!(cards = gone.len(), "emptied the trash");
+    announce_purged(&app, &gone);
+    sync::poke(&app);
+    Ok(gone.iter().map(|id| id.to_string()).collect())
+}
+
+/// How long a card stays in the trash before it is deleted for good.
+const TRASH_DAYS: i64 = 30;
+
+/// Deletes for good the cards that have been in the trash for
+/// `TRASH_DAYS`; run hourly, after a backup.
+fn purge_old_trash(app: &tauri::AppHandle, state: &AppState) {
+    let cutoff = now_ms() - TRASH_DAYS * 24 * 60 * 60 * 1000;
+    let gone = lock(state).map(|mut s| s.trashed_before(cutoff).and_then(|ids| s.purge_cards(&ids, now_ms())));
+    match gone {
+        Ok(Ok(gone)) if !gone.is_empty() => {
+            tracing::info!(cards = gone.len(), days = TRASH_DAYS, "deleted cards long in the trash");
+            announce_purged(app, &gone);
+            sync::poke(app);
+        }
+        Ok(Ok(_)) => {}
+        Ok(Err(e)) => tracing::error!(error = %e, "deleting old cards in the trash failed"),
+        Err(e) => tracing::error!(error = %e, "deleting old cards in the trash failed"),
+    }
+}
+
+/// Tells the frontend of documents deleted for good (here, or by another
+/// device): it closes them, and takes in the workspace document listing them.
+pub(crate) fn announce_purged(app: &tauri::AppHandle, ids: &[DocId]) {
+    use tauri::Emitter;
+    if ids.is_empty() {
+        return;
+    }
+    let _ = app.emit("docs-purged", ids.iter().map(|id| id.to_string()).collect::<Vec<_>>());
+    let _ = app.emit("sync-applied", vec![DocId::WORKSPACE.to_owned()]);
+}
+
 #[tauri::command]
 fn topic_cards(state: tauri::State<AppState>, topic: String) -> CmdResult<Vec<CardRow>> {
     Ok(lock(&state)?.topic_cards(&topic)?)
@@ -712,8 +758,10 @@ fn auto_backup(app: tauri::AppHandle) {
                 false
             }
         };
-        // Never compact without a recent backup to go back to.
+        // Never compact or delete for good without a recent backup to go
+        // back to.
         if backed_up {
+            purge_old_trash(&app, &state);
             compact_logs(&state, &dir);
         }
         assets::sweep(&state);
@@ -1052,6 +1100,7 @@ pub fn run() {
             trash_card,
             restore_card,
             list_trash,
+            empty_trash,
             pin_card,
             topic_cards,
             topic_counts,

@@ -18,6 +18,8 @@ export const MEMORY_API_PEER = "3";
  *  Everything is gone on reload. */
 export function memoryBackend(now: () => number = Date.now): Backend {
   const docs = new Map<string, { doc: LoroDoc; updatedAt: number }>();
+  /** Deleted for good: later updates are dropped, as the host does. */
+  const purged = new Set<string>();
   const settings = new Map<string, unknown>();
   const backups: { info: BackupInfo; docs: Map<string, Uint8Array> }[] = [];
   /** Added files: hash → object URL. */
@@ -67,6 +69,7 @@ export function memoryBackend(now: () => number = Date.now): Backend {
     },
     docSnapshot: async (id) => docs.get(id)?.doc.export({ mode: "snapshot" }) ?? null,
     applyUpdate: async (id, _kind, bytes) => {
+      if (purged.has(id)) return;
       const e = docs.get(id) ?? { doc: hostDoc(), updatedAt: 0 };
       e.doc.import(bytes);
       e.updatedAt = now();
@@ -80,6 +83,16 @@ export function memoryBackend(now: () => number = Date.now): Backend {
         .filter(([, e]) => readMeta(e.doc).pinnedAt !== null && readMeta(e.doc).deletedAt === null)
         .sort(([, a], [, b]) => (readMeta(a.doc).pinnedAt ?? 0) - (readMeta(b.doc).pinnedAt ?? 0))
         .map(([id, e]) => row(id, e)),
+    emptyTrash: async () => {
+      const gone = cards()
+        .filter(([id, e]) => readMeta(e.doc).deletedAt !== null && !isJournalId(id))
+        .map(([id]) => id);
+      for (const id of gone) {
+        docs.delete(id);
+        purged.add(id);
+      }
+      return gone;
+    },
     listTrash: async (limit = 200) =>
       cards()
         .filter(([, e]) => readMeta(e.doc).deletedAt !== null)

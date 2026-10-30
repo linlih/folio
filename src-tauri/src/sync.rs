@@ -367,6 +367,10 @@ fn run(app: tauri::AppHandle, engine: Engine, http: Http, name: String, stop: Ar
             named = engine.set_device_name(&http, &name).map_err(|e| tracing::debug!(error = %e, "sending the device name failed")).is_ok();
         }
         let result = engine.sync(&state.store, &http as &dyn Transport);
+        // Deleted for good by another device (the workspace document said so).
+        if let Ok(gone) = lock(&state).map(|mut s| s.take_purged()) {
+            crate::announce_purged(&app, &gone);
+        }
         let pending = lock(&state).ok().and_then(|s| s.outbox_len().ok()).unwrap_or(0);
         match result {
             Ok(report) => {

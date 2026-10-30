@@ -15,7 +15,7 @@ use folio_core::{DocId, DocKind};
 use folio_store::Store;
 
 use crate::crypto::{b64, unb64, Keys};
-use crate::protocol::{Round, AcksResponse, BlobsResponse, DeviceInfo, HeavyDoc, PullResponse, PushItem};
+use crate::protocol::{Round, AcksResponse, BlobsResponse, DeviceInfo, HeavyDoc, PullResponse, PushItem, MAX_PURGE_IDS};
 use crate::{Result, SyncError};
 
 /// The server's side of the conversation; HTTP in the app, the relay
@@ -46,6 +46,8 @@ pub trait Transport {
     /// Reports the files this device uses (replacing its last report);
     /// returns those the server does not have whole.
     fn report_refs(&self, ids: &[String]) -> Result<Vec<String>>;
+    /// Deletes documents for good on the server (by tag).
+    fn purge(&self, docs: &[String]) -> Result<()>;
 }
 
 /// Updates sent per push.
@@ -168,6 +170,7 @@ pub fn forget_workspace(store: &Store) -> Result<()> {
     }
     store.clear_device_acks()?;
     store.forget_uploads()?;
+    store.resend_purges()?;
     Ok(())
 }
 
@@ -274,6 +277,10 @@ impl Engine {
                     let (kind, doc, bytes) = open_envelope(plain)?;
                     if s.apply_remote(&doc, kind, bytes, now_ms())? {
                         applied.push(Applied { doc, bytes: bytes.to_vec() });
+                    } else if s.is_purged(&doc)? {
+                        // The server still has a document deleted for good
+                        // (it went back to an older copy): tell it again.
+                        s.set_purges_sent(std::slice::from_ref(&doc), false)?;
                     }
                 }
                 s.set_sync_value(CURSOR, &last.to_le_bytes())?;
@@ -504,12 +511,30 @@ impl Engine {
     /// server may not take them); it is in the report.
     pub fn sync(&self, store: &Mutex<Store>, t: &dyn Transport) -> Result<Report> {
         let pushed = self.push(store, t)?;
+        // A server from before deleting for good does not know the request;
+        // the documents are still deleted on every device.
+        if let Err(e) = self.send_purges(store, t) {
+            tracing::warn!(error = %e, "could not tell the server of documents deleted for good");
+        }
         let (pulled, applied) = self.pull(store, t)?;
         let (resent, acks_error) = match self.exchange_acks(store, t) {
             Ok(n) => (n, None),
             Err(e) => (0, Some(e.to_string())),
         };
         Ok(Report { pushed, pulled, applied, acks_error, resent })
+    }
+
+    /// Tells the server of documents deleted for good (§5.4), so it deletes
+    /// its copy; returns how many. Every device does, which costs little and
+    /// does not depend on the one that deleted them staying around.
+    fn send_purges(&self, store: &Mutex<Store>, t: &dyn Transport) -> Result<usize> {
+        let ids = lock(store).purges_unsent()?;
+        for chunk in ids.chunks(MAX_PURGE_IDS) {
+            let tags: Vec<String> = chunk.iter().map(|id| self.keys.doc_tag(id.as_str())).collect();
+            t.purge(&tags)?;
+            lock(store).set_purges_sent(chunk, true)?;
+        }
+        Ok(ids.len())
     }
 
     fn exchange_acks(&self, store: &Mutex<Store>, t: &dyn Transport) -> Result<usize> {

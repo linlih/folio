@@ -19,6 +19,9 @@ export interface Backend {
   trashCard(id: string): Promise<void>;
   restoreCard(id: string): Promise<void>;
   listTrash(limit?: number): Promise<CardRow[]>;
+  /** Deletes every card in the trash for good, on every device (journal
+   *  days stay); returns their ids. */
+  emptyTrash(): Promise<string[]>;
   /** Pins a card to the sidebar, or unpins it (a card field: it syncs). */
   pinCard(id: string, pinned: boolean): Promise<void>;
   /** Pinned cards not in the trash, in the order they were pinned. */

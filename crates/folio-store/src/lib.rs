@@ -224,7 +224,13 @@ pub struct Store {
     peer: u64,
     /// The data folder (`store.db`, `index.db`, `backups/`).
     dir: PathBuf,
+    /// Documents deleted for good since `take_purged` was last called.
+    purged_now: Vec<DocId>,
 }
+
+/// The workspace document's map of documents deleted for good: id → when
+/// (§5.4). It syncs like any edit, so every device deletes them.
+const PURGED: &str = "purged";
 
 /// `sync_state` keys of this library's peer ids: Rust's, the editor's and
 /// the API replica's (§4.5 rule 3).
@@ -243,11 +249,13 @@ impl Store {
         }
         let index_recreated = schema::migrate(&conn)?;
         let peer = Self::load_or_create_peer(&conn, PEER_KEYS[0])?;
-        let mut store = Store { conn, docs: HashMap::new(), peer, dir: dir.to_path_buf() };
+        let mut store = Store { conn, docs: HashMap::new(), peer, dir: dir.to_path_buf(), purged_now: Vec::new() };
         let migrated = store.migrate_bodies()?;
         if index_recreated || migrated > 0 || store.index_is_empty()? {
             store.rebuild_index()?;
         }
+        // A library from an app that did not delete for good yet.
+        store.apply_purges(now_ms())?;
         Ok(store)
     }
 
@@ -277,7 +285,12 @@ impl Store {
     }
 
     /// The single write path for document content.
+    /// Updates of a document deleted for good are dropped.
     pub fn apply_update(&mut self, id: &DocId, kind: DocKind, bytes: &[u8], origin: Origin, now_ms: i64) -> Result<()> {
+        if self.is_purged(id)? {
+            tracing::debug!(doc = %id, "dropped an update of a document deleted for good");
+            return Ok(());
+        }
         let doc = self.doc_mut(id, kind)?;
         doc.import(bytes).map_err(loro_err)?;
         let tx = self.conn.unchecked_transaction()?;
@@ -297,6 +310,9 @@ impl Store {
         tx.commit()?;
         if kind == DocKind::Card {
             self.reindex_card(id, now_ms)?;
+        }
+        if kind == DocKind::Workspace {
+            self.apply_purges(now_ms)?;
         }
         Ok(())
     }
@@ -429,6 +445,9 @@ impl Store {
     /// new (our own update coming back, or one seen before): then nothing is
     /// stored or reindexed.
     pub fn apply_remote(&mut self, id: &DocId, kind: DocKind, bytes: &[u8], now_ms: i64) -> Result<bool> {
+        if self.is_purged(id)? {
+            return Ok(false);
+        }
         if self.kind_of(id)?.is_some() {
             let doc = self.doc_mut(id, kind)?;
             let before = doc.oplog_vv();
@@ -482,6 +501,130 @@ impl Store {
 
     pub fn restore_card(&mut self, id: &DocId, now_ms: i64) -> Result<()> {
         self.edit(id, DocKind::Card, now_ms, |doc| card::set_deleted(doc, None))
+    }
+
+    // ---- deleting for good (§5.4) ----
+
+    /// Deletes cards for good on every device: lists them in the workspace
+    /// document's `purged` map, which syncs, and deletes them here. Returns
+    /// those deleted. Never a journal day: its id is its date, and a date
+    /// deleted for good could never be written again.
+    pub fn purge_cards(&mut self, ids: &[DocId], now_ms: i64) -> Result<Vec<DocId>> {
+        let ws = DocId::workspace();
+        let ids: Vec<&DocId> = ids.iter().filter(|id| **id != ws && !id.is_journal()).collect();
+        if ids.is_empty() {
+            return Ok(Vec::new());
+        }
+        let write = |doc: &LoroDoc| -> loro::LoroResult<()> {
+            let map = doc.get_map(PURGED);
+            for id in &ids {
+                map.insert(id.as_str(), now_ms)?;
+            }
+            doc.commit();
+            Ok(())
+        };
+        if self.kind_of(&ws)?.is_some() {
+            self.edit(&ws, DocKind::Workspace, now_ms, write)?;
+        } else {
+            let doc = LoroDoc::new();
+            doc.set_peer_id(self.peer).map_err(loro_err)?;
+            write(&doc).map_err(loro_err)?;
+            let bytes = doc.export(ExportMode::all_updates()).map_err(loro_err)?;
+            self.apply_update(&ws, DocKind::Workspace, &bytes, Origin::Local, now_ms)?;
+        }
+        Ok(self.take_purged())
+    }
+
+    /// Cards (not journal days) moved to the trash at or before `cutoff`
+    /// (ms): what is deleted for good after a while there.
+    pub fn trashed_before(&self, cutoff: i64) -> Result<Vec<DocId>> {
+        let mut stmt =
+            self.conn.prepare_cached("SELECT card_id FROM idx.cards WHERE deleted_at IS NOT NULL AND deleted_at <= ?1 AND kind != 'journal'")?;
+        let ids = stmt.query_map([cutoff], |r| r.get::<_, String>(0))?;
+        ids.map(|id| DocId::parse(&id?).map_err(StoreError::from)).collect()
+    }
+
+    /// Documents deleted for good since the last call (here or, through the
+    /// workspace document, on another device), for the app to close them.
+    pub fn take_purged(&mut self) -> Vec<DocId> {
+        std::mem::take(&mut self.purged_now)
+    }
+
+    pub fn is_purged(&self, id: &DocId) -> Result<bool> {
+        Ok(self.conn.query_row("SELECT EXISTS(SELECT 1 FROM purged WHERE doc_id = ?1)", [id.as_str()], |r| r.get(0))?)
+    }
+
+    /// Deletes here what the workspace document lists as deleted for good
+    /// and is not yet: the document, its updates, what waits to be sent,
+    /// the reports of it and its index rows. (Local backups keep it until
+    /// they are rotated out.)
+    fn apply_purges(&mut self, now_ms: i64) -> Result<()> {
+        let ws = DocId::workspace();
+        if self.kind_of(&ws)?.is_none() {
+            return Ok(());
+        }
+        let listed: Vec<String> = self.doc_mut(&ws, DocKind::Workspace)?.get_map(PURGED).keys().map(|k| k.to_string()).collect();
+        if listed.is_empty() {
+            return Ok(());
+        }
+        let known: std::collections::HashSet<String> = {
+            let mut stmt = self.conn.prepare_cached("SELECT doc_id FROM purged")?;
+            stmt.query_map([], |r| r.get(0))?.collect::<std::result::Result<_, _>>()?
+        };
+        let new: Vec<DocId> =
+            listed.iter().filter(|id| !known.contains(*id)).filter_map(|id| DocId::parse(id).ok()).filter(|id| *id != ws && !id.is_journal()).collect();
+        if new.is_empty() {
+            return Ok(());
+        }
+        let tx = self.conn.unchecked_transaction()?;
+        for id in &new {
+            let id = id.as_str();
+            for table in ["docs", "doc_updates", "outbox", "device_acks"] {
+                tx.execute(&format!("DELETE FROM {table} WHERE doc_id = ?1"), [id])?;
+            }
+            for (table, column) in [
+                ("cards", "card_id"),
+                ("blocks", "card_id"),
+                ("fts", "card_id"),
+                ("tags", "card_id"),
+                ("card_topics", "card_id"),
+                ("asset_refs", "doc_id"),
+                ("links", "from_card"),
+                ("refs", "from_card"),
+            ] {
+                tx.execute(&format!("DELETE FROM idx.{table} WHERE {column} = ?1"), [id])?;
+            }
+            tx.execute("INSERT OR IGNORE INTO purged(doc_id, at) VALUES (?1, ?2)", params![id, now_ms])?;
+        }
+        tx.commit()?;
+        for id in &new {
+            self.docs.remove(id);
+            tracing::info!(doc = %id, "deleted a document for good");
+        }
+        self.purged_now.extend(new);
+        Ok(())
+    }
+
+    /// Documents deleted for good that the sync server has not been told of.
+    pub fn purges_unsent(&self) -> Result<Vec<DocId>> {
+        let mut stmt = self.conn.prepare_cached("SELECT doc_id FROM purged WHERE sent = 0 ORDER BY doc_id")?;
+        let ids = stmt.query_map([], |r| r.get::<_, String>(0))?;
+        ids.map(|id| DocId::parse(&id?).map_err(StoreError::from)).collect()
+    }
+
+    pub fn set_purges_sent(&self, ids: &[DocId], sent: bool) -> Result<()> {
+        let mut stmt = self.conn.prepare_cached("UPDATE purged SET sent = ?2 WHERE doc_id = ?1")?;
+        for id in ids {
+            stmt.execute(params![id.as_str(), sent])?;
+        }
+        Ok(())
+    }
+
+    /// Tells the (next) sync server of every deletion again: a device
+    /// joining a workspace, or starting over.
+    pub fn resend_purges(&self) -> Result<()> {
+        self.conn.execute("UPDATE purged SET sent = 0", [])?;
+        Ok(())
     }
 
     /// Pins a card to the sidebar, or unpins it.
@@ -966,6 +1109,80 @@ mod tests {
     use super::*;
 
     #[test]
+    fn a_card_deleted_for_good_is_gone_everywhere_and_stays_gone() {
+        let (a_dir, b_dir) = (tempfile::tempdir().unwrap(), tempfile::tempdir().unwrap());
+        let mut a = Store::open(a_dir.path()).unwrap();
+        let mut b = Store::open(b_dir.path()).unwrap();
+        let gone = a.create_card(CardKind::Note, "旧笔记", 1).unwrap();
+        let kept = a.create_card(CardKind::Note, "留着", 2).unwrap();
+        for id in [&gone, &kept] {
+            b.apply_remote(id, DocKind::Card, &a.doc_snapshot(id).unwrap(), 3).unwrap();
+        }
+        a.trash_card(&gone, 10).unwrap();
+        assert_eq!(a.trashed_before(10).unwrap(), vec![gone.clone()]);
+        assert!(a.trashed_before(9).unwrap().is_empty());
+        let edit_from_b = {
+            let doc = b.doc_copy(&gone).unwrap();
+            let v = doc.oplog_vv();
+            folio_core::card::append_paragraph(&doc, "离线时写的").unwrap();
+            doc.export(ExportMode::updates(&v)).unwrap()
+        };
+        a.outbox_ack(&a.outbox_batch(100).unwrap().iter().map(|o| o.id).collect::<Vec<_>>()).unwrap();
+
+        let day = DocId::journal(2026, 10, 1).unwrap();
+        let snapshot = a.doc_snapshot(&gone).unwrap();
+        a.apply_update(&day, DocKind::Card, &snapshot, Origin::Local, 11).unwrap();
+        assert_eq!(a.purge_cards(&[gone.clone(), day.clone()], 20).unwrap(), vec![gone.clone()], "never a journal day");
+        assert!(!a.is_purged(&day).unwrap());
+        assert!(a.doc_snapshot_if_exists(&gone).unwrap().is_none());
+        let trash: Vec<String> = a.list_trash(10).unwrap().into_iter().map(|c| c.id).collect();
+        assert_eq!(trash, vec![day.to_string()], "the journal day stays in the trash");
+        assert!(a.search("旧笔记", 10).unwrap().is_empty());
+        assert_eq!(a.list_cards(10).unwrap().len(), 1);
+        assert_eq!(a.purges_unsent().unwrap(), vec![gone.clone()]);
+        // Nothing of it is left to send; the workspace document listing it is.
+        let outbox = a.outbox_batch(100).unwrap();
+        assert!(outbox.iter().all(|o| o.doc != gone) && outbox.iter().any(|o| o.doc == DocId::workspace()));
+        // An update made elsewhere before the deletion arrived is dropped,
+        // and so is one from an editor still open here.
+        assert!(!a.apply_remote(&gone, DocKind::Card, &edit_from_b, 21).unwrap());
+        a.apply_update(&gone, DocKind::Card, &edit_from_b, Origin::Local, 22).unwrap();
+        assert!(a.doc_snapshot_if_exists(&gone).unwrap().is_none());
+
+        // The other device deletes it when the workspace document arrives.
+        for o in &outbox {
+            b.apply_remote(&o.doc, o.kind, &o.bytes, 30).unwrap();
+        }
+        assert_eq!(b.take_purged(), vec![gone.clone()]);
+        assert!(b.doc_snapshot_if_exists(&gone).unwrap().is_none());
+        assert_eq!(b.card_summary(&kept).unwrap().title, "留着");
+        assert!(!b.outbox_docs().unwrap().contains(&gone), "nothing of it is sent");
+        // And it stays deleted after a restart.
+        drop(a);
+        let mut a = Store::open(a_dir.path()).unwrap();
+        assert!(a.take_purged().is_empty());
+        assert!(!a.apply_remote(&gone, DocKind::Card, &edit_from_b, 40).unwrap());
+    }
+
+    #[test]
+    fn a_library_from_before_deleting_for_good_catches_up_on_open() {
+        let dir = tempfile::tempdir().unwrap();
+        let gone = {
+            let mut s = Store::open(dir.path()).unwrap();
+            let gone = s.create_card(CardKind::Note, "x", 1).unwrap();
+            s.purge_cards(&[gone.clone()], 2).unwrap();
+            // As an older app would have left it: listed, but still here.
+            s.conn.execute("DELETE FROM purged", []).unwrap();
+            s.create_card(CardKind::Note, "y", 3).unwrap();
+            s.conn.execute("INSERT INTO docs(doc_id, kind, snapshot, updated_at) VALUES (?1, 'card', NULL, 1)", [gone.as_str()]).unwrap();
+            gone
+        };
+        let mut s = Store::open(dir.path()).unwrap();
+        assert_eq!(s.take_purged(), vec![gone.clone()]);
+        assert!(s.doc_snapshot_if_exists(&gone).unwrap().is_none());
+    }
+
+    #[test]
     fn create_list_reopen() {
         let dir = tempfile::tempdir().unwrap();
         let id = {
@@ -1011,7 +1228,7 @@ mod tests {
             s.conn
                 .execute_batch(
                     "DROP INDEX docs_by_changed; ALTER TABLE docs DROP COLUMN changed;
-                     ALTER TABLE assets DROP COLUMN orphan_since;
+                     ALTER TABLE assets DROP COLUMN orphan_since; DROP TABLE purged;
                      INSERT INTO assets(sha256, mime, size, local) VALUES ('kept', 'image/png', 3, 1);
                      PRAGMA user_version = 1;",
                 )

@@ -32,7 +32,7 @@ use rusqlite::{params, Connection, OptionalExtension};
 
 use crate::crypto::WrappedKey;
 use crate::crypto::{chunks_for, MAX_SEALED_CHUNK};
-use crate::protocol::{Round, AcksResponse, BlobState, BlobsResponse, DeviceInfo, HeavyDoc, PullResponse, PulledAck, PulledItem, PushItem, MAX_BLOB_IDS, MAX_PULL, MAX_REF_IDS};
+use crate::protocol::{Round, AcksResponse, BlobState, BlobsResponse, DeviceInfo, HeavyDoc, PullResponse, PulledAck, PulledItem, PushItem, MAX_BLOB_IDS, MAX_PULL, MAX_PURGE_IDS, MAX_REF_IDS};
 use crate::{Result, SyncError};
 
 const SCHEMA: &str = "
@@ -59,6 +59,12 @@ const SCHEMA: &str = "
     UNIQUE (workspace, device, doc)
   );
   CREATE INDEX IF NOT EXISTS acks_by_workspace ON acks(workspace, seq);
+  -- Documents deleted for good (by tag): their updates are gone and any
+  -- that still arrive are dropped.
+  CREATE TABLE IF NOT EXISTS purged (
+    workspace TEXT NOT NULL, doc TEXT NOT NULL, at INTEGER NOT NULL,
+    PRIMARY KEY (workspace, doc)
+  );
   -- Files: one row each, whole once 'complete'; the chunks received.
   CREATE TABLE IF NOT EXISTS blobs (
     workspace TEXT NOT NULL, id TEXT NOT NULL, chunks INTEGER,
@@ -281,6 +287,10 @@ impl Relay {
         Self::touch(&tx, workspace, device, at)?;
         for item in items {
             let blob = crate::crypto::unb64(&item.blob)?;
+            // From a device that has not heard of the deletion yet.
+            if Self::is_purged(&tx, workspace, &item.doc)? {
+                continue;
+            }
             tx.execute(
                 "INSERT INTO updates(workspace, doc, device, blob, at) VALUES (?1, ?2, ?3, ?4, ?5)",
                 params![workspace, item.doc, device, blob, at],
@@ -448,6 +458,9 @@ impl Relay {
         if covers > Self::head_of(&tx, workspace)? {
             return Err(SyncError::Conflict("a snapshot cannot cover updates not yet on the server".into()));
         }
+        if Self::is_purged(&tx, workspace, &item.doc)? {
+            return Self::head_of(&tx, workspace);
+        }
         let blob = crate::crypto::unb64(&item.blob)?;
         tx.execute(
             "INSERT INTO updates(workspace, doc, device, blob, at, kind) VALUES (?1, ?2, ?3, ?4, ?5, 'snapshot')",
@@ -457,6 +470,30 @@ impl Relay {
         tx.execute("DELETE FROM updates WHERE workspace = ?1 AND doc = ?2 AND seq <= ?3", params![workspace, item.doc, covers])?;
         tx.commit()?;
         Ok(seq)
+    }
+
+    /// Deletes documents for good (by tag): their updates and snapshots
+    /// go, and any that arrive later are dropped. Their version reports
+    /// stay (a version, no content), so a device's count of them holds.
+    pub fn purge(&self, workspace: &str, device: &str, docs: &[String]) -> Result<()> {
+        if docs.len() > MAX_PURGE_IDS {
+            return Err(SyncError::Protocol(format!("at most {MAX_PURGE_IDS} documents at a time")));
+        }
+        let mut conn = self.conn();
+        self.require(&conn, workspace)?;
+        let tx = conn.transaction()?;
+        let at = now_ms();
+        Self::touch(&tx, workspace, device, at)?;
+        for doc in docs {
+            tx.execute("INSERT OR IGNORE INTO purged(workspace, doc, at) VALUES (?1, ?2, ?3)", params![workspace, doc, at])?;
+            tx.execute("DELETE FROM updates WHERE workspace = ?1 AND doc = ?2", params![workspace, doc])?;
+        }
+        tx.commit()?;
+        Ok(())
+    }
+
+    fn is_purged(conn: &Connection, workspace: &str, doc: &str) -> Result<bool> {
+        Ok(conn.query_row("SELECT EXISTS(SELECT 1 FROM purged WHERE workspace = ?1 AND doc = ?2)", params![workspace, doc], |r| r.get(0))?)
     }
 
     fn chunk_path(&self, workspace: &str, id: &str, n: u32) -> PathBuf {
@@ -770,6 +807,26 @@ mod tests {
 
     /// A server database from before snapshots and removal gets the new
     /// columns and keeps its log.
+    /// A document deleted for good: its updates and snapshot go, and later
+    /// pushes of it are dropped; other documents are untouched.
+    #[test]
+    fn purged_documents_are_deleted_and_stay_deleted() {
+        let relay = Relay::open_in_memory().unwrap();
+        relay.create_workspace("ws", &crate::crypto::wrap(&crate::crypto::WorkspaceKey::generate(), "p", (1024, 1, 1)).unwrap()).unwrap();
+        let item = |doc: &str| PushItem { doc: doc.into(), blob: crate::crypto::b64(b"sealed") };
+        relay.push("ws", "a", &[item("gone"), item("kept"), item("gone")]).unwrap();
+        let head = relay.push_snapshot("ws", "a", &item("gone"), 3).unwrap();
+        relay.purge("ws", "a", &["gone".into()]).unwrap();
+        relay.purge("ws", "b", &["gone".into()]).unwrap();
+        let docs = |after| relay.pull("ws", "b", after, 100).unwrap().updates.into_iter().map(|u| u.doc).collect::<Vec<_>>();
+        assert_eq!(docs(0), vec!["kept"]);
+        relay.push("ws", "c", &[item("gone"), item("kept")]).unwrap();
+        assert_eq!(relay.push_snapshot("ws", "c", &item("gone"), head).unwrap(), relay.head("ws").unwrap());
+        assert_eq!(docs(0), vec!["kept", "kept"]);
+        let too_many = vec!["x".to_owned(); crate::protocol::MAX_PURGE_IDS + 1];
+        assert!(relay.purge("ws", "a", &too_many).is_err());
+    }
+
     /// A round of reports: its cursor and number kept and listed with the
     /// devices; a round that does not follow the last is refused (what lets
     /// a device see the server lost its reports).

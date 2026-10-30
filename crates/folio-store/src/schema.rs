@@ -45,6 +45,10 @@ const STORE_MIGRATIONS: &[&str] = &[
     // 3: when a file stopped being used by any card; it is deleted a while
     // later (design/attachments.md §6).
     "ALTER TABLE assets ADD COLUMN orphan_since INTEGER;",
+    // 4: documents deleted for good (§5.4), from the workspace document's
+    // `purged` map: their updates are refused from then on. `sent` once the
+    // sync server was told to delete its copy.
+    "CREATE TABLE purged (doc_id TEXT PRIMARY KEY, at INTEGER NOT NULL, sent INTEGER NOT NULL DEFAULT 0);",
 ];
 
 /// Whether `store.db` has steps to run (and is not new).

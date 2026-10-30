@@ -13,7 +13,7 @@ use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use folio_sync::crypto::WrappedKey;
-use folio_sync::protocol::{AcksRequest, AcksStored, BlobDone, BlobIds, BlobsResponse, DeviceName, DevicesResponse, HeavyResponse, Live, PushRequest, PushResponse, RefsResponse, SnapshotRequest, SnapshotResponse, DEVICE_HEADER, MAX_PULL};
+use folio_sync::protocol::{AcksRequest, AcksStored, BlobDone, BlobIds, BlobsResponse, DeviceName, DevicesResponse, HeavyResponse, Live, PurgeRequest, PushRequest, PushResponse, RefsResponse, SnapshotRequest, SnapshotResponse, DEVICE_HEADER, MAX_PULL};
 use folio_sync::relay::Relay;
 use folio_sync::SyncError;
 use serde::Deserialize;
@@ -53,6 +53,7 @@ pub fn router(server: Arc<Server>) -> Router {
         .route("/v1/w/{ws}/acks", get(pull_acks).post(push_acks))
         .route("/v1/w/{ws}/blobs/have", post(blobs_have))
         .route("/v1/w/{ws}/blobs/refs", axum::routing::put(blob_refs))
+        .route("/v1/w/{ws}/purge", post(purge))
         .route("/v1/w/{ws}/blobs/{id}/done", post(blob_done))
         .route("/v1/w/{ws}/blobs/{id}/{n}", get(get_chunk).put(put_chunk))
         .route("/health", get(|| async { "ok" }))
@@ -218,6 +219,12 @@ async fn blobs_have(State(s): State<Arc<Server>>, Path(ws): Path<String>, header
     let device = authorize(&s, &headers)?;
     check_workspace(&ws)?;
     Ok(Json(blocking(move || s.relay.blobs(&ws, &device, &req.ids)).await?))
+}
+
+async fn purge(State(s): State<Arc<Server>>, Path(ws): Path<String>, headers: HeaderMap, Json(req): Json<PurgeRequest>) -> Result<(), Failure> {
+    let device = authorize(&s, &headers)?;
+    check_workspace(&ws)?;
+    blocking(move || s.relay.purge(&ws, &device, &req.docs)).await
 }
 
 async fn blob_refs(State(s): State<Arc<Server>>, Path(ws): Path<String>, headers: HeaderMap, Json(req): Json<BlobIds>) -> Result<Json<RefsResponse>, Failure> {

@@ -24,6 +24,7 @@ export function tauriBackend(): Backend {
     trashCard: (id) => invoke<void>("trash_card", { id }),
     restoreCard: (id) => invoke<void>("restore_card", { id }),
     listTrash: (limit) => invoke<CardRow[]>("list_trash", { limit }),
+    emptyTrash: () => invoke<string[]>("empty_trash"),
     journalDays: (from, to) => invoke<JournalDay[]>("journal_days", { from, to }),
     backlinks: (id) => invoke<Backlink[]>("backlinks", { id }),
     unlinkedReferences: (id, limit) => invoke<Backlink[]>("unlinked_references", { id, limit }),

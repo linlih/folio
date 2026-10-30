@@ -141,6 +141,7 @@ body.resizing { cursor: col-resize; user-select: none; }
 .page-header h1 { margin: 0; font: var(--page-title-weight) var(--page-title-size) / var(--page-title-leading) var(--font-body); }
 .page-header .button { margin-left: auto; align-self: center; }
 .page-meta { color: var(--muted); }
+.trash-hint { margin: -8px 0 16px; font-size: 13px; }
 .empty { color: var(--muted); }
 
 .card-list { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--border); }

@@ -52,6 +52,13 @@ export async function startDocs(): Promise<DocHub> {
     // Another device's changes, applied by the host (§5.3): open editors
     // take them in; lists, titles and backlinks reload.
     const { listen } = await import("@tauri-apps/api/event");
+    // Cards deleted for good (the trash emptied here or on another device,
+    // or long in it): their tabs close.
+    await listen<string[]>("docs-purged", (e) => {
+      const shell = useShell.getState();
+      for (const id of e.payload) shell.forgetCard(id);
+      cardsChanged();
+    });
     await listen<string[]>("sync-applied", (e) => {
       void h.refresh(e.payload).then(() => {
         for (const id of e.payload) window.dispatchEvent(new CustomEvent(DOC_SAVED, { detail: { id } }));

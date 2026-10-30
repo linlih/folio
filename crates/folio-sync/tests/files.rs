@@ -84,6 +84,9 @@ impl Transport for Direct<'_> {
     fn finish_blob(&self, id: &str, chunks: u32) -> folio_sync::Result<()> {
         self.relay.finish_blob(WS, &self.device, id, chunks)
     }
+    fn purge(&self, docs: &[String]) -> folio_sync::Result<()> {
+        self.relay.purge(WS, &self.device, docs)
+    }
     fn report_refs(&self, ids: &[String]) -> folio_sync::Result<Vec<String>> {
         self.relay.report_refs(WS, &self.device, ids)
     }

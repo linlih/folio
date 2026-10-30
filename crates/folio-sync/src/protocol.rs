@@ -231,6 +231,14 @@ pub struct RefsResponse {
 
 /// Most files in one report.
 pub const MAX_REF_IDS: usize = 500_000;
+/// Documents per purge request.
+pub const MAX_PURGE_IDS: usize = 1000;
+
+/// Documents deleted for good, by tag (design/ARCHITECTURE.md §5.4).
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct PurgeRequest {
+    pub docs: Vec<String>,
+}
 
 /// Most updates a pull returns.
 pub const MAX_PULL: u32 = 1000;

@@ -142,7 +142,11 @@
     "restored": "已恢复“{{title}}”。",
     "movedMany": "已把 {{count}} 张卡片移到回收站，按 {{undo}} 撤销。",
     "restoredMany": "已恢复 {{count}} 张卡片。",
-    "emptyHint": "移到回收站的卡片会出现在这里，可以随时恢复。"
+    "emptyHint": "移到回收站的卡片会出现在这里，30 天内可以随时恢复。",
+    "emptyTrash": "清空回收站",
+    "emptyConfirm": "永久删除回收站里的 {{count}} 张卡片？所有同步的设备上都会删除，无法恢复。",
+    "emptied": "已永久删除 {{count}} 张卡片。",
+    "autoHint": "在回收站里超过 30 天的卡片会自动永久删除。"
   },
   "outline": {
     "expand": "展开",

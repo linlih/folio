@@ -142,7 +142,11 @@
     "restored": "Restored “{{title}}”.",
     "movedMany": "Moved {{count}} cards to the trash. Press {{undo}} to undo.",
     "restoredMany": "Restored {{count}} cards.",
-    "emptyHint": "Cards you move to the trash show up here, and can be restored any time."
+    "emptyHint": "Cards you move to the trash show up here, and can be restored for 30 days.",
+    "emptyTrash": "Empty trash",
+    "emptyConfirm": "Delete the {{count}} cards in the trash for good? They are deleted on every synced device and cannot be restored.",
+    "emptied": "Deleted {{count}} cards for good.",
+    "autoHint": "Cards in the trash for more than 30 days are deleted for good."
   },
   "outline": {
     "expand": "Expand",
