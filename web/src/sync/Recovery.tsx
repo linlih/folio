@@ -57,7 +57,8 @@ export function RecoveryCode() {
       ) : (
         exists !== null && (
           <>
-            {exists && <p className="sync-done">{t("sync.recoverySet")}</p>}
+            {/* Workspaces from before recovery codes have none until one is made. */}
+            <p className={exists ? "sync-done" : "sync-warn"}>{t(exists ? "sync.recoverySet" : "sync.recoveryMissing")}</p>
             <div className="sync-actions">
               {confirming ? (
                 <>

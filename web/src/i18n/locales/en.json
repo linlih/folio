@@ -499,7 +499,8 @@
     "errorRecoveryFormat": "That is not a valid recovery code. It has 8 groups of 4 characters.",
     "errorRecoveryWrong": "Wrong recovery code; it doesn't open this sync space.",
     "errorNoRecovery": "This sync space has no recovery code yet.",
-    "errorOldServer": "The server is too old for this. Upgrade folio-server first."
+    "errorOldServer": "The server is too old for this. Upgrade folio-server first.",
+    "recoveryMissing": "No recovery code yet. If you forget the passphrase and no device is still syncing, no new device can join. Make one now."
   },
   "panel": {
     "title": "Details",

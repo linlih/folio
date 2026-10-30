@@ -189,8 +189,8 @@ function Enabled({ status, onChange }: { status: SyncStatus; onChange: (s: SyncS
       <p className="sync-hint">{t("sync.codeHint")}</p>
       {status.errorKind !== "removed" && (
         <>
-          <DeviceList lastSync={status.lastSync} />
           <RecoveryCode />
+          <DeviceList lastSync={status.lastSync} />
           <ChangePassphrase />
         </>
       )}

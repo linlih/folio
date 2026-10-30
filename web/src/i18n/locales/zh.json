@@ -499,7 +499,8 @@
     "errorRecoveryFormat": "这不是有效的恢复码。它由 8 组、每组 4 个字符组成。",
     "errorRecoveryWrong": "恢复码不对，打不开这个同步空间。",
     "errorNoRecovery": "这个同步空间还没有设置恢复码。",
-    "errorOldServer": "服务器版本太旧，不支持这项操作。请先升级 folio-server。"
+    "errorOldServer": "服务器版本太旧，不支持这项操作。请先升级 folio-server。",
+    "recoveryMissing": "还没有恢复码。忘了口令、又没有正在同步的设备时，就无法再加入新设备。建议现在生成一个。"
   },
   "panel": {
     "title": "详情",
