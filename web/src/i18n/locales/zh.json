@@ -755,5 +755,52 @@
     "markDone": "已整理",
     "done": "「{{title}}」已整理，仍在卡片库里（{{undo}} 撤销）",
     "inInbox": "在收集箱中"
+  },
+  "db": {
+    "cards_one": "{{count}} 张卡片",
+    "cards_other": "{{count}} 张卡片",
+    "mode": {
+      "table": "表格",
+      "board": "看板",
+      "blocks": "段落"
+    },
+    "addField": "添加属性",
+    "fieldName": "属性名",
+    "fieldType": "类型",
+    "add": "添加",
+    "type": {
+      "select": "单选",
+      "text": "文字",
+      "number": "数字",
+      "date": "日期",
+      "checkbox": "勾选",
+      "url": "链接"
+    },
+    "titleColumn": "标题",
+    "sortAsc": "升序排列",
+    "sortDesc": "降序排列",
+    "renameField": "重命名",
+    "deleteField": "删除属性",
+    "fieldDeleted": "已删除属性「{{name}}」，卡片上的值还在（{{undo}} 撤销）",
+    "choose": "选择…",
+    "optionPlaceholder": "搜索或新建选项",
+    "newOption": "新建「{{name}}」",
+    "noOptions": "输入名字，回车新建选项",
+    "newRow": "+ 新建卡片（输入标题回车）",
+    "newCard": "+ 新建",
+    "status": "状态",
+    "statusTodo": "待办",
+    "statusDoing": "进行中",
+    "statusDone": "完成",
+    "boardNeedsSelect": "看板按一个「单选」属性分列。可以添加一个「状态」属性（待办 / 进行中 / 完成），选项之后可以再加。",
+    "addStatus": "添加「状态」属性",
+    "groupBy": "分列依据",
+    "noValue": "未设置{{name}}",
+    "moveTo": "移到",
+    "more_one": "另 {{count}} 项",
+    "more_other": "另 {{count}} 项",
+    "empty": "还没有卡片带这个标签",
+    "emptyHint": "在任意卡片里写上 #{{name}}，它就会出现在这里。",
+    "intro": "带 #{{name}} 的卡片都在这张表里。添加属性（比如状态、评分、日期）后，就能在每张卡片上填写，并按属性排序、分列。"
   }
 }

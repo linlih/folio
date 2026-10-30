@@ -755,5 +755,52 @@
     "markDone": "Dealt with",
     "done": "“{{title}}” dealt with; it stays in the card library ({{undo}} to undo)",
     "inInbox": "In the inbox"
+  },
+  "db": {
+    "cards_one": "{{count}} card",
+    "cards_other": "{{count}} cards",
+    "mode": {
+      "table": "Table",
+      "board": "Board",
+      "blocks": "Blocks"
+    },
+    "addField": "Add field",
+    "fieldName": "Field name",
+    "fieldType": "Type",
+    "add": "Add",
+    "type": {
+      "select": "Select",
+      "text": "Text",
+      "number": "Number",
+      "date": "Date",
+      "checkbox": "Checkbox",
+      "url": "Link"
+    },
+    "titleColumn": "Title",
+    "sortAsc": "Sort ascending",
+    "sortDesc": "Sort descending",
+    "renameField": "Rename",
+    "deleteField": "Delete field",
+    "fieldDeleted": "Deleted the field “{{name}}”; the values stay on the cards ({{undo}} to undo)",
+    "choose": "Choose…",
+    "optionPlaceholder": "Search or add an option",
+    "newOption": "Add “{{name}}”",
+    "noOptions": "Type a name and press Enter to add an option",
+    "newRow": "+ New card (type a title, press Enter)",
+    "newCard": "+ New",
+    "status": "Status",
+    "statusTodo": "To do",
+    "statusDoing": "Doing",
+    "statusDone": "Done",
+    "boardNeedsSelect": "A board has a column for each choice of a Select field. Add a Status field (To do / Doing / Done); you can add choices later.",
+    "addStatus": "Add a Status field",
+    "groupBy": "Columns by",
+    "noValue": "No {{name}}",
+    "moveTo": "Move to",
+    "more_one": "{{count}} more",
+    "more_other": "{{count}} more",
+    "empty": "No cards have this tag yet",
+    "emptyHint": "Write #{{name}} in any card and it shows up here.",
+    "intro": "Every card tagged #{{name}} is in this table. Add fields (a status, a rating, a date) to fill in on each card, then sort and group by them."
   }
 }

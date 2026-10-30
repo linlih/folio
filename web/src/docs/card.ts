@@ -289,6 +289,16 @@ function addParagraph(doc: LoroDoc, parent: TreeID | undefined, text: string, so
   if (text) kids.insertContainer(0, new LoroText()).insert(0, text);
 }
 
+/** Appends a paragraph holding just `#tag` (a new card in a tag's
+ *  database belongs to it this way). The caller commits. */
+export function appendTag(doc: LoroDoc, tag: string) {
+  const kids = addNode(doc, undefined, "paragraph", { bid: newBid(), source: null }).data.ensureMergeableMovableList("children");
+  const node = kids.insertContainer(0, new LoroMap());
+  node.set("nodeName", "tag");
+  node.ensureMergeableMap("attributes").set("name", tag);
+  node.ensureMergeableMovableList("children");
+}
+
 /** Appends one block per line: paragraphs in a document card, items of the
  *  last top-level list in an outline (journal). `source` marks blocks not
  *  written by a person (§0.3). Returns nothing; the caller commits. */

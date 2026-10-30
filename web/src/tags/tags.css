@@ -2,3 +2,96 @@
 .tag-title { display: flex; align-items: center; gap: 4px; }
 .tag-title svg { color: var(--muted); width: 0.8em; height: 0.8em; }
 .tag-blocks { border-top: 0; padding-top: 0; margin-top: 0; }
+
+/* A tag's database (tags/TagView.tsx, DatabaseViews.tsx): wider than text. */
+.page.tag-page.wide { max-width: min(1200px, 100%); }
+.db-toolbar { display: flex; align-items: center; gap: 12px; margin: -6px 0 14px; }
+.db-toolbar .db-add-field { margin-left: auto; }
+.db-modes { display: inline-flex; padding: 2px; border: 1px solid var(--border); border-radius: var(--radius); }
+.db-mode { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: calc(var(--radius) - 2px); color: var(--secondary); font-size: 13px; }
+.db-mode.on { background: var(--hover); color: var(--text); }
+.db-intro { margin: -4px 0 12px; }
+.db-hint { margin: 6px 8px; color: var(--muted); font-size: 12.5px; }
+.db-empty { color: var(--muted); }
+
+/* Option chips, one tint per colour name (docs/database.ts OPTION_COLORS). */
+.db-chip { display: inline-block; max-width: 100%; padding: 1px 8px; border-radius: 10px; font-size: 12.5px; line-height: 1.6; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; background: var(--chip-bg); color: var(--text); }
+.db-color-gray { --chip-bg: color-mix(in srgb, #8a8a8a 22%, transparent); }
+.db-color-brown { --chip-bg: color-mix(in srgb, #9a6b45 24%, transparent); }
+.db-color-orange { --chip-bg: color-mix(in srgb, #d9822b 26%, transparent); }
+.db-color-yellow { --chip-bg: color-mix(in srgb, #d6b11f 30%, transparent); }
+.db-color-green { --chip-bg: color-mix(in srgb, #4b9b5d 26%, transparent); }
+.db-color-blue { --chip-bg: color-mix(in srgb, #3f7fc2 24%, transparent); }
+.db-color-purple { --chip-bg: color-mix(in srgb, #8a5cc2 24%, transparent); }
+.db-color-pink { --chip-bg: color-mix(in srgb, #c25c96 24%, transparent); }
+.db-color-red { --chip-bg: color-mix(in srgb, #c2513f 24%, transparent); }
+
+/* Table: scrolls sideways on its own; the title column stays. */
+.db-table-wrap { overflow-x: auto; border-top: 1px solid var(--border); }
+.db-table { border-collapse: collapse; min-width: 100%; font-size: 13.5px; }
+.db-table th, .db-table td { border-bottom: 1px solid var(--border); padding: 0; text-align: left; vertical-align: middle; }
+.db-table th + th, .db-table td + td { border-left: 1px solid var(--border); }
+.db-table th { font-weight: 500; color: var(--secondary); white-space: nowrap; }
+.db-table td { min-width: 120px; }
+.db-title-col { position: sticky; left: 0; z-index: 1; background: var(--paper); min-width: 200px; max-width: 320px; }
+.db-add-col { width: 36px; min-width: 36px !important; }
+.db-head { display: flex; align-items: center; gap: 5px; width: 100%; padding: 7px 8px; color: inherit; font: inherit; text-align: left; }
+.db-head:hover { background: var(--hover); }
+.db-rename { width: 100%; padding: 6px 8px; border: 0; outline: 1px solid var(--accent); background: var(--paper); color: var(--text); font: inherit; }
+.db-open { display: block; width: 100%; padding: 7px 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); font: 14px var(--font-body); text-align: left; }
+.db-open:hover { text-decoration: underline; }
+.db-input { width: 100%; min-width: 0; padding: 7px 8px; border: 0; background: none; color: var(--text); font: 13.5px var(--font-ui); outline: none; }
+.db-input:focus { outline: 1px solid var(--accent); outline-offset: -1px; background: var(--paper); }
+.db-input[type="number"] { -moz-appearance: textfield; }
+.db-input[type="number"]::-webkit-inner-spin-button, .db-input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.db-check { margin: 0 8px; width: 15px; height: 15px; accent-color: var(--accent); }
+.db-url { display: flex; align-items: center; }
+.db-url .icon-button { flex: none; width: 24px; height: 24px; }
+.db-select { display: flex; align-items: center; width: 100%; min-height: 32px; padding: 4px 8px; text-align: left; }
+.db-select:hover { background: var(--hover); }
+.db-select-popup { width: 220px; max-height: 320px; overflow-y: auto; }
+.db-select-search { width: 100%; margin-bottom: 4px; padding: 5px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--paper); color: var(--text); font: 13px var(--font-ui); outline: none; }
+.db-option { width: 100%; text-align: left; }
+.db-option:hover { background: var(--hover); }
+.db-new { width: 100%; padding: 8px; border: 0; background: none; color: var(--text); font: 13.5px var(--font-ui); outline: none; }
+.db-new::placeholder { color: var(--muted); }
+.db-field-form { width: 220px; }
+.db-field-form input { width: 100%; margin-bottom: 4px; padding: 5px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--paper); color: var(--text); font: 13px var(--font-ui); outline: none; }
+.db-field-form .popup-item { width: 100%; text-align: left; }
+.db-field-form .popup-item[aria-pressed="true"] { color: var(--accent); }
+.db-field-form-actions { display: flex; justify-content: flex-end; padding: 6px 4px 2px; }
+
+/* Board: columns side by side, scrolling sideways. */
+.db-group-by { display: inline-flex; align-items: center; gap: 6px; margin-bottom: 10px; color: var(--muted); font-size: 13px; }
+.db-board { display: flex; gap: 12px; align-items: flex-start; overflow-x: auto; padding-bottom: 12px; }
+.db-column { flex: 0 0 260px; display: grid; gap: 8px; padding: 8px; border-radius: 8px; background: var(--hover); }
+.db-column.over { outline: 2px solid var(--accent); outline-offset: -2px; }
+.db-column-head { display: flex; align-items: center; gap: 8px; margin: 0 0 2px; padding: 2px 4px; font: 500 13px var(--font-ui); }
+.db-count { color: var(--muted); font-weight: 400; }
+.db-card-wrap { position: relative; }
+.db-card { display: grid; gap: 6px; padding: 10px 30px 10px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--paper); cursor: grab; }
+.db-card-open { display: grid; gap: 3px; text-align: left; }
+.db-card-title { font: 14px/1.4 var(--font-body); color: var(--text); overflow-wrap: anywhere; }
+.db-card-preview { color: var(--secondary); font-size: 12.5px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.db-card-fields { display: flex; flex-wrap: wrap; gap: 4px 8px; color: var(--muted); font-size: 12px; }
+.db-card-menu { position: absolute; top: 6px; right: 4px; width: 24px; height: 24px; }
+.db-column .db-new { padding: 6px 4px; background: none; }
+.db-board-empty { display: grid; justify-items: start; gap: 10px; padding: 16px 0; color: var(--secondary); }
+
+/* A card's fields under its title (card/CardFields.tsx). */
+.card-fields { display: grid; gap: 10px; margin: 2px 0 14px; }
+.card-fields-group { display: grid; gap: 2px; }
+.card-fields-tag { justify-self: start; display: inline-flex; align-items: center; gap: 2px; padding: 0 4px; color: var(--muted); font-size: 12.5px; border-radius: 4px; }
+.card-fields-tag:hover { background: var(--hover); color: var(--text); }
+.card-field { display: flex; align-items: center; gap: 8px; min-height: 32px; font-size: 13.5px; }
+.card-field-name { flex: 0 0 7.5em; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.card-field > :last-child { flex: 1; min-width: 0; }
+.card-field .db-input, .card-field .db-select { border-radius: 4px; }
+.card-field .db-input:hover, .card-field .db-select:hover { background: var(--hover); }
+
+@media (hover: none) and (pointer: coarse) {
+  .db-board { scroll-snap-type: x mandatory; scroll-padding-inline: 16px; }
+  .db-column { flex-basis: min(80vw, 280px); scroll-snap-align: start; }
+  .db-card { cursor: default; }
+  .db-card-menu { width: 34px; height: 34px; top: 2px; right: 0; }
+}
