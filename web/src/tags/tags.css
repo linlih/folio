@@ -94,6 +94,8 @@
 .card-field { display: flex; align-items: center; gap: 8px; min-height: 32px; font-size: 13.5px; }
 .card-field-name { flex: 0 0 7.5em; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .card-field > :last-child { flex: 1; min-width: 0; }
+/* Stretched, Chromium (Android) draws a checkbox in the middle of its box. */
+.card-field > .db-check { flex: 0 0 auto; }
 .card-field .db-input, .card-field .db-select { border-radius: 4px; }
 .card-field .db-input:hover, .card-field .db-select:hover { background: var(--hover); }
 
