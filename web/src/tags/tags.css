@@ -44,6 +44,9 @@
 .db-input:focus { outline: 1px solid var(--accent); outline-offset: -1px; background: var(--paper); }
 .db-input[type="number"] { -moz-appearance: textfield; }
 .db-input[type="number"]::-webkit-inner-spin-button, .db-input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+/* iOS centres a date input's value by default. */
+.db-input[type="date"] { -webkit-appearance: none; appearance: none; text-align: left; box-sizing: border-box; height: calc(1.2em + 14px); line-height: 1.2; }
+.db-input[type="date"]::-webkit-date-and-time-value { text-align: left; }
 .db-check { margin: 0 8px; width: 15px; height: 15px; accent-color: var(--accent); }
 .db-url { display: flex; align-items: center; }
 .db-url .icon-button { flex: none; width: 24px; height: 24px; }
