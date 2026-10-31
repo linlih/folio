@@ -74,7 +74,7 @@ pub fn list() -> Value {
         {
             "name": "find_by_tag",
             "title": "Blocks with a tag",
-            "description": "Blocks tagged #tag (matched without regard to case), with their card ids.",
+            "description": "Blocks tagged #tag (matched without regard to case), with their card ids and the lines nested under each.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -259,7 +259,15 @@ pub fn call(store: &mut Store, name: &str, args: &Value) -> Result<String, Strin
             }
             Ok(rows
                 .iter()
-                .map(|r| format!("- in “{}” (id {}): {}", title_or(&r.card_title, &r.card_id), r.card_id, r.text))
+                .map(|r| {
+                    // The lines under it, indented: often the note itself,
+                    // with the tag alone on the line above.
+                    let mut out = format!("- in “{}” (id {}): {}", title_or(&r.card_title, &r.card_id), r.card_id, r.text);
+                    for c in &r.children {
+                        out.push_str(&format!("\n{}- {}", "  ".repeat(c.depth as usize), c.text));
+                    }
+                    out
+                })
                 .collect::<Vec<_>>()
                 .join("\n"))
         }

@@ -45,6 +45,15 @@
   border-radius: 0 4px 4px 0;
 }
 .backlink-block:hover { background: var(--hover); color: var(--text); border-left-color: var(--accent); }
+/* A block with the blocks under it (a tag page): one rule down the side,
+ * the children indented as in the card, each with its bullet. */
+.backlink-tree { margin: 2px 0; border-left: 2px solid var(--border); }
+.backlink-tree:hover { border-left-color: var(--accent); }
+.backlink-tree .backlink-block { margin: 0; border-left: 0; }
+.backlink-child { position: relative; padding-left: calc(10px + var(--depth) * 18px); }
+.backlink-child::before { content: ""; position: absolute; left: calc(var(--depth) * 18px - 2px); top: calc(2.5px + 0.8em); width: 5px; height: 5px; border-radius: 50%; background: var(--muted); }
+.backlink-more { margin: 0 0 4px; padding: 2px 10px; color: var(--muted); font: 12.5px var(--font-ui); }
+.backlink-more:hover { color: var(--text); }
 .backlink-via { margin-right: 6px; padding: 0 5px; border-radius: 3px; font: 11px/1.6 var(--font-ui); color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); }
 /* An unlinked mention: its text, then a button that links it. */
 .backlink-mention { display: flex; align-items: flex-start; gap: 6px; }

@@ -1,5 +1,5 @@
 import { ChevronRight, Link2 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { type CSSProperties, useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { Backlink } from "../bindings/commands";
 import { backend } from "../platform";
@@ -31,10 +31,14 @@ export function Group({ group, onLink }: { group: ReturnType<typeof byCard>[numb
       <ul>
         {group.rows.map((r) => (
           <li key={`${r.via}:${r.bid}`} className={onLink ? "backlink-mention" : undefined}>
-            <button className="backlink-block" onClick={(e) => openAt(r.cardId, group.title, r.bid, toSide(e))}>
-              {r.via === "ref" && <span className="backlink-via">{t("backlinks.ref")}</span>}
-              {r.text || t("backlinks.emptyBlock")}
-            </button>
+            {r.children?.length ? (
+              <BlockTree row={r} title={group.title} />
+            ) : (
+              <button className="backlink-block" onClick={(e) => openAt(r.cardId, group.title, r.bid, toSide(e))}>
+                {r.via === "ref" && <span className="backlink-via">{t("backlinks.ref")}</span>}
+                {r.text || t("backlinks.emptyBlock")}
+              </button>
+            )}
             {onLink && (
               <button className="button backlink-link" title={t("backlinks.linkHint")} onClick={() => onLink([r])}>
                 <Link2 size={13} />
@@ -45,6 +49,40 @@ export function Group({ group, onLink }: { group: ReturnType<typeof byCard>[numb
         ))}
       </ul>
     </li>
+  );
+}
+
+/** How many blocks under a block show before 显示全部. */
+const CHILDREN_SHOWN = 8;
+
+/** A block with the blocks nested under it, indented as in the card: a tag
+ *  written alone on a line, with the note itself below it. */
+function BlockTree({ row, title }: { row: Backlink; title: string }) {
+  const { t } = useTranslation();
+  const [all, setAll] = useState(false);
+  const children = row.children ?? [];
+  const shown = all ? children : children.slice(0, CHILDREN_SHOWN);
+  return (
+    <div className="backlink-tree">
+      <button className="backlink-block" onClick={(e) => openAt(row.cardId, title, row.bid, toSide(e))}>
+        {row.text || t("backlinks.emptyBlock")}
+      </button>
+      {shown.map((c) => (
+        <button
+          key={c.bid}
+          className="backlink-block backlink-child"
+          style={{ "--depth": c.depth } as CSSProperties}
+          onClick={(e) => openAt(row.cardId, title, c.bid, toSide(e))}
+        >
+          {c.text || t("backlinks.emptyBlock")}
+        </button>
+      ))}
+      {children.length > CHILDREN_SHOWN && (
+        <button className="backlink-more" onClick={() => setAll((v) => !v)}>
+          {all ? t("backlinks.showLess") : t("backlinks.showAll", { count: children.length })}
+        </button>
+      )}
+    </div>
   );
 }
 

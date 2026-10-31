@@ -83,10 +83,13 @@ function TaggedBlocks({ name, active }: { name: string; active: boolean }) {
       window.removeEventListener(DOC_SAVED, onChange);
     };
   }, [active, load]);
-  const groups = rows ? byCard(rows) : [];
+  // A tagged block under another one shows there, not again on its own.
+  const nested = new Set(rows?.flatMap((r) => (r.children ?? []).map((c) => `${r.cardId}:${c.bid}`)));
+  const shown = rows?.filter((r) => !nested.has(`${r.cardId}:${r.bid}`));
+  const groups = shown ? byCard(shown) : [];
   return (
     <>
-      {rows && <p className="page-meta db-intro">{t("tags.count", { blocks: rows.length, cards: groups.length })}</p>}
+      {shown && <p className="page-meta db-intro">{t("tags.count", { blocks: shown.length, cards: groups.length })}</p>}
       {rows?.length === 0 && <EmptyState icon={<Hash size={28} strokeWidth={1.5} />} title={t("tags.empty")} hint={t("tags.emptyHint", { name })} />}
       {groups.length > 0 && (
         <section className="backlinks tag-blocks">

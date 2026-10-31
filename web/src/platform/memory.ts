@@ -1,5 +1,5 @@
 import { LoroDoc } from "loro-crdt";
-import type { AssetEvent, BackupInfo, Backlink, CardRow, JournalDay, SearchHit } from "../bindings/commands";
+import type { AssetEvent, BackupInfo, Backlink, CardRow, ChildBlock, JournalDay, SearchHit } from "../bindings/commands";
 import { appendBlocks, bodyLines, initCard, preview, readCardTopics, readMeta, readProps, setClip, setDeleted, setInbox, setPinned } from "../docs/card";
 import { isJournalId, journalDate, uuidv7 } from "../docs/ids";
 import { extractIndex } from "../docs/index";
@@ -257,7 +257,19 @@ export function memoryBackend(now: () => number = Date.now): Backend {
         const x = extractIndex(e.doc);
         const bids = new Set(x.tags.filter(([, name]) => name.trim().toLowerCase() === key).map(([bid]) => bid));
         const m = readMeta(e.doc);
-        for (const b of x.blocks) if (bids.has(b.bid)) out.push({ cardId: cid, cardTitle: m.title, cardKind: m.kind, bid: b.bid, text: b.text, via: "tag" });
+        for (const b of x.blocks) {
+          if (!bids.has(b.bid)) continue;
+          // Blocks come in document order, so the ones under it follow it.
+          const children: ChildBlock[] = [];
+          const depth = new Map([[b.bid, 0]]);
+          for (const c of x.blocks.slice(x.blocks.indexOf(b) + 1)) {
+            const d = c.parent === null ? undefined : depth.get(c.parent);
+            if (d === undefined) break;
+            depth.set(c.bid, d + 1);
+            children.push({ bid: c.bid, depth: d + 1, text: c.text });
+          }
+          out.push({ cardId: cid, cardTitle: m.title, cardKind: m.kind, bid: b.bid, text: b.text, via: "tag", ...(children.length > 0 && { children }) });
+        }
       }
       return out.slice(0, limit);
     },

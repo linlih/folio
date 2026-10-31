@@ -224,6 +224,8 @@
     "noneUnlinked": "No other card mentions this card's title.",
     "ref": "block ref",
     "emptyBlock": "(empty block)",
+    "showAll": "Show all {{count}}",
+    "showLess": "Show less",
     "link": "Link",
     "linkHint": "Turn this mention into a card link",
     "linkAll": "Link all ({{count}})",

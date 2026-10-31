@@ -64,4 +64,26 @@ describe("#tags", () => {
     const todo = await backend.tagged("TODO");
     expect(todo.map((r) => r.text)).toEqual(["记录 #Todo #todo"]);
   });
+
+  it("a tag alone on an item brings the items under it", async () => {
+    const backend = memoryBackend();
+    const hub = new DocHub(backend, MEMORY_FRONTEND_PEER);
+    const id = await backend.createCard("日记");
+    const handle = await hub.open(id);
+    const { editor } = await bind(handle.doc, handle.undo);
+    editor.commands.setContent(
+      '<ul><li><p><span data-tag="想法">#想法</span></p><ul><li><p>第一条</p><ul><li><p>补充</p></li></ul></li><li><p>第二条</p></li></ul></li><li><p>别的事</p></li></ul>',
+    );
+    await settle();
+    editor.destroy();
+    await handle.persistence.flush();
+
+    const [row, ...rest] = await backend.tagged("想法");
+    expect(rest).toEqual([]);
+    expect(row.children?.map((c) => [c.depth, c.text])).toEqual([
+      [1, "第一条"],
+      [2, "补充"],
+      [1, "第二条"],
+    ]);
+  });
 });

@@ -108,6 +108,15 @@ export interface Backlink {
   text: string;
   /** "link" ([[card]]), "ref" (((block)) of the card), "mention" (unlinked) or "tag" (a tag page). */
   via: "link" | "ref" | "mention" | "tag";
+  /** The blocks nested under it, in document order (tag pages only). */
+  children?: ChildBlock[];
+}
+
+/** A block nested under another; `depth` 1 is directly under it. */
+export interface ChildBlock {
+  bid: string;
+  depth: number;
+  text: string;
 }
 
 export interface SearchHit {

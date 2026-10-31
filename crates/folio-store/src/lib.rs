@@ -171,6 +171,19 @@ pub struct Backlink {
     /// "link" ([[card]]) or "ref" (((block)) of the card), or "mention"
     /// (unlinked: the card's title appears in the text).
     pub via: String,
+    /// The blocks nested under it, in document order (a tag page: a tag
+    /// written alone on a line, with the note indented below it).
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub children: Vec<ChildBlock>,
+}
+
+/// A block nested under another; `depth` 1 is directly under it.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChildBlock {
+    pub bid: String,
+    pub depth: u32,
+    pub text: String,
 }
 
 /// A search result: a card (by title, `bid` None) or one of its blocks.
@@ -247,7 +260,7 @@ pub struct JournalDay {
 }
 
 fn backlink_row(r: &rusqlite::Row) -> rusqlite::Result<Backlink> {
-    Ok(Backlink { card_id: r.get(0)?, card_title: r.get(1)?, card_kind: r.get(2)?, bid: r.get(3)?, text: r.get(4)?, via: r.get(5)? })
+    Ok(Backlink { card_id: r.get(0)?, card_title: r.get(1)?, card_kind: r.get(2)?, bid: r.get(3)?, text: r.get(4)?, via: r.get(5)?, children: Vec::new() })
 }
 
 pub struct Store {
@@ -1025,6 +1038,26 @@ impl Store {
               ORDER BY c.updated_at DESC, b.ord LIMIT ?2",
         )?;
         let rows = stmt.query_map(params![tag_key(tag), limit], backlink_row)?;
+        let mut rows: Vec<Backlink> = rows.collect::<std::result::Result<_, _>>()?;
+        for row in &mut rows {
+            row.children = self.child_blocks(&row.card_id, &row.bid)?;
+        }
+        Ok(rows)
+    }
+
+    /// The blocks nested under a block, in document order: blocks of a card
+    /// are indexed in document order, so their rowids are too.
+    fn child_blocks(&self, card_id: &str, bid: &str) -> Result<Vec<ChildBlock>> {
+        let mut stmt = self.conn.prepare_cached(
+            "WITH RECURSIVE sub(bid, depth) AS (
+               SELECT bid, 1 FROM idx.blocks WHERE card_id = ?1 AND parent_bid = ?2
+               UNION ALL
+               SELECT b.bid, s.depth + 1 FROM idx.blocks b JOIN sub s ON b.card_id = ?1 AND b.parent_bid = s.bid
+             )
+             SELECT b.bid, s.depth, b.text FROM sub s JOIN idx.blocks b ON b.card_id = ?1 AND b.bid = s.bid
+              ORDER BY b.rowid LIMIT 200",
+        )?;
+        let rows = stmt.query_map(params![card_id, bid], |r| Ok(ChildBlock { bid: r.get(0)?, depth: r.get(1)?, text: r.get(2)? }))?;
         Ok(rows.collect::<std::result::Result<_, _>>()?)
     }
 
@@ -1643,6 +1676,44 @@ mod tests {
         assert_eq!(todo, vec![(b.to_string(), "b1".to_owned(), "tag".to_owned()), (a.to_string(), "a1".to_owned(), "tag".to_owned())]);
         // Tags are part of the block's text, so search finds them too.
         assert!(s.search("#会议", 10).unwrap().iter().any(|h| h.bid.as_deref() == Some("a1")));
+    }
+
+    #[test]
+    fn a_tagged_item_comes_with_the_items_under_it() {
+        use folio_core::body::{add_block, push_inline, push_text};
+        let dir = tempfile::tempdir().unwrap();
+        let mut s = Store::open(dir.path()).unwrap();
+        let id = s.create_card(CardKind::Note, "日记", 1).unwrap();
+        let doc = LoroDoc::new();
+        doc.import(&s.doc_snapshot(&id).unwrap()).unwrap();
+        let v = doc.oplog_vv();
+        // - #想法
+        //   - 第一条
+        //     - 补充
+        //   - 第二条
+        // - 别的事
+        let item = |list, bid: &str, text: &str| {
+            let it = add_block(&doc, Some(list), "listItem", &[("bid", bid.into())]).unwrap();
+            let p = add_block(&doc, Some(it), "paragraph", &[]).unwrap();
+            push_text(&doc, p, text).unwrap();
+            (it, p)
+        };
+        let top = add_block(&doc, None, "bulletList", &[]).unwrap();
+        let (idea, p) = item(top, "idea", "");
+        push_inline(&doc, p, "tag", &[("name", "想法")]).unwrap();
+        let under = add_block(&doc, Some(idea), "bulletList", &[]).unwrap();
+        let (first, _) = item(under, "c1", "第一条");
+        let deeper = add_block(&doc, Some(first), "bulletList", &[]).unwrap();
+        item(deeper, "c1a", "补充");
+        item(under, "c2", "第二条");
+        item(top, "other", "别的事");
+        doc.commit();
+        s.apply_update(&id, DocKind::Card, &doc.export(ExportMode::updates(&v)).unwrap(), Origin::Local, 2).unwrap();
+
+        let rows = s.tagged("想法", 10).unwrap();
+        assert_eq!(rows.len(), 1);
+        let kids: Vec<_> = rows[0].children.iter().map(|c| (c.bid.as_str(), c.depth, c.text.as_str())).collect();
+        assert_eq!(kids, vec![("c1", 1, "第一条"), ("c1a", 2, "补充"), ("c2", 1, "第二条")]);
     }
 
     #[test]
