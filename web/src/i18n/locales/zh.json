@@ -725,7 +725,9 @@
     "undo": "撤销",
     "redo": "重做",
     "blockRef": "引用块 ((",
-    "hideKeyboard": "收起键盘"
+    "hideKeyboard": "收起键盘",
+    "pullSearch": "下拉搜索",
+    "releaseSearch": "松开搜索"
   },
   "update": {
     "title": "Folio {{version}} 可以更新了",

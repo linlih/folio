@@ -150,3 +150,19 @@ body.phone-typing:has(.keyboard-bar) .shell { padding-bottom: 44px; }
   :root .library-views .icon-button { width: 36px; height: 36px; }
   :root .segmented button { padding: 6px 12px; }
 }
+
+/* Pulling the journal down from its top (shell/pullSearch.ts). */
+.pull-search {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 6px;
+  height: 0;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 13px;
+  padding-bottom: 0;
+}
+.pull-search[data-ready="true"] { color: var(--accent); }
+.pull-search span { padding-bottom: 10px; }
+.pull-search svg { margin-bottom: 12px; }

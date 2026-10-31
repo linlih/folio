@@ -725,7 +725,9 @@
     "undo": "Undo",
     "redo": "Redo",
     "blockRef": "Reference a block ((",
-    "hideKeyboard": "Hide keyboard"
+    "hideKeyboard": "Hide keyboard",
+    "pullSearch": "Pull down to search",
+    "releaseSearch": "Release to search"
   },
   "update": {
     "title": "Folio {{version}} is available",

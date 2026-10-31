@@ -11,7 +11,7 @@ import { focusedPane, useShell, type Pane, type TabTarget } from "./tabs";
 import "./phone.css";
 
 /** The pages the bottom bar leads to; everything else is opened from them. */
-const ROOTS: TabTarget["kind"][] = ["journal", "inbox", "library", "boards"];
+const ROOTS: TabTarget["kind"][] = ["journal", "inbox", "tasks", "library", "boards"];
 const isRoot = (kind: TabTarget["kind"]) => ROOTS.includes(kind);
 /** Every open tab stays mounted (its editors keep their state); on a phone
  *  only this many are kept, the longest unused closing first. */
@@ -91,8 +91,8 @@ export function PhoneTopBar({ pane }: { pane: Pane }) {
       {/* A whiteboard and a topic show their own names, on the page. */}
       <span className="phone-title">{root || inTopic || tab.target.kind === "board" ? "" : label(tab)}</span>
       {root && (
-        <button className="icon-button" aria-label={t("nav.tasks")} title={t("nav.tasks")} onClick={() => useShell.getState().open({ kind: "tasks" })}>
-          <SquareCheck size={18} />
+        <button className="icon-button" aria-label={t("phone.search")} title={t("phone.search")} onClick={() => useShell.getState().setSearchOpen(true)}>
+          <Search size={18} />
         </button>
       )}
       {root && (
@@ -119,12 +119,12 @@ function section(pane: Pane): TabTarget["kind"] | null {
 }
 
 /** The five entries at the bottom of a phone (§0.2), and the button that
- *  writes a quick note to today's journal. */
+ *  writes a quick note to today's journal. Search is in the top bar (and a
+ *  pull down at the top of the journal). */
 export function PhoneNav() {
   const { t } = useTranslation();
   const pane = useShell(focusedPane);
   const open = useShell((s) => s.open);
-  const setSearchOpen = useShell((s) => s.setSearchOpen);
   const current = section(pane);
   const activeKind = pane.tabs.find((x) => x.key === pane.active)?.target.kind;
   const inboxCount = useInboxCount((s) => s.count);
@@ -140,6 +140,7 @@ export function PhoneNav() {
         </span>
       ),
     },
+    { kind: "tasks", label: t("nav.tasks"), icon: <SquareCheck size={21} strokeWidth={1.75} /> },
     { kind: "library", label: t("nav.library"), icon: <LibraryBig size={21} strokeWidth={1.75} /> },
     { kind: "boards", label: t("nav.boards"), icon: <LayoutDashboard size={21} strokeWidth={1.75} /> },
   ];
@@ -166,10 +167,6 @@ export function PhoneNav() {
             <span>{it.label}</span>
           </button>
         ))}
-        <button className="phone-nav-item" onClick={() => setSearchOpen(true)}>
-          <Search size={21} strokeWidth={1.75} />
-          <span>{t("phone.search")}</span>
-        </button>
       </nav>
     </>
   );

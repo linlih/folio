@@ -1,5 +1,7 @@
 import { Menu } from "@base-ui/react/menu";
-import { MoreHorizontal } from "lucide-react";
+import { usePullToSearch } from "../shell/pullSearch";
+import { usePhone } from "../shell/phone";
+import { MoreHorizontal, Search } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { copyMarkdown, exportCardMarkdown } from "../card/markdown";
 import { useTranslation } from "react-i18next";
@@ -54,6 +56,8 @@ export function JournalView() {
   const sentinel = useRef<HTMLDivElement>(null);
   const editors = useRef(new Map<string, Editor>());
   const page = useRef<HTMLDivElement>(null);
+  const pullHint = useRef<HTMLDivElement>(null);
+  usePullToSearch(page, pullHint, usePhone());
   // Days near the visible part, rendered in full; their last heights.
   const [near, setNear] = useState<Set<string>>(() => new Set(Array.from({ length: PAGE }, (_, i) => addDays(today, -i))));
   const heights = useRef(new Map<string, number>());
@@ -180,6 +184,10 @@ export function JournalView() {
 
   return (
     <div className="page journal" ref={page}>
+      <div className="pull-search" ref={pullHint} aria-hidden="true">
+        <Search size={15} />
+        <span />
+      </div>
       {days.map((date) => {
         const text = texts.get(date);
         const live = editing.includes(date);
