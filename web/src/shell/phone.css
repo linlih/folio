@@ -140,8 +140,10 @@ body.phone-typing:has(.keyboard-bar) .shell { padding-bottom: 44px; }
      list of shortcuts itself stays, for a keyboard attached to a tablet). */
   :root kbd:not(.shortcut-row kbd) { display: none; }
 
-  /* iOS zooms the page into a field whose text is under 16px. */
-  :root :is(input, select, textarea) { font-size: 16px !important; }
+  /* iOS zooms the page into a field whose text is under 16px. Titles
+     typed in place are larger already and keep their size (a card's title
+     stays above its headings). */
+  :root :is(input, select, textarea):not(.card-page-title, .topic-name-input.big) { font-size: 16px !important; }
 
   /* Fingers need bigger targets. */
   :root .board-zoom .icon-button, :root .board-tool { min-width: 40px; min-height: 40px; }
