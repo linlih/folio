@@ -1,6 +1,6 @@
 import { Menu } from "@base-ui/react/menu";
-import { ArrowDown, ArrowUp, MoreHorizontal } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { ArrowDown, ArrowUp, ArrowUpDown, Check, ChevronDown, Columns3, MoreHorizontal } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { CARDS_CHANGED } from "../card/actions";
 import type { PropValue } from "../docs/card";
@@ -107,9 +107,47 @@ const ROW_MIME = "application/x-folio-db-row";
 
 /** Columns by a select field's choices. Cards move by dragging (mouse) or
  *  through each card's menu (touch). */
+/** A quiet button on the board's bar that opens a menu: what it is set
+ *  to, and a caret. */
+function BarMenu({ icon, label, title, children }: { icon: ReactNode; label: ReactNode; title: string; children: ReactNode }) {
+  return (
+    <Menu.Root>
+      <Menu.Trigger className="db-chip" title={title} aria-label={title}>
+        {icon}
+        {label}
+        <ChevronDown size={12} className="db-chip-caret" />
+      </Menu.Trigger>
+      <Menu.Portal>
+        <Menu.Positioner side="bottom" align="start" sideOffset={4}>
+          <Menu.Popup className="popup">{children}</Menu.Popup>
+        </Menu.Positioner>
+      </Menu.Portal>
+    </Menu.Root>
+  );
+}
+
+/** Which select field makes the columns: only select fields can, which the
+ *  menu says, so one with a single select field still shows where it is. */
+function GroupMenu({ tag, field, selects }: { tag: string; field: Field; selects: Field[] }) {
+  const { t } = useTranslation();
+  return (
+    <BarMenu icon={<Columns3 size={14} />} label={field.name} title={t("db.groupBy")}>
+      <div className="popup-label">{t("db.groupBy")}</div>
+      {selects.map((f) => (
+        <Menu.Item key={f.id} className="popup-item" onClick={() => void editDatabase((doc) => setView(doc, tag, { groupBy: f.id }))}>
+          {f.name}
+          {f.id === field.id && <Check size={14} className="check" />}
+        </Menu.Item>
+      ))}
+      <div className="popup-separator" />
+      <div className="popup-label db-menu-note">{t("db.groupByHint")}</div>
+    </BarMenu>
+  );
+}
+
 /** What the cards are ordered by, and which way: the same order as the
  *  table's (a column heading sets it there), kept with the tag's view. */
-function SortControl({ tag, db }: { tag: string; db: Database }) {
+function SortMenu({ tag, db }: { tag: string; db: Database }) {
   const { t } = useTranslation();
   const set = (view: { sortBy?: string; sortDesc?: boolean }) => void editDatabase((doc) => setView(doc, tag, view));
   const keys = [
@@ -118,24 +156,35 @@ function SortControl({ tag, db }: { tag: string; db: Database }) {
     { id: "title", name: t("db.titleColumn") },
     ...db.fields.map((f) => ({ id: f.id, name: f.name })),
   ];
-  const current = keys.some((k) => k.id === db.view.sortBy) ? db.view.sortBy : "created";
+  const current = keys.find((k) => k.id === db.view.sortBy) ?? keys[0];
   const desc = db.view.sortDesc;
   return (
-    <div className="db-sort">
-      <label className="db-bar-select">
-        {t("db.sortBy")}
-        <select value={current} onChange={(e) => set({ sortBy: e.target.value })}>
-          {keys.map((k) => (
-            <option key={k.id} value={k.id}>
-              {k.name}
-            </option>
-          ))}
-        </select>
-      </label>
-      <button className="icon-button db-sort-dir" aria-label={t(desc ? "db.sortDesc" : "db.sortAsc")} title={t(desc ? "db.sortDesc" : "db.sortAsc")} onClick={() => set({ sortDesc: !desc })}>
-        {desc ? <ArrowDown size={14} /> : <ArrowUp size={14} />}
-      </button>
-    </div>
+    <BarMenu
+      icon={<ArrowUpDown size={14} />}
+      label={
+        <>
+          {current.name}
+          {desc ? <ArrowDown size={12} /> : <ArrowUp size={12} />}
+        </>
+      }
+      title={t("db.sortBy")}
+    >
+      <div className="popup-label">{t("db.sortBy")}</div>
+      {keys.map((k) => (
+        <Menu.Item key={k.id} className="popup-item" onClick={() => set({ sortBy: k.id })}>
+          {k.name}
+          {k.id === current.id && <Check size={14} className="check" />}
+        </Menu.Item>
+      ))}
+      <div className="popup-separator" />
+      {[false, true].map((d) => (
+        <Menu.Item key={String(d)} className="popup-item" onClick={() => set({ sortDesc: d })}>
+          {d ? <ArrowDown size={14} /> : <ArrowUp size={14} />}
+          {t(d ? "db.sortDesc" : "db.sortAsc")}
+          {d === desc && <Check size={14} className="check" />}
+        </Menu.Item>
+      ))}
+    </BarMenu>
   );
 }
 
@@ -167,19 +216,9 @@ export function BoardView({ tag, db, rows, change }: { tag: string; db: Database
   return (
     <>
       <div className="db-board-bar">
-        <label className="db-bar-select">
-          {t("db.groupBy")}
-          <select value={field.id} onChange={(e) => void editDatabase((doc) => setView(doc, tag, { groupBy: e.target.value }))}>
-            {selects.map((f) => (
-              <option key={f.id} value={f.id}>
-                {f.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <SortControl tag={tag} db={db} />
+        <GroupMenu tag={tag} field={field} selects={selects} />
+        <SortMenu tag={tag} db={db} />
       </div>
-      {selects.length === 1 && <p className="db-bar-hint">{t("db.groupByHint")}</p>}
       <div className="db-board">
         {columns.map(({ option, rows: cards }) => {
           const key = option?.id ?? "";

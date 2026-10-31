@@ -801,7 +801,7 @@
     "sortBy": "Sort",
     "sortCreated": "Created",
     "sortUpdated": "Edited",
-    "groupByHint": "Columns come from a single-select field; to group another way, add one.",
+    "groupByHint": "Columns come from single-select fields. To group another way, add one.",
     "noValue": "No {{name}}",
     "moveTo": "Move to",
     "more_one": "{{count}} more",

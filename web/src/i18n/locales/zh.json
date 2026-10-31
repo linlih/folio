@@ -801,7 +801,7 @@
     "sortBy": "排序",
     "sortCreated": "创建时间",
     "sortUpdated": "修改时间",
-    "groupByHint": "只能按「单选」属性分列；想按别的分类，先添加一个单选属性。",
+    "groupByHint": "只能按「单选」属性分列。想按别的分类，先添加一个单选属性。",
     "noValue": "未设置{{name}}",
     "moveTo": "移到",
     "more_one": "另 {{count}} 项",
