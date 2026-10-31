@@ -19,7 +19,7 @@ export const TYPE_ICON: Record<FieldType, ReactNode> = {
 };
 
 /** "+": a new field, named and typed. */
-export function AddField({ tag, label }: { tag: string; label?: string }) {
+export function AddField({ tag, label, count }: { tag: string; label?: string; count?: number }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
@@ -52,6 +52,7 @@ export function AddField({ tag, label }: { tag: string; label?: string }) {
                 }
               }}
             />
+            {count !== undefined && <div className="db-field-scope">{t("db.fieldScope", { count, name: tag })}</div>}
             <div className="popup-label">{t("db.fieldType")}</div>
             {FIELD_TYPES.map((x) => (
               <button key={x} className="popup-item" aria-pressed={x === type} data-highlighted={x === type ? "" : undefined} onClick={() => setType(x)}>

@@ -764,6 +764,9 @@
       "board": "Board",
       "blocks": "Blocks"
     },
+    "manageFields": "Manage fields",
+    "fieldScope_one": "Shown on the card tagged #{{name}}",
+    "fieldScope_other": "Shown on the {{count}} cards tagged #{{name}}",
     "addField": "Add field",
     "fieldName": "Field name",
     "fieldType": "Type",

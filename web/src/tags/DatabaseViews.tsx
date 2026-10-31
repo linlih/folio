@@ -72,7 +72,7 @@ export function TableView({ tag, db, rows, change }: { tag: string; db: Database
               </th>
             ))}
             <th className="db-add-col">
-              <AddField tag={tag} />
+              <AddField tag={tag} count={rows.length} />
             </th>
           </tr>
         </thead>

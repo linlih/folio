@@ -50,7 +50,7 @@ export function TagView({ name, active }: { name: string; active: boolean }) {
             </button>
           ))}
         </div>
-        {mode !== "blocks" && db && db.fields.length === 0 && <AddField tag={name} label={t("db.addField")} />}
+        {mode !== "blocks" && db && <AddField tag={name} label={t("db.addField")} count={rows?.length} />}
       </div>
       {mode !== "blocks" && db && db.fields.length === 0 && rows && rows.length > 0 && <p className="sync-hint db-intro">{t("db.intro", { name })}</p>}
       {mode === "blocks" ? (

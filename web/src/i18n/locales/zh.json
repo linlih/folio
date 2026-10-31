@@ -764,6 +764,9 @@
       "board": "看板",
       "blocks": "段落"
     },
+    "manageFields": "管理属性",
+    "fieldScope_one": "会出现在 {{count}} 张带 #{{name}} 的卡片上",
+    "fieldScope_other": "会出现在 {{count}} 张带 #{{name}} 的卡片上",
     "addField": "添加属性",
     "fieldName": "属性名",
     "fieldType": "类型",

@@ -1,4 +1,5 @@
-import { Hash } from "lucide-react";
+import { Hash, Settings2 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { useEffect, useState } from "react";
 import { bodyFacts, readProps, setProp, type PropValue } from "../docs/card";
 import { readDatabase, type Database } from "../docs/database";
@@ -12,6 +13,7 @@ import "../tags/tags.css";
  *  has any (design/inbox-and-tags.md §3). Values are written straight into
  *  the card's replica. */
 export function CardFields({ handle }: { handle: DocHandle }) {
+  const { t } = useTranslation();
   const [tags, setTags] = useState<string[]>([]);
   const [values, setValues] = useState<Record<string, PropValue>>({});
   const [dbs, setDbs] = useState<{ tag: string; db: Database }[]>([]);
@@ -55,10 +57,18 @@ export function CardFields({ handle }: { handle: DocHandle }) {
     <div className="card-fields">
       {dbs.map(({ tag, db }) => (
         <section key={tag} className="card-fields-group">
-          <button className="card-fields-tag" onClick={() => open(tag)}>
-            <Hash size={12} />
-            {tag}
-          </button>
+          {/* Fields belong to the tag, not the card: they are added, renamed
+              and removed on the tag's page, where every card they affect is. */}
+          <div className="card-fields-head">
+            <button className="card-fields-tag" onClick={() => open(tag)}>
+              <Hash size={12} />
+              {tag}
+            </button>
+            <button className="card-fields-manage" onClick={() => open(tag)}>
+              <Settings2 size={12} />
+              {t("db.manageFields")}
+            </button>
+          </div>
           {db.fields.map((f) => (
             <div key={f.id} className="card-field">
               <span className="card-field-name">{f.name}</span>
