@@ -22,5 +22,6 @@ describe("sync errors", () => {
   it("words the status line by its kind", () => {
     expect(errorText(zh, { error: "the server refused the token", errorKind: "unauthorized" })).toBe(zh("sync.errorUnauthorized"));
     expect(errorText(zh, { error: "database: locked", errorKind: "other" })).toBe("database: locked");
+    expect(errorText(zh, { error: "this device cannot read its sync key", errorKind: "key-missing" })).toBe(zh("sync.errorKeyMissing"));
   });
 });

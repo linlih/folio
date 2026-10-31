@@ -173,7 +173,7 @@ export interface SyncStatus {
   pending: number;
   error: string | null;
   /** What went wrong, to word it in the interface's language. */
-  errorKind: "network" | "unauthorized" | "removed" | "wrong-passphrase" | "other" | null;
+  errorKind: "network" | "unauthorized" | "removed" | "key-missing" | "wrong-passphrase" | "other" | null;
   /** Files waiting to go up; files cards use that are not on this device. */
   filesUp: number;
   filesDown: number;

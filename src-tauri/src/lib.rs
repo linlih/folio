@@ -5,6 +5,7 @@ mod assets;
 mod diagnostics;
 mod library;
 mod mcp;
+mod secret;
 mod sync;
 
 use std::path::PathBuf;
@@ -504,13 +505,25 @@ fn titles(state: tauri::State<AppState>, ids: Vec<String>) -> CmdResult<Vec<(Str
     Ok(lock(&state)?.titles(&ids)?)
 }
 
+/// Settings the page may not read or write through the commands below:
+/// the sync settings hold the server token (and, on devices without a
+/// keychain, the key), and only the host's sync commands change them.
+fn page_may_use(key: &str) -> CmdResult<()> {
+    if key == "sync" || key.starts_with("sync.") {
+        return Err(CommandError::Other(format!("the setting {key} is not the page's")));
+    }
+    Ok(())
+}
+
 #[tauri::command]
 fn get_local_setting(state: tauri::State<AppState>, key: String) -> CmdResult<Option<serde_json::Value>> {
+    page_may_use(&key)?;
     Ok(lock(&state)?.local_setting(&key)?)
 }
 
 #[tauri::command]
 fn set_local_setting(state: tauri::State<AppState>, key: String, value: serde_json::Value) -> CmdResult<()> {
+    page_may_use(&key)?;
     Ok(lock(&state)?.set_local_setting(&key, &value)?)
 }
 
@@ -1263,6 +1276,14 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_page_cannot_reach_the_sync_settings() {
+        assert!(page_may_use("sync").is_err());
+        assert!(page_may_use("sync.name").is_err());
+        assert!(page_may_use("ui.theme").is_ok());
+        assert!(page_may_use("syncthing").is_ok());
+    }
 
     /// An identifier the app used before.
     const OLD: &str = "dev.old.app";

@@ -4,8 +4,9 @@
 //! package signed with the same key as the installed app, so a wrong file
 //! cannot replace it. It also keeps what other apps share to Folio from
 //! their share sheets, for the inbox ([`Apk::take_shared`]), and leaves
-//! for the background when Back has nowhere to go ([`Apk::to_background`]). On other
-//! platforms the plugin does nothing.
+//! for the background when Back has nowhere to go ([`Apk::to_background`]),
+//! and encrypts the sync key with a key in the Android Keystore
+//! ([`Apk::seal`]). On other platforms the plugin does nothing.
 
 use tauri::plugin::{Builder, TauriPlugin};
 use tauri::Runtime;
@@ -51,6 +52,26 @@ mod android {
         text: Option<String>,
     }
 
+    #[derive(Serialize)]
+    struct Text<'a> {
+        text: &'a str,
+    }
+
+    #[derive(Serialize)]
+    struct SealedArgs<'a> {
+        sealed: &'a str,
+    }
+
+    #[derive(Deserialize)]
+    struct Sealed {
+        sealed: String,
+    }
+
+    #[derive(Deserialize)]
+    struct Opened {
+        text: String,
+    }
+
     #[derive(Deserialize)]
     struct Started {
         started: bool,
@@ -79,6 +100,19 @@ mod android {
         pub fn take_shared(&self) -> Result<Option<String>, String> {
             let shared: Shared = self.0.run_mobile_plugin("takeShared", ()).map_err(|e| e.to_string())?;
             Ok(shared.text)
+        }
+
+        /// `text` encrypted with this app's key in the Android Keystore
+        /// (made on first use; it cannot be read out of the device), base64.
+        pub fn seal(&self, text: &str) -> Result<String, String> {
+            let sealed: Sealed = self.0.run_mobile_plugin("seal", Text { text }).map_err(|e| e.to_string())?;
+            Ok(sealed.sealed)
+        }
+
+        /// What [`Self::seal`] encrypted.
+        pub fn open(&self, sealed: &str) -> Result<String, String> {
+            let opened: Opened = self.0.run_mobile_plugin("open", SealedArgs { sealed }).map_err(|e| e.to_string())?;
+            Ok(opened.text)
         }
 
         /// Sends the app to the background, as the Home button does.

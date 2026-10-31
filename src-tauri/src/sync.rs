@@ -24,7 +24,7 @@ use folio_sync::SyncError;
 use serde::{Deserialize, Serialize};
 use tauri::{Emitter, Manager};
 
-use crate::{lock, now_ms, AppState, CmdResult, CommandError};
+use crate::{lock, now_ms, secret, AppState, CmdResult, CommandError};
 
 const SETTING: &str = "sync";
 /// This device's own name for itself, kept when sync stops so that joining
@@ -48,8 +48,8 @@ const USAGE_EVERY: Duration = Duration::from_secs(10 * 60);
 /// Computers keep every file; phones download what is looked at.
 const DOWNLOAD_ALL: bool = cfg!(desktop);
 
-/// Kept in `local_settings`. The workspace key is stored here for now; the
-/// OS keychain comes later (§5.3).
+/// Kept in `local_settings`; the workspace key in the system keychain where
+/// this device has one (secret.rs), only the place recorded here.
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SyncSettings {
@@ -57,8 +57,16 @@ pub struct SyncSettings {
     pub token: String,
     pub workspace: String,
     pub device: String,
-    /// The workspace key, base64.
+    /// The workspace key, base64. Empty in the library once it is kept
+    /// elsewhere (`key_in`); filled in memory by [`load`].
     pub key: String,
+    /// Where the key is kept: "keychain" or "keystore" (secret.rs); empty
+    /// while it is in `key`, as before 0.1.10 and where neither works.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub key_in: String,
+    /// On Android, the key sealed by the Keystore.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub key_sealed: String,
     /// This device's name in the device list; the computer's when empty.
     #[serde(default)]
     pub name: String,
@@ -182,9 +190,65 @@ fn remembered_name(state: &AppState) -> String {
     store.local_setting(NAME_SETTING).ok().flatten().and_then(|v| v.as_str().map(str::to_owned)).unwrap_or_default()
 }
 
-fn load(state: &AppState) -> Option<SyncSettings> {
-    let store = lock(state).ok()?;
-    store.local_setting(SETTING).ok().flatten().and_then(|v| serde_json::from_value(v).ok())
+/// The settings, with the key read from where it is kept; a key still in
+/// the library is moved out first. A key that cannot be read leaves `key`
+/// empty, and sync reports it (`key-missing`).
+fn load(app: &tauri::AppHandle) -> Option<SyncSettings> {
+    let state = app.state::<AppState>();
+    let mut s: SyncSettings = {
+        let store = lock(&state).ok()?;
+        store.local_setting(SETTING).ok().flatten().and_then(|v| serde_json::from_value(v).ok())?
+    };
+    if s.key_in.is_empty() {
+        if !s.key.is_empty() && secure(app, &mut s) {
+            match lock(&state).and_then(|store| save(&store, &s)) {
+                Ok(()) => tracing::info!(place = %s.key_in, "moved the sync key out of the library"),
+                Err(e) => tracing::warn!(error = %e, "the sync key is kept, but the library still holds it"),
+            }
+        }
+    } else {
+        match secret::get(app, &s.key_in, &account(&s), &s.key_sealed) {
+            Ok(key) => s.key = key,
+            Err(e) => tracing::error!(error = %e, place = %s.key_in, "cannot read the sync key"),
+        }
+    }
+    Some(s)
+}
+
+/// Whether this device syncs, without reading the key.
+fn is_set_up(app: &tauri::AppHandle) -> bool {
+    lock(&app.state::<AppState>()).ok().and_then(|store| store.local_setting(SETTING).ok().flatten()).is_some_and(|v| !v.is_null())
+}
+
+/// Names this device's key among others in the keychain.
+fn account(s: &SyncSettings) -> String {
+    format!("{}/{}", s.workspace, s.device)
+}
+
+/// Keeps the key outside the library if this device can; false where it
+/// cannot (it stays in the library, as before).
+fn secure(app: &tauri::AppHandle, s: &mut SyncSettings) -> bool {
+    match secret::put(app, &account(s), &s.key) {
+        Ok((place, sealed)) => {
+            s.key_in = place.into();
+            s.key_sealed = sealed;
+            true
+        }
+        Err(e) => {
+            tracing::warn!(error = %e, "no keychain to keep the sync key in; it stays in the library");
+            false
+        }
+    }
+}
+
+/// Writes the settings; the key not with them once it is kept elsewhere.
+fn save(store: &folio_store::Store, s: &SyncSettings) -> CmdResult<()> {
+    let mut kept = s.clone();
+    if !kept.key_in.is_empty() {
+        kept.key = String::new();
+    }
+    store.set_local_setting(SETTING, &serde_json::to_value(&kept).map_err(other)?)?;
+    Ok(())
 }
 
 fn other(e: impl std::fmt::Display) -> CommandError {
@@ -239,11 +303,19 @@ fn update(app: &tauri::AppHandle, f: impl FnOnce(&mut SyncStatus)) {
     let _ = app.emit("sync-status", snapshot);
 }
 
-/// Starts the loop if this device is set up to sync.
+/// Starts the loop if this device is set up to sync. In a thread of its
+/// own: reading the key may wait on the keychain or, on Android, on the
+/// main thread this may be called from.
 pub fn start_if_enabled(app: &tauri::AppHandle) {
-    if let Some(settings) = load(&app.state::<AppState>()) {
-        start(app, settings);
-    }
+    let app = app.clone();
+    std::thread::Builder::new()
+        .name("sync-start".into())
+        .spawn(move || {
+            if let Some(settings) = load(&app) {
+                start(&app, settings);
+            }
+        })
+        .ok();
 }
 
 /// Asks the loop to push soon (after a local edit).
@@ -276,6 +348,20 @@ fn start(app: &tauri::AppHandle, settings: SyncSettings) {
         Some(k) => k,
         None => {
             tracing::error!("sync settings hold no usable key");
+            // Shown in Settings → Sync, where stopping and joining again
+            // brings the key back.
+            update(app, |st| {
+                *st = SyncStatus {
+                    enabled: true,
+                    server: settings.server.clone(),
+                    device: settings.device.clone(),
+                    code: code_of(&settings),
+                    error: Some("this device cannot read its sync key; stop syncing here and join again".into()),
+                    error_kind: Some("key-missing"),
+                    files_all: DOWNLOAD_ALL,
+                    ..Default::default()
+                };
+            });
             return;
         }
     };
@@ -596,7 +682,7 @@ fn fetch(
 #[tauri::command]
 pub fn asset_fetch(app: tauri::AppHandle, sha256s: Vec<String>) {
     let sha256s: Vec<String> = sha256s.into_iter().filter(|s| folio_store::assets::is_hash(s)).collect();
-    if load(&app.state::<AppState>()).is_none() {
+    if !is_set_up(&app) {
         for sha in sha256s {
             let _ = app.emit("asset-missing", AssetMissing { sha256: sha, reason: "no-sync" });
         }
@@ -614,11 +700,12 @@ pub fn asset_fetch(app: tauri::AppHandle, sha256s: Vec<String>) {
     poke_files(&app);
 }
 
-fn enable(app: &tauri::AppHandle, settings: SyncSettings) -> CmdResult<SyncStatus> {
+fn enable(app: &tauri::AppHandle, mut settings: SyncSettings) -> CmdResult<SyncStatus> {
+    secure(app, &mut settings);
     let state = app.state::<AppState>();
     {
         let mut store = lock(&state)?;
-        store.set_local_setting(SETTING, &serde_json::to_value(&settings).map_err(other)?)?;
+        save(&store, &settings)?;
         // Everything written here so far goes up with the first push.
         let docs = store.queue_everything(now_ms())?;
         tracing::info!(docs, workspace = %settings.workspace, "sync enabled");
@@ -668,7 +755,7 @@ pub async fn sync_create(app: tauri::AppHandle, server: String, token: String, p
     .await
     .map_err(other)??;
     let name = remembered_name(&app.state::<AppState>());
-    enable(&app, SyncSettings { server, token, workspace, device, key: key_b64, name })
+    enable(&app, SyncSettings { server, token, workspace, device, key: key_b64, name, ..Default::default() })
 }
 
 /// Another device: joins with the sync code and the passphrase.
@@ -684,7 +771,7 @@ pub async fn sync_join(app: tauri::AppHandle, code: String, passphrase: String) 
     .await
     .map_err(other)??;
     let name = remembered_name(&app.state::<AppState>());
-    enable(&app, SyncSettings { server: code.server, token: code.token, workspace: code.workspace, device, key: crypto::b64(&key.0), name })
+    enable(&app, SyncSettings { server: code.server, token: code.token, workspace: code.workspace, device, key: crypto::b64(&key.0), name, ..Default::default() })
 }
 
 /// Another device, without the passphrase (forgotten): joins with the sync
@@ -714,14 +801,14 @@ pub async fn sync_join_recovery(app: tauri::AppHandle, code: String, recovery: S
     .map_err(other)??;
     tracing::warn!(workspace = %code.workspace, "joined with the recovery code and set a new passphrase");
     let name = remembered_name(&app.state::<AppState>());
-    enable(&app, SyncSettings { server: code.server, token: code.token, workspace: code.workspace, device, key: crypto::b64(&key.0), name })
+    enable(&app, SyncSettings { server: code.server, token: code.token, workspace: code.workspace, device, key: crypto::b64(&key.0), name, ..Default::default() })
 }
 
 /// Makes a recovery code (replacing any before) and returns it, to show
 /// once: the server keeps only the key wrapped under it.
 #[tauri::command]
 pub async fn sync_recovery_create(app: tauri::AppHandle) -> CmdResult<String> {
-    let settings = load(&app.state::<AppState>()).ok_or_else(|| other("sync is not set up"))?;
+    let settings = load(&app).ok_or_else(|| other("sync is not set up"))?;
     let key = key_of(&settings).ok_or_else(|| other("sync settings hold no usable key"))?;
     tauri::async_runtime::spawn_blocking(move || {
         let code = crypto::new_recovery_code();
@@ -739,7 +826,7 @@ pub async fn sync_recovery_create(app: tauri::AppHandle) -> CmdResult<String> {
 /// from before them).
 #[tauri::command]
 pub async fn sync_recovery_exists(app: tauri::AppHandle) -> CmdResult<bool> {
-    let settings = load(&app.state::<AppState>()).ok_or_else(|| other("sync is not set up"))?;
+    let settings = load(&app).ok_or_else(|| other("sync is not set up"))?;
     tauri::async_runtime::spawn_blocking(move || {
         let http = Http::new(&settings.server, &settings.token, &settings.workspace, &settings.device);
         Ok(http.get_recovery_key().map_err(|e| failed(&e))?.is_some())
@@ -753,7 +840,7 @@ pub async fn sync_recovery_exists(app: tauri::AppHandle) -> CmdResult<bool> {
 #[tauri::command]
 pub async fn sync_change_passphrase(app: tauri::AppHandle, passphrase: String) -> CmdResult<()> {
     check_passphrase(&passphrase)?;
-    let settings = load(&app.state::<AppState>()).ok_or_else(|| other("sync is not set up"))?;
+    let settings = load(&app).ok_or_else(|| other("sync is not set up"))?;
     let key = key_of(&settings).ok_or_else(|| other("sync settings hold no usable key"))?;
     tauri::async_runtime::spawn_blocking(move || {
         let wrapped = crypto::wrap(&key, &passphrase, crypto::DEFAULT_COST).map_err(other)?;
@@ -786,7 +873,11 @@ pub fn sync_now(app: tauri::AppHandle) {
 pub fn sync_disable(app: tauri::AppHandle) -> CmdResult<SyncStatus> {
     stop(&app);
     let state = app.state::<AppState>();
-    let name = load(&state).map(|s| s.name);
+    let settings = load(&app);
+    if let Some(s) = &settings {
+        secret::delete(&s.key_in, &account(s));
+    }
+    let name = settings.map(|s| s.name);
     {
         let store = lock(&state)?;
         if let Some(name) = name {
@@ -803,7 +894,7 @@ pub fn sync_disable(app: tauri::AppHandle) -> CmdResult<SyncStatus> {
 /// The workspace's devices (asks the server).
 #[tauri::command]
 pub async fn sync_devices(app: tauri::AppHandle) -> CmdResult<Vec<SyncDevice>> {
-    let settings = load(&app.state::<AppState>()).ok_or_else(|| other("sync is not set up"))?;
+    let settings = load(&app).ok_or_else(|| other("sync is not set up"))?;
     tauri::async_runtime::spawn_blocking(move || list_devices(&settings)).await.map_err(other)?
 }
 
@@ -815,9 +906,9 @@ pub async fn sync_rename_device(app: tauri::AppHandle, name: String) -> CmdResul
     if name.chars().count() > MAX_NAME {
         return Err(other(format!("a device name has at most {MAX_NAME} characters")));
     }
-    let mut settings = load(&app.state::<AppState>()).ok_or_else(|| other("sync is not set up"))?;
+    let mut settings = load(&app).ok_or_else(|| other("sync is not set up"))?;
     settings.name = name;
-    lock(&app.state::<AppState>())?.set_local_setting(SETTING, &serde_json::to_value(&settings).map_err(other)?)?;
+    save(&*lock(&app.state::<AppState>())?, &settings)?;
     tauri::async_runtime::spawn_blocking(move || {
         let (engine, http) = connect(&settings)?;
         engine.set_device_name(&http, &device_name(&settings)).map_err(|e| failed(&e))?;
@@ -831,7 +922,7 @@ pub async fn sync_rename_device(app: tauri::AppHandle, name: String) -> CmdResul
 /// a new device.
 #[tauri::command]
 pub async fn sync_remove_device(app: tauri::AppHandle, id: String) -> CmdResult<Vec<SyncDevice>> {
-    let settings = load(&app.state::<AppState>()).ok_or_else(|| other("sync is not set up"))?;
+    let settings = load(&app).ok_or_else(|| other("sync is not set up"))?;
     tauri::async_runtime::spawn_blocking(move || {
         let (engine, http) = connect(&settings)?;
         engine.remove_device(&http, &id).map_err(|e| failed(&e))?;
@@ -871,5 +962,24 @@ mod tests {
         assert!(failed(&SyncError::Network("refused".into())).to_string().starts_with("[network] cannot reach the server"));
         assert!(failed(&SyncError::Unauthorized).to_string().starts_with("[unauthorized] "));
         assert_eq!(tagged("bad-code", "this is not a sync code").to_string(), "[bad-code] this is not a sync code");
+    }
+
+    #[test]
+    fn a_key_kept_elsewhere_is_not_written_to_the_library() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = folio_store::Store::open(dir.path()).unwrap();
+        let mut s = SyncSettings { server: "http://x".into(), token: "t".into(), workspace: "w".into(), device: "d".into(), key: "secret".into(), ..Default::default() };
+        // No keychain: the key stays, as before.
+        save(&store, &s).unwrap();
+        assert_eq!(store.local_setting(SETTING).unwrap().unwrap()["key"], "secret");
+        s.key_in = secret::KEYCHAIN.into();
+        save(&store, &s).unwrap();
+        let kept = store.local_setting(SETTING).unwrap().unwrap();
+        assert_eq!(kept["key"], "", "an older version still finds the field");
+        assert_eq!(kept["keyIn"], "keychain");
+        assert!(kept.get("keySealed").is_none());
+        // What an older version wrote still reads.
+        let old: SyncSettings = serde_json::from_value(serde_json::json!({"server": "s", "token": "t", "workspace": "w", "device": "d", "key": "k"})).unwrap();
+        assert!(old.key_in.is_empty() && old.key == "k");
     }
 }

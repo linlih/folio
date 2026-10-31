@@ -449,6 +449,7 @@
     "errorCode": "this is not a sync code. Copy it whole from the first device.",
     "errorNoWorkspace": "the server has no such sync space.",
     "errorRemoved": "another device removed this one from the sync space. To go on, stop syncing here and join again.",
+    "errorKeyMissing": "This device cannot read its sync key from the system's secure storage (keychain) (the library may have been copied or restored from another device). Your notes are all here. To go on, stop syncing here and join again with the sync code.",
     "stateSyncing": "Syncing…",
     "stateDone": "Synced ({{time}})",
     "stateStarting": "Connecting…",

@@ -524,7 +524,7 @@ CREATE TABLE index_meta (doc_id TEXT PRIMARY KEY, indexed_vv BLOB, gen INT);
 - **附件**：按 sha256 内容寻址，分块加密后经单独的接口上传，服务器存成文件；卡片里只存哈希（存储见 4.6，同步设计见 `design/attachments.md` §5，2026-10-28 已实现，接口为 `POST blobs/have`、`PUT/GET blobs/{id}/{n}`、`POST blobs/{id}/done`、`PUT blobs/refs`）。
 - **E2EE**：工作区主密钥用用户口令（Argon2id）派生的 KEK 包裹后存服务端；新设备输入口令解开。所有 blob 用 XChaCha20-Poly1305 加密，`doc_id` 也可做 HMAC 混淆。
 - **恢复码（2026-10-31）**：设置里可生成恢复码（160 位随机，Crockford base32，8 组 × 4 字符，只显示一次）；主密钥再用它包裹一份存服务端（`workspaces.recovery_key`，`PUT/GET /v1/w/{ws}/key/recovery`），服务端看不到恢复码。忘了口令时，新设备凭同步码 + 恢复码解开主密钥并设新口令（`PUT key/passphrase` 替换口令那一份）；已在同步的设备有主密钥，不受影响，也不重新加密任何内容。已有设备也可直接更改口令。重新生成会让旧恢复码失效。纯新增：旧服务器返回 404 时提示升级服务器，旧数据不动。
-- **第一版实现（M3，2026-10）**：`crates/folio-sync`（协议、加密、服务端存储 `relay`、客户端引擎 `client`、HTTP/WebSocket 传输）+ `crates/folio-server`（axum）。与上面草图的差别：日志按**工作区**一条，`seq` 与游标都是工作区级的（一次拉取覆盖所有文档）；`doc_id` 用 HMAC 混淆成标签，文档种类和真实 id 封在密文信封里，服务端只看到“某工作区、某标签、某设备的一段密文”。接口：`PUT/GET /v1/w/{ws}/key`（包裹后的主密钥）、`POST push`、`GET pull?after=`、`GET live`（WebSocket，只通知新的 head）、`PUT device`（加密的设备名）、`GET devices`、`POST/GET acks`（加密的版本报告）；所有请求带服务器令牌（启动时的 `FOLIO_SERVER_TOKEN`）和设备 id。新设备凭“同步码”（服务器地址 + 令牌 + 工作区 id）加口令加入；口令不在同步码里。设备开启同步时把每个文档的完整历史放进 outbox 一次，之前写入的内容（迁移、恢复、导入）不会漏传。工作区主密钥暂存本机设置，之后移到系统钥匙串。附件已于 2026-10-28 加入，收敛校验、跨设备永久删除已于 2026-10-30 加入。
+- **第一版实现（M3，2026-10）**：`crates/folio-sync`（协议、加密、服务端存储 `relay`、客户端引擎 `client`、HTTP/WebSocket 传输）+ `crates/folio-server`（axum）。与上面草图的差别：日志按**工作区**一条，`seq` 与游标都是工作区级的（一次拉取覆盖所有文档）；`doc_id` 用 HMAC 混淆成标签，文档种类和真实 id 封在密文信封里，服务端只看到“某工作区、某标签、某设备的一段密文”。接口：`PUT/GET /v1/w/{ws}/key`（包裹后的主密钥）、`POST push`、`GET pull?after=`、`GET live`（WebSocket，只通知新的 head）、`PUT device`（加密的设备名）、`GET devices`、`POST/GET acks`（加密的版本报告）；所有请求带服务器令牌（启动时的 `FOLIO_SERVER_TOKEN`）和设备 id。新设备凭“同步码”（服务器地址 + 令牌 + 工作区 id）加口令加入；口令不在同步码里。设备开启同步时把每个文档的完整历史放进 outbox 一次，之前写入的内容（迁移、恢复、导入）不会漏传。工作区主密钥存系统钥匙串（2026-10-31，见 5.6 第 4 项）。附件已于 2026-10-28 加入，收敛校验、跨设备永久删除已于 2026-10-30 加入。
 - **无服务器模式（可选，后期）**：同样的协议也可以落到 WebDAV / iCloud Drive / S3：每台设备只写自己的 `ops-<device>/` 目录（单写者），其他设备读取 → 天然无冲突（tine BACKLOG 中提到的思路，在 CRDT 下变得简单）。
 
 **部署（2026-10-26）**：`scripts/install-server.sh`，在装有 systemd 的 Linux 上以 root 运行，参数只要域名。下载 Release 里的静态二进制（`folio-server-{x86_64,aarch64}-linux`，musl，附 sha256 校验）。全部文件在 `/opt/folio-sync`：`bin/`（程序、管理命令 `folio-sync`、安装脚本副本）、`etc/folio-sync.env`（令牌和设置，root 所有、0640；令牌只生成一次，重跑沿用）、`data/`（数据库）、`logs/folio-sync.log`（systemd 240+ 写文件，logrotate 每天轮转、保留 14 天；更老的 systemd 留在 journal）、`VERSION`。系统用户与 systemd 服务都叫 `folio-sync`，只监听 `127.0.0.1:8787`，带沙箱选项（只能写 `data/` 和 `logs/`）。管理命令软链到 `/usr/bin/folio-sync`（有的系统如 OpenCloudOS 的 sudo 搜索路径不含 `/usr/local/bin`）：`status`（服务状态 + 健康检查）、`start` / `stop` / `restart`、`logs [-f]`、`info`（地址、令牌、版本、路径）、`upgrade [--version]`（取最新安装脚本重跑，离线时用本地副本）、`uninstall [--purge]`。HTTPS 交给 Caddy（参照自建 Logseq 同步的做法，不依赖系统包管理器）：机器上没有 Caddy 时，询问后下载 Caddy 官方发布的二进制（版本固定为 2.11.7，SHA-512 写在脚本里校验），装在 `/opt/folio-sync/bin/caddy`，配置和证书在 `/opt/folio-sync/caddy/`，以系统用户 `folio-caddy` 运行独立服务 `folio-sync-caddy`（只开放绑定低端口的能力），日志写 `logs/caddy.log`；装之前先检查 80 和 HTTPS 端口是否被别的程序占用并说出是谁，有冲突就在改动任何东西之前停下；可换 HTTPS 端口（证书仍走 80，并关闭 TLS-ALPN 验证），与自建 Logseq 同步一致：在终端里直接运行时按步骤询问域名、公网 HTTPS 端口（默认 443，换成别的端口可以避开大部分扫描）和本机端口，回车用括号里的值；再列出安装计划（地址、端口、HTTPS 怎么配置、安装位置、安全组要放行的端口），同意后才动手。重跑和 `folio-sync upgrade` 沿用上次的端口；`--domain`、`--https-port`、`--port`、`--yes` 用于无人值守。机器上已经有系统的 Caddy（用 `/etc/caddy/Caddyfile` 管理）时，询问后追加站点（先备份、`caddy validate` 通过才写入、保留文件的属主和权限、用标记行包住，重跑时整块替换，改域名会再问一次）；Caddyfile 里已有同名站点就不动，只提示；Caddy 不是用 `/etc/caddy/Caddyfile` 管理的（如 Docker）就打印配置片段。还会检查域名是否解析到本机、端口是否被占用、ufw / firewalld 是否需要放行 80/443，最后等 `https://域名/health` 可访问并打印服务器地址和令牌。`folio-sync uninstall`（或 `--uninstall`）移除服务与程序，数据、令牌、日志留在 `/opt/folio-sync`；`--purge` 整个目录和用户一并删除。客户端实时通道支持 `wss://`（tungstenite 开启 rustls）；服务端收到 SIGTERM 会正常退出。CI 的 `Server install` 在全新的 Ubuntu 上跑全流程（装 Caddy、目录与权限、管理命令的启停与日志、重跑保留令牌、与其他站点共用 Caddyfile、卸载、彻底删除）。
@@ -561,7 +561,7 @@ CREATE TABLE index_meta (doc_id TEXT PRIMARY KEY, indexed_vv BLOB, gen INT);
 | 1 | 传输 | 官方托管只接受 HTTPS；自托管使用 http 时，在同步设置里明显提示（局域网测试除外） | 令牌与包裹后的主密钥不能明文传 |
 | 2 | **忘记口令** ✅ 2026-10-31 | 开启同步时生成**恢复码**（类似 1Password 的 Secret Key / Bitwarden 恢复码），要求用户保存并确认；口令可用恢复码重置 | 端到端加密下官方也无法找回；用户会把“进不去”当成“数据丢了”，是最大的口碑风险 |
 | 3 | 口令强度 | 设置口令时显示强度，拒绝常见弱口令；Argon2id 参数随硬件调高 | 服务器或截获者拿到包裹后的密钥可离线猜口令 |
-| 4 | 本机密钥 | 工作区主密钥存系统钥匙串（macOS/iOS Keychain、Windows DPAPI、Android Keystore），不存本机设置；本地数据库静态加密作为选项（参考 Notesnook 的 sqlite-multiple-ciphers） | 现在主密钥明文存在 `local_settings` |
+| 4 | **本机密钥** ✅ 2026-10-31（静态加密未做） | 工作区主密钥存系统钥匙串（macOS/iOS Keychain、Windows 凭据管理器、Linux Secret Service、Android Keystore），不存本机设置；本地数据库静态加密作为选项（参考 Notesnook 的 sqlite-multiple-ciphers） | 资料库（及其备份、被同步盘或复制带走的副本）不再含主密钥 |
 | 5 | 账号与设备 | 账号体系；每台设备单独的凭证，替代共用的服务器令牌；设备列表可单独移除；移除后轮换主密钥（重新加密，新密钥只发给留下的设备） | 丢了手机要能只撤销那一台；同步码泄露要能补救 |
 | 6 | 真正的删除 | 跨设备永久删除（5.4）同时删除服务器上的对应密文（2026-10-30 已做：清空回收站、回收站 30 天自动清理）；注销账号清空服务器上的全部数据；写明保留期限 | 用户期待，也是法规要求（GDPR、《个人信息保护法》的删除权） |
 | 7 | 服务器数据量 | 压缩（已做）：服务器只保留每个文档最新的加密完整快照 + 之后的更新，旧条目在上传快照时删除（5.3）；可选“信箱模式”（所有设备收到后即删，代价是没有异地副本、新设备要从老设备取数据） | 删掉的旧内容不应无限期留在服务器上 |
@@ -569,6 +569,15 @@ CREATE TABLE index_meta (doc_id TEXT PRIMARY KEY, indexed_vv BLOB, gen INT);
 | 9 | AI 与加密 | 服务器端不做任何需要读内容的 AI；AI 只在本机运行，或由用户明确选择把指定内容发给模型服务商，每次标明发往哪里；默认不发送 | “端到端加密”和“AI 原生”同时宣传时，这一点讲不清会失去信任（0.3） |
 | 10 | 可验证 | 一页通俗的安全说明（服务器能看到 / 看不到什么，含元数据）；公开协议与客户端加密代码；用户规模上来后做第三方安全审计；保留自托管 | 让用户能验证，而不只是相信 |
 | 11 | 合规（中国） | 国内托管涉及 ICP 备案、数据境内存储、《个人信息保护法》；上线前请专业人士确认 | 全球化产品，各地区要求不同 |
+
+**第 4 项的做法**（2026-10-31，`src-tauri/src/secret.rs`）：
+- macOS、iOS 存 Keychain，Windows 存凭据管理器，Linux 存 Secret Service；服务名 `Folio`，账户 `sync key {工作区}/{设备}`，同一台电脑上的多个资料库互不相干。Android 用 Android Keystore 里不可导出的 AES 密钥以 AES-GCM 加密主密钥，密文留在本机设置（`folio-apk` 插件的 `seal` / `open`）。
+- 同步设置里 `keyIn` 记录存在哪里，`key` 留成空字段（旧版本仍能读出设置）。
+- **升级**：启动时把设置里的明文密钥写入钥匙串，读回一致后才清掉明文，只做一次。没有钥匙串（如没有 Secret Service 的 Linux）时照旧存在设置里，同步不受影响。
+- **读不到密钥**（资料库复制或恢复到另一台设备、Android 从云备份恢复）：同步页提示，停止同步后用同步码 + 口令重新加入，笔记不受影响。停止同步时删除钥匙串里的这一项。
+- 页面读写本机设置的命令不再能碰同步设置（`sync`、`sync.*`），以前页面脚本能读到令牌和密钥。
+- **仍有的缺口**：升级前的自动备份里还有明文密钥，随备份轮换消失；降级回 0.1.9 及更早版本后同步会停，需重新加入。
+- 验证：桌面两个旧资料库升级后照常同步、删掉钥匙串项后提示；Pixel 5 升级、新加入、重启后照常同步，密文损坏时提示且能重新加入；iOS 模拟器升级与重启后照常同步。macOS 上重新编译（签名变化）后读取钥匙串不弹密码框。
 
 **端到端加密的代价**（设计相关功能时考虑）：网页版需在浏览器内解密；分享与多人协作需要交换密钥；服务器端搜索和服务器端 AI 不可行。
 

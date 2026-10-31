@@ -187,7 +187,7 @@ function Enabled({ status, onChange }: { status: SyncStatus; onChange: (s: SyncS
       </div>
       <CopyBlock label={t("sync.codeLabel")} text={status.code} />
       <p className="sync-hint">{t("sync.codeHint")}</p>
-      {status.errorKind !== "removed" && (
+      {status.errorKind !== "removed" && status.errorKind !== "key-missing" && (
         <>
           <RecoveryCode />
           <DeviceList lastSync={status.lastSync} />

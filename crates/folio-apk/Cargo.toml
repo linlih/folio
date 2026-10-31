@@ -2,7 +2,7 @@
 # Tauri requires plugin crates to be named tauri-plugin-<name> and to link
 # under the same name; the folder keeps the workspace's folio-* naming.
 name = "tauri-plugin-folio-apk"
-description = "Android: where update packages are downloaded to, and handing one to the system installer, and text shared from other apps (the inbox)."
+description = "Android: where update packages are downloaded to, and handing one to the system installer, text shared from other apps (the inbox), and the sync key sealed by the Android Keystore."
 version.workspace = true
 edition.workspace = true
 license.workspace = true

@@ -37,6 +37,8 @@ function kindText(t: TFunction, kind: string | null): string | null {
       return t("sync.errorUnauthorized");
     case "removed":
       return t("sync.errorRemoved");
+    case "key-missing":
+      return t("sync.errorKeyMissing");
     case "wrong-passphrase":
       return t("sync.errorPassphrase");
     case "bad-code":
