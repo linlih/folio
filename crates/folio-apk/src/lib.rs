@@ -3,7 +3,8 @@
 //! system installer with [`Apk::install`]. The installer only accepts a
 //! package signed with the same key as the installed app, so a wrong file
 //! cannot replace it. It also keeps what other apps share to Folio from
-//! their share sheets, for the inbox ([`Apk::take_shared`]). On other
+//! their share sheets, for the inbox ([`Apk::take_shared`]), and leaves
+//! for the background when Back has nowhere to go ([`Apk::to_background`]). On other
 //! platforms the plugin does nothing.
 
 use tauri::plugin::{Builder, TauriPlugin};
@@ -78,6 +79,11 @@ mod android {
         pub fn take_shared(&self) -> Result<Option<String>, String> {
             let shared: Shared = self.0.run_mobile_plugin("takeShared", ()).map_err(|e| e.to_string())?;
             Ok(shared.text)
+        }
+
+        /// Sends the app to the background, as the Home button does.
+        pub fn to_background(&self) -> Result<(), String> {
+            self.0.run_mobile_plugin::<serde::de::IgnoredAny>("toBackground", ()).map(drop).map_err(|e| e.to_string())
         }
     }
 

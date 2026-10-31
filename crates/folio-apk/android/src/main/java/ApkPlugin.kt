@@ -65,6 +65,14 @@ class ApkPlugin(private val activity: Activity) : Plugin(activity) {
         invoke.resolve(ret)
     }
 
+    /** Back on a page with nowhere to go back to: out of sight, as the
+     *  Home button would, rather than closed. */
+    @Command
+    fun toBackground(invoke: Invoke) {
+        activity.moveTaskToBack(true)
+        invoke.resolve()
+    }
+
     @Command
     fun updatesDir(invoke: Invoke) {
         val updates = dir()

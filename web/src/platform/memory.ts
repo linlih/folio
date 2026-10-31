@@ -113,6 +113,7 @@ export function memoryBackend(now: () => number = Date.now): Backend {
         .sort((a, b) => b.inboxAt - a.inboxAt),
     setInbox: async (id, inbox) => edit(id, (d) => setInbox(d, inbox ? now() : null)),
     takeShared: async () => null,
+    toBackground: async () => {},
     tagCards: async (tag) => {
       const key = tag.trim().toLowerCase();
       return live()

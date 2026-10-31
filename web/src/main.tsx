@@ -11,6 +11,7 @@ import { AppShell } from "./shell/AppShell";
 import { useShell } from "./shell/tabs";
 import { ErrorBoundary } from "./shell/ErrorBoundary";
 import { receiveShares } from "./inbox/clip";
+import { handleAndroidBack } from "./shell/androidBack";
 
 /** The desktop app on macOS draws into the title bar (tauri.macos.conf.json):
  *  the traffic lights sit in the sidebar's top row, the tabs beside them. */
@@ -39,6 +40,7 @@ async function start() {
   );
   // Links shared to Folio from other apps go to the inbox.
   receiveShares();
+  handleAndroidBack();
 }
 
 void start();

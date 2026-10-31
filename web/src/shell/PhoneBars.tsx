@@ -44,6 +44,28 @@ function goBack(pane: Pane) {
   if (previous) s.activate(previous, pane.id);
 }
 
+/** A topic of the card library is open in `pane`: the one it is in. */
+function topicUp(pane: Pane): { parent: string | null } | null {
+  const { libraryTopic } = useShell.getState();
+  const tab = pane.tabs.find((x) => x.key === pane.active);
+  if (tab?.target.kind !== "library" || !libraryTopic) return null;
+  return { parent: useTopics.getState().topics.find((x) => x.id === libraryTopic)?.parent ?? null };
+}
+
+/** The top bar's Back, for Android's Back too (androidBack.ts). False on a
+ *  page of the bottom bar, where there is nowhere to go back to. */
+export function goBackFrom(pane: Pane): boolean {
+  const up = topicUp(pane);
+  if (up) {
+    useShell.getState().setLibraryTopic(up.parent);
+    return true;
+  }
+  const tab = pane.tabs.find((x) => x.key === pane.active);
+  if (!tab || isRoot(tab.target.kind)) return false;
+  goBack(pane);
+  return true;
+}
+
 /** The bar at the top of a pane on a phone, in place of the tab bar:
  *  Back on a page opened from another (and inside a topic of the card
  *  library, up to its parent topic or the library), the page's name, and
@@ -53,16 +75,12 @@ export function PhoneTopBar({ pane }: { pane: Pane }) {
   const label = useTabLabel();
   const setDialog = useShell((s) => s.setDialog);
   const libraryTopic = useShell((s) => s.libraryTopic);
-  const topics = useTopics((s) => s.topics);
   useHistory(pane);
   const tab = pane.tabs.find((x) => x.key === pane.active);
   if (!tab) return null;
   const inTopic = tab.target.kind === "library" && !!libraryTopic;
   const root = isRoot(tab.target.kind) && !inTopic;
-  const back = () => {
-    if (!inTopic) return goBack(pane);
-    useShell.getState().setLibraryTopic(topics.find((x) => x.id === libraryTopic)?.parent ?? null);
-  };
+  const back = () => goBackFrom(pane);
   return (
     <header className="phone-top">
       {!root && (

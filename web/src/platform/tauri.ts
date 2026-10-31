@@ -76,6 +76,7 @@ export function tauriBackend(): Backend {
     inbox: () => invoke<InboxItem[]>("inbox"),
     setInbox: (id, inbox) => invoke<void>("set_inbox", { id, inbox }),
     takeShared: () => invoke<string | null>("take_shared"),
+    toBackground: () => invoke<void>("to_background"),
     tagCards: (tag) => invoke<TagCard[]>("tag_cards", { tag }),
     syncStatus: () => invoke<SyncStatus>("sync_status"),
     syncCreate: (server, token, passphrase) => invoke<SyncStatus>("sync_create", { server, token, passphrase }),

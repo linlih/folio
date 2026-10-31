@@ -281,6 +281,22 @@ fn set_inbox(app: tauri::AppHandle, state: tauri::State<AppState>, id: String, i
     Ok(())
 }
 
+/// Back with nowhere to go back to (Android): out of sight like Home,
+/// rather than closed. Nothing elsewhere.
+#[tauri::command]
+fn to_background(app: tauri::AppHandle) -> CmdResult<()> {
+    #[cfg(target_os = "android")]
+    {
+        use tauri_plugin_folio_apk::ApkExt;
+        return app.apk().to_background().map_err(CommandError::Other);
+    }
+    #[cfg(not(target_os = "android"))]
+    {
+        let _ = app;
+        Ok(())
+    }
+}
+
 /// What another app shared to this one (Android's share sheet) since it
 /// was last asked; None elsewhere.
 #[tauri::command]
@@ -1184,6 +1200,7 @@ pub fn run() {
             inbox,
             set_inbox,
             take_shared,
+            to_background,
             tag_cards,
             topic_cards,
             topic_counts,

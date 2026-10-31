@@ -42,6 +42,8 @@ export interface Backend {
   /** Text another app shared to Folio since the last call (Android's share
    *  sheet); null where there is none or no such thing. */
   takeShared(): Promise<string | null>;
+  /** Android: leaves for the background, as Home does. */
+  toBackground(): Promise<void>;
   /** The cards of a tag's database with their field values (§3). */
   tagCards(tag: string): Promise<TagCard[]>;
   /** Written journal days between two dates (inclusive), newest first. */
