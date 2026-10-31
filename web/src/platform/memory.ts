@@ -29,6 +29,7 @@ export function memoryBackend(now: () => number = Date.now): Backend {
   const hostDoc = () => {
     const doc = new LoroDoc();
     doc.setPeerId(HOST_PEER);
+    doc.setRecordTimestamp(true);
     return doc;
   };
 
@@ -58,7 +59,7 @@ export function memoryBackend(now: () => number = Date.now): Backend {
 
   return {
     kind: "memory",
-    appInfo: async () => ({ version: "web", dataDir: "(memory)", frontendPeer: MEMORY_FRONTEND_PEER, apiPeer: MEMORY_API_PEER, platform: "web" }),
+    appInfo: async () => ({ version: "web", dataDir: "(memory)", frontendPeer: MEMORY_FRONTEND_PEER, apiPeer: MEMORY_API_PEER, storePeer: String(HOST_PEER), platform: "web" }),
     listCards: async (limit = 200) =>
       rows((m) => m.deletedAt === null && m.kind !== "journal")
         .sort((a, b) => b.updatedAt - a.updatedAt)

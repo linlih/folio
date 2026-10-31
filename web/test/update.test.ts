@@ -42,7 +42,7 @@ describe("updates", () => {
     const b = backend as unknown as Record<string, unknown>;
     const kind = b.kind;
     b.kind = "tauri";
-    vi.spyOn(backend, "appInfo").mockResolvedValue({ version: "0.1.0", dataDir: "", frontendPeer: "1", apiPeer: "2", platform: "android" });
+    vi.spyOn(backend, "appInfo").mockResolvedValue({ version: "0.1.0", dataDir: "", frontendPeer: "1", apiPeer: "2", storePeer: "3", platform: "android" });
     vi.spyOn(backend, "latestRelease").mockResolvedValue({ version: "0.2.0", notes: "新功能", date: null, apk: "https://github.com/linlih/folio/releases/download/v0.2.0/folio-android-arm64.apk" });
     const download = vi.spyOn(backend, "downloadUpdate").mockImplementation(async (_url, onProgress) => {
       onProgress(0.5);
@@ -81,7 +81,7 @@ describe("updates", () => {
     const b = backend as unknown as Record<string, unknown>;
     const kind = b.kind;
     b.kind = "tauri";
-    vi.spyOn(backend, "appInfo").mockResolvedValue({ version: "0.1.0", dataDir: "", frontendPeer: "1", apiPeer: "2", platform: "android" });
+    vi.spyOn(backend, "appInfo").mockResolvedValue({ version: "0.1.0", dataDir: "", frontendPeer: "1", apiPeer: "2", storePeer: "3", platform: "android" });
     vi.spyOn(backend, "latestRelease").mockResolvedValue({ version: "0.2.0", notes: "", date: null, apk: "https://github.com/linlih/folio/releases/download/v0.2.0/folio-android-arm64.apk" });
     vi.spyOn(backend, "downloadUpdate").mockRejectedValue(new Error("the download stopped early"));
     const installer = vi.spyOn(backend, "installUpdate").mockResolvedValue(true);

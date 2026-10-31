@@ -31,6 +31,8 @@ export interface AppInfo {
   frontendPeer: string;
   /** Peer id of the API replica (web/src/api). */
   apiPeer: string;
+  /** Rust's own peer id; with the two above, every edit this device makes. */
+  storePeer: string;
   /** "macos", "windows", "linux", "android" or "ios" ("web" in a browser). */
   platform: string;
 }

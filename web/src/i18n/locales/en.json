@@ -834,5 +834,16 @@
     "emptyFields_one": "+{{count}} empty field",
     "emptyFields_other": "+{{count}} empty fields",
     "fieldOfTag": "A field of #{{name}}: changes apply to every card with it"
+  },
+  "history": {
+    "menu": "Version history…",
+    "title": "Version history",
+    "description": "Every edit to the card is kept. Pick a version to see it as it was; restoring writes it as a new edit, which you can undo and which syncs to your other devices.",
+    "current": "Current version",
+    "here": "This device",
+    "elsewhere": "Another device",
+    "undated": "Earlier (time not recorded)",
+    "restore": "Restore this version",
+    "restored": "Restored the version from {{when}} ({{undo}} to undo)"
   }
 }

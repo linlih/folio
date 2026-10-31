@@ -834,5 +834,16 @@
     "emptyFields_one": "+{{count}} 个空属性",
     "emptyFields_other": "+{{count}} 个空属性",
     "fieldOfTag": "#{{name}} 的属性，改动对所有带它的卡片生效"
+  },
+  "history": {
+    "menu": "历史版本…",
+    "title": "历史版本",
+    "description": "卡片的每次编辑都保留着。选一个版本查看当时的样子；恢复会作为一次新的编辑写入，可以撤销，也会同步到其他设备。",
+    "current": "当前版本",
+    "here": "这台设备",
+    "elsewhere": "其他设备",
+    "undated": "更早（没有记录时间）",
+    "restore": "恢复到这个版本",
+    "restored": "已恢复到 {{when}} 的版本（{{undo}} 撤销）"
   }
 }

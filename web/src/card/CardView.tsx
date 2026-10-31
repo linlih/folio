@@ -76,6 +76,9 @@ function CardMenu({ cardId, title }: { cardId: string; title: string }) {
             <Menu.Item className="popup-item" onClick={() => void setPin(cardId, !pinned)}>
               {t(pinned ? "nav.unpin" : "nav.pin")}
             </Menu.Item>
+            <Menu.Item className="popup-item" onClick={() => useShell.getState().setDialog({ kind: "history", cardId })}>
+              {t("history.menu")}
+            </Menu.Item>
             <Menu.Separator className="popup-separator" />
             <Menu.Item className="popup-item" onClick={() => void copyMarkdown(cardId)}>
               {t("markdown.copy")}

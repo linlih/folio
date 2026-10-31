@@ -320,6 +320,12 @@ impl Store {
         Ok(peer)
     }
 
+    /// Rust's own peer id: what this device's store writes (cards it makes,
+    /// MCP and imports) carry.
+    pub fn peer(&self) -> u64 {
+        self.peer
+    }
+
     /// The peer id the frontend replica must use: distinct from Rust's own and
     /// stable across launches (§4.5 rule 3).
     pub fn frontend_peer(&self) -> Result<u64> {
@@ -516,6 +522,7 @@ impl Store {
         let id = DocId::new_card();
         let doc = LoroDoc::new();
         doc.set_peer_id(self.peer).map_err(loro_err)?;
+        doc.set_record_timestamp(true);
         card::init_card(&doc, kind, title, now_ms).map_err(loro_err)?;
         let bytes = doc.export(ExportMode::all_updates()).map_err(loro_err)?;
         self.apply_update(&id, DocKind::Card, &bytes, Origin::Local, now_ms)?;
@@ -529,6 +536,7 @@ impl Store {
         let id = DocId::new_card();
         let doc = LoroDoc::new();
         doc.set_peer_id(self.peer).map_err(loro_err)?;
+        doc.set_record_timestamp(true);
         card::init_card(&doc, CardKind::Note, title, now_ms).map_err(loro_err)?;
         card::set_clip(&doc, clip, now_ms).map_err(loro_err)?;
         if !note.trim().is_empty() {
@@ -599,6 +607,8 @@ impl Store {
         } else {
             let doc = LoroDoc::new();
             doc.set_peer_id(self.peer).map_err(loro_err)?;
+            // Dated edits, for a card's history (web/src/docs/history.ts).
+            doc.set_record_timestamp(true);
             write(&doc).map_err(loro_err)?;
             let bytes = doc.export(ExportMode::all_updates()).map_err(loro_err)?;
             self.apply_update(&ws, DocKind::Workspace, &bytes, Origin::Local, now_ms)?;
@@ -1204,6 +1214,8 @@ impl Store {
         if !self.docs.contains_key(id) {
             let doc = LoroDoc::new();
             doc.set_peer_id(self.peer).map_err(loro_err)?;
+            // Dated edits, for a card's history (web/src/docs/history.ts).
+            doc.set_record_timestamp(true);
             let snapshot: Option<Option<Vec<u8>>> =
                 self.conn.query_row("SELECT snapshot FROM docs WHERE doc_id = ?1", [id.as_str()], |r| r.get(0)).optional()?;
             if let Some(Some(s)) = snapshot {

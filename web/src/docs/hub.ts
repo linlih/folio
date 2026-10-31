@@ -1,4 +1,5 @@
 import { LoroDoc, UndoManager } from "loro-crdt";
+import { recordTimes } from "./history";
 import type { Backend } from "../platform/backend";
 import { initCard, META_ORIGIN, TAG_RENAME_ORIGIN } from "./card";
 import { afterComposition, trackComposition } from "./composition";
@@ -109,6 +110,8 @@ export class DocHub {
   private async load(id: string): Promise<DocHandle> {
     const doc = new LoroDoc();
     doc.setPeerId(BigInt(this.peer));
+    // Dated edits, for the card's history (docs/history.ts).
+    recordTimes(doc);
     const snapshot = await this.backend.docSnapshot(id);
     const workspace = id === WORKSPACE_ID;
     const board = isBoardId(id);

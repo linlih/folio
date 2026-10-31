@@ -72,6 +72,8 @@ struct AppInfo {
     frontend_peer: String,
     /// The peer id of the frontend's API replica.
     api_peer: String,
+    /// Rust's own peer id (with the two above: every edit this device makes).
+    store_peer: String,
     /// "macos", "windows", "linux", "android" or "ios": how updates arrive.
     platform: &'static str,
 }
@@ -85,6 +87,7 @@ fn app_info(app: tauri::AppHandle, state: tauri::State<AppState>) -> CmdResult<A
         // As strings: a u64 does not fit a JavaScript number.
         frontend_peer: store.frontend_peer()?.to_string(),
         api_peer: store.api_peer()?.to_string(),
+        store_peer: store.peer().to_string(),
         platform: std::env::consts::OS,
     })
 }
