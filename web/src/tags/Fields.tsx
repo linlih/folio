@@ -73,7 +73,7 @@ export function AddField({ tag, label, count }: { tag: string; label?: string; c
 }
 
 /** Removes a field as one undoable step: the values stay on the cards. */
-async function removeField(tag: string, field: Field, t: (k: string, o?: Record<string, unknown>) => string) {
+export async function removeField(tag: string, field: Field, t: (k: string, o?: Record<string, unknown>) => string) {
   await editDatabase((doc) => deleteField(doc, tag, field.id));
   appUndo.push({
     label: "field",

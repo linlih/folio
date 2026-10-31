@@ -782,7 +782,6 @@
       "board": "Board",
       "blocks": "Blocks"
     },
-    "manageFields": "Manage fields",
     "fieldScope_one": "Shown on the card tagged #{{name}}",
     "fieldScope_other": "Shown on the {{count}} cards tagged #{{name}}",
     "addField": "Add field",
@@ -826,6 +825,14 @@
     "more_other": "{{count}} more",
     "empty": "No cards have this tag yet",
     "emptyHint": "Write #{{name}} in any card and it shows up here.",
-    "intro": "Every card tagged #{{name}} is in this table. Add fields (a status, a rating, a date) to fill in on each card, then sort and group by them."
+    "intro": "Every card tagged #{{name}} is in this table. Add fields (a status, a rating, a date) to fill in on each card, then sort and group by them.",
+    "showFields": "Show fields",
+    "hideFields": "Hide fields",
+    "openTag": "All cards with #{{name}}",
+    "fieldCount_one": "{{count}} field",
+    "fieldCount_other": "{{count}} fields",
+    "emptyFields_one": "+{{count}} empty field",
+    "emptyFields_other": "+{{count}} empty fields",
+    "fieldOfTag": "A field of #{{name}}: changes apply to every card with it"
   }
 }

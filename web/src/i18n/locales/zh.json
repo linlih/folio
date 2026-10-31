@@ -782,7 +782,6 @@
       "board": "看板",
       "blocks": "段落"
     },
-    "manageFields": "管理属性",
     "fieldScope_one": "会出现在 {{count}} 张带 #{{name}} 的卡片上",
     "fieldScope_other": "会出现在 {{count}} 张带 #{{name}} 的卡片上",
     "addField": "添加属性",
@@ -826,6 +825,14 @@
     "more_other": "另 {{count}} 项",
     "empty": "还没有卡片带这个标签",
     "emptyHint": "在任意卡片里写上 #{{name}}，它就会出现在这里。",
-    "intro": "带 #{{name}} 的卡片都在这张表里。添加属性（比如状态、评分、日期）后，就能在每张卡片上填写，并按属性排序、分列。"
+    "intro": "带 #{{name}} 的卡片都在这张表里。添加属性（比如状态、评分、日期）后，就能在每张卡片上填写，并按属性排序、分列。",
+    "showFields": "展开属性",
+    "hideFields": "收起属性",
+    "openTag": "查看所有带 #{{name}} 的卡片",
+    "fieldCount_one": "{{count}} 个属性",
+    "fieldCount_other": "{{count}} 个属性",
+    "emptyFields_one": "+{{count}} 个空属性",
+    "emptyFields_other": "+{{count}} 个空属性",
+    "fieldOfTag": "#{{name}} 的属性，改动对所有带它的卡片生效"
   }
 }

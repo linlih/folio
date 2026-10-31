@@ -97,14 +97,24 @@
 /* A card's fields under its title (card/CardFields.tsx). */
 .card-fields { display: grid; gap: 10px; margin: 2px 0 14px; }
 .card-fields-group { display: grid; gap: 2px; }
-.card-fields-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.card-fields-manage { display: inline-flex; align-items: center; gap: 3px; padding: 0 4px; color: var(--muted); font-size: 12px; border-radius: 4px; }
-.card-fields-manage:hover { background: var(--hover); color: var(--text); }
+.card-fields-head { display: flex; align-items: center; gap: 2px; min-height: 26px; }
+.card-fields-fold { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 22px; margin-left: -4px; color: var(--muted); border-radius: 4px; }
+.card-fields-fold:hover, .card-fields-summary:hover { background: var(--hover); color: var(--text); }
+/* Folded: the values on one line after the tag; a click opens it. */
+.card-fields-summary { flex: 1; min-width: 0; display: flex; align-items: center; gap: 4px 10px; padding: 1px 6px; overflow: hidden; white-space: nowrap; color: var(--secondary); font-size: 12.5px; text-align: left; border-radius: 4px; }
+.card-fields-value { overflow: hidden; text-overflow: ellipsis; max-width: 12em; }
+.card-fields-head .db-add-field { margin-left: auto; padding: 0 6px; height: 24px; border: 0; background: none; color: var(--muted); font-size: 12px; }
+.card-fields-head .db-add-field:hover { background: var(--hover); color: var(--text); }
+.card-fields-more { justify-self: start; padding: 2px 4px; color: var(--muted); font-size: 12.5px; border-radius: 4px; }
+.card-fields-more:hover { background: var(--hover); color: var(--text); }
 .db-field-scope { padding: 2px 2px 4px; color: var(--muted); font-size: 12px; }
 .card-fields-tag { justify-self: start; display: inline-flex; align-items: center; gap: 2px; padding: 0 4px; color: var(--muted); font-size: 12.5px; border-radius: 4px; }
 .card-fields-tag:hover { background: var(--hover); color: var(--text); }
 .card-field { display: flex; align-items: center; gap: 8px; min-height: 32px; font-size: 13.5px; }
-.card-field-name { flex: 0 0 7.5em; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.card-field-name { flex: 0 0 7.5em; display: flex; align-items: center; gap: 4px; min-width: 0; padding: 2px 4px; margin-left: -4px; color: var(--muted); font: inherit; text-align: left; border-radius: 4px; }
+.card-field-name > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+button.card-field-name:hover { background: var(--hover); color: var(--text); }
+input.card-field-name { width: 7.5em; color: var(--text); }
 .card-field > :last-child { flex: 1; min-width: 0; }
 /* Stretched, Chromium (Android) draws a checkbox in the middle of its box. */
 .card-field > .db-check { flex: 0 0 auto; }
