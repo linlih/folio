@@ -20,7 +20,7 @@ export function TagView({ name, active }: { name: string; active: boolean }) {
   const { t } = useTranslation();
   const db = useDatabase(name);
   const [rows, change] = useRows(name, active);
-  const mode = db?.view.mode ?? "table";
+  const mode = db?.view.mode ?? "blocks";
   const modes: { mode: ViewMode; icon: ReactNode }[] = [
     { mode: "table", icon: <Table2 size={14} /> },
     { mode: "board", icon: <Columns3 size={14} /> },
@@ -33,7 +33,8 @@ export function TagView({ name, active }: { name: string; active: boolean }) {
           <Hash size={22} strokeWidth={1.75} />
           {name}
         </h1>
-        {rows && <span className="page-meta">{t("db.cards", { count: rows.length })}</span>}
+        {/* The table's count: it leaves out journal days, which 段落 counts below. */}
+        {rows && mode !== "blocks" && <span className="page-meta">{t("db.cards", { count: rows.length })}</span>}
       </header>
       <div className="db-toolbar">
         <div className="db-modes" role="tablist">

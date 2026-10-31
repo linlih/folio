@@ -18,8 +18,17 @@ const sync = (a: LoroDoc, b: LoroDoc) => {
 describe("a tag's database", () => {
   it("has fields in order, choices, and a view", () => {
     const ws = new LoroDoc();
-    expect(readDatabase(ws, "书")).toEqual({ fields: [], view: DEFAULT_VIEW });
+    // Only a mark so far: every block with it.
+    expect(readDatabase(ws, "书")).toEqual({ fields: [], view: { ...DEFAULT_VIEW, mode: "blocks" } });
+    setView(ws, "书", { sortBy: "title" });
+    expect(readDatabase(ws, "书").view.mode).toBe("blocks");
+    setView(ws, "书", { sortBy: "created" });
     const status = addField(ws, "书", "状态", "select", 1);
+    // With fields, the table; and a view once chosen stays.
+    expect(readDatabase(ws, "书").view.mode).toBe("table");
+    setView(ws, "书", { mode: "blocks" });
+    expect(readDatabase(ws, "书").view.mode).toBe("blocks");
+    setView(ws, "书", { mode: "table" });
     const rating = addField(ws, "书", " 评分 ", "number", 2);
     const want = addOption(ws, "书", status, "想读", 3)!;
     const reading = addOption(ws, "书", status, "在读", 4)!;

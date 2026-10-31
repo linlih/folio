@@ -40,6 +40,9 @@ export interface Field {
 export type ViewMode = "table" | "board" | "blocks";
 
 export interface DbView {
+  /** Never chosen: the table once the tag has fields, before that every
+   *  block with the tag (most tags are only marks, often in the journal,
+   *  which the table leaves out). */
   mode: ViewMode;
   /** The select field the board groups by; null: the first one. */
   groupBy: string | null;
@@ -100,14 +103,12 @@ export function readDatabase(doc: LoroDoc, tag: string): Database {
   }
   const v = db?.get("view");
   const mode = v instanceof LoroMap ? str(v, "mode") : "";
-  const view: DbView = v instanceof LoroMap
-    ? {
-        mode: mode === "board" || mode === "blocks" ? mode : "table",
-        groupBy: str(v, "group_by") || null,
-        sortBy: str(v, "sort_by") || DEFAULT_VIEW.sortBy,
-        sortDesc: v.get("sort_desc") === undefined ? DEFAULT_VIEW.sortDesc : v.get("sort_desc") === true,
-      }
-    : DEFAULT_VIEW;
+  const view: DbView = {
+    mode: mode === "table" || mode === "board" || mode === "blocks" ? mode : fields.length > 0 ? "table" : "blocks",
+    groupBy: v instanceof LoroMap ? str(v, "group_by") || null : DEFAULT_VIEW.groupBy,
+    sortBy: (v instanceof LoroMap && str(v, "sort_by")) || DEFAULT_VIEW.sortBy,
+    sortDesc: v instanceof LoroMap && v.get("sort_desc") !== undefined ? v.get("sort_desc") === true : DEFAULT_VIEW.sortDesc,
+  };
   return { fields: fields.sort(byOrder), view };
 }
 
