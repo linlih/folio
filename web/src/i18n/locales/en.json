@@ -25,6 +25,8 @@
     "title": "Card library",
     "newCard": "New card",
     "untitled": "Untitled",
+    "inboxWaiting_one": "{{count}} item waiting in the inbox",
+    "inboxWaiting_other": "{{count}} items waiting in the inbox",
     "empty": "No cards yet",
     "count_one": "{{count}} card",
     "count_other": "{{count}} cards",

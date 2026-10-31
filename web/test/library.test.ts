@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { CardRow } from "../src/bindings/commands";
-import { applyQuery, DEFAULT_QUERY, isEmptyCard } from "../src/library/query";
+import { applyQuery, DEFAULT_QUERY, isEmptyCard, withoutUnsorted } from "../src/library/query";
 
 const DAY = 86_400_000;
 const now = new Date(2026, 9, 24, 12);
@@ -46,5 +46,12 @@ describe("card library query", () => {
 
   it("finds empty cards", () => {
     expect(CARDS.filter(isEmptyCard).map((c) => c.id)).toEqual(["c"]);
+  });
+
+  it("leaves out links still in the inbox, unless put in a topic", () => {
+    const rows = [row("note", "手写的卡片", "", 1, 1), row("clip", "一篇文章", "", 0, 0), row("filed", "放进主题的文章", "", 0, 0)];
+    const { cards, waiting } = withoutUnsorted(rows, [["filed", "topic-1"]], [{ id: "clip" }, { id: "filed" }]);
+    expect(cards.map((c) => c.id)).toEqual(["note", "filed"]);
+    expect(waiting).toBe(1);
   });
 });

@@ -2,6 +2,9 @@
    dates on the right, multi-select. */
 
 .library { max-width: calc(var(--measure) + 240px); }
+/* Links still in the inbox are not listed here; say how many wait there. */
+.library-inbox-note { display: inline-flex; align-items: center; gap: 4px; align-self: center; padding: 2px 8px; border-radius: 999px; color: var(--muted); font: 12.5px var(--font-ui); }
+.library-inbox-note:hover { background: var(--hover); color: var(--text); }
 .library-header-actions { margin-left: auto; display: flex; gap: 8px; align-self: center; }
 .page-header .library-header-actions .button { margin-left: 0; }
 

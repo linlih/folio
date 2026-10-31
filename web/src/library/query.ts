@@ -27,6 +27,16 @@ export const DEFAULT_QUERY: LibraryQuery = { text: "", sort: "updated", edited: 
 /** A card nobody wrote anything in (Heptabase's "empty cards"). */
 export const isEmptyCard = (c: CardRow) => !c.title.trim() && !c.preview.trim();
 
+/** The library without what still waits in the inbox: a clipped link not
+ *  dealt with is little more than a link, so it stays out of the cards
+ *  written by hand until marked 已整理. One already put in a topic has been
+ *  sorted, so it shows. `waiting`: how many were left out. */
+export function withoutUnsorted(rows: CardRow[], inTopics: [string, string][], inbox: { id: string }[]) {
+  const filed = new Set(inTopics.map(([id]) => id));
+  const waiting = new Set(inbox.map((i) => i.id).filter((id) => !filed.has(id)));
+  return { cards: rows.filter((c) => !waiting.has(c.id)), waiting: waiting.size };
+}
+
 function startOf(edited: EditedWithin, now: Date): number {
   const day = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
   if (edited === "today") return day;

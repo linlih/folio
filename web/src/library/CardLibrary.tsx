@@ -1,4 +1,4 @@
-import { Brush, FolderInput, Layers, LayoutGrid, List, Plus, Search, Trash2, X, LibraryBig } from "lucide-react";
+import { Brush, FolderInput, Inbox, Layers, LayoutGrid, List, Plus, Search, Trash2, X, LibraryBig } from "lucide-react";
 import { isTouch } from "../shell/phone";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -6,7 +6,7 @@ import type { CardRow } from "../bindings/commands";
 import { CARDS_CHANGED, moveManyToTrash } from "../card/actions";
 import { backend } from "../platform";
 import { useShell } from "../shell/tabs";
-import { applyQuery, DEFAULT_QUERY, isEmptyCard, type EditedWithin, type LibraryGrouping, type LibraryQuery, type LibraryView, type SortKey } from "./query";
+import { applyQuery, DEFAULT_QUERY, isEmptyCard, withoutUnsorted, type EditedWithin, type LibraryGrouping, type LibraryQuery, type LibraryView, type SortKey } from "./query";
 import "./library.css";
 import { EmptyState } from "../shell/EmptyState";
 import { TopicPicker } from "../card/TopicRow";
@@ -15,6 +15,7 @@ import { subTopics } from "../docs/workspace";
 import { CARDS_MIME } from "../card/drag";
 import { SubTopicStrip, TopicGrid, TopicHeader } from "./TopicGrid";
 import { keyLabel } from "../shell/shortcuts";
+import { INBOX_CHANGED } from "../inbox/clip";
 
 /** Sort and filter choices are remembered on this device. */
 const QUERY_SETTING = "library.query";
@@ -41,10 +42,15 @@ export function CardLibrary({ active = true }: { active?: boolean }) {
   /** Naming a new sub-topic (asked for from the topic's menu). */
   const [addingSub, setAddingSub] = useState(false);
 
+  /** Links in the inbox, not dealt with yet: they wait there, not here. */
+  const [unsorted, setUnsorted] = useState(0);
+
   const reload = useCallback(async () => {
     try {
-      const [all, inTopics] = await Promise.all([backend.listCards(5000), backend.cardTopicPairs()]);
-      setCards(all);
+      const [all, inTopics, inbox] = await Promise.all([backend.listCards(5000), backend.cardTopicPairs(), backend.inbox()]);
+      const { cards, waiting } = withoutUnsorted(all, inTopics, inbox);
+      setCards(cards);
+      setUnsorted(waiting);
       setPairs(inTopics);
     } catch (e) {
       setNotice(t("error.generic", { message: String(e) }));
@@ -70,7 +76,11 @@ export function CardLibrary({ active = true }: { active?: boolean }) {
   useEffect(() => {
     const onChange = () => void reload();
     window.addEventListener(CARDS_CHANGED, onChange);
-    return () => window.removeEventListener(CARDS_CHANGED, onChange);
+    window.addEventListener(INBOX_CHANGED, onChange);
+    return () => {
+      window.removeEventListener(CARDS_CHANGED, onChange);
+      window.removeEventListener(INBOX_CHANGED, onChange);
+    };
   }, [reload]);
 
   useEffect(() => {
@@ -230,6 +240,12 @@ export function CardLibrary({ active = true }: { active?: boolean }) {
       <header className="page-header">
         {topic ? <TopicHeader topicId={topic} onNewSub={() => setAddingSub(true)} /> : <h1>{t("library.title")}</h1>}
         {cards && <span className="page-meta">{t("library.count", { count: topic ? (deepByTopic.get(topic)?.length ?? 0) : cards.length })}</span>}
+        {!topic && unsorted > 0 && (
+          <button className="library-inbox-note" onClick={() => useShell.getState().open({ kind: "inbox" })}>
+            <Inbox size={13} />
+            {t("library.inboxWaiting", { count: unsorted })}
+          </button>
+        )}
         <span className="library-header-actions">
           {empties.length > 0 && (
             <button className="button" title={t("library.cleanEmptyHint")} onClick={() => void moveManyToTrash(empties)}>
