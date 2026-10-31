@@ -112,7 +112,7 @@ const ROW_MIME = "application/x-folio-db-row";
 function BarMenu({ icon, label, title, children }: { icon: ReactNode; label: ReactNode; title: string; children: ReactNode }) {
   return (
     <Menu.Root>
-      <Menu.Trigger className="db-bar-button" title={title} aria-label={title}>
+      <Menu.Trigger className="button db-bar-button" title={title} aria-label={title}>
         {icon}
         {label}
         <ChevronDown size={12} className="db-bar-caret" />
