@@ -24,6 +24,7 @@
 .journal-static { cursor: text; min-height: 1.6em; border-radius: var(--radius); }
 .journal-static:hover { background: color-mix(in srgb, var(--ink) 2.5%, transparent); }
 .journal-line { position: relative; }
+.journal-href { color: var(--accent); text-decoration: underline; }
 .journal-line::before {
   content: "•";
   position: absolute;

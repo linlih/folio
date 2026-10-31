@@ -5,6 +5,7 @@
 import { LoroMap, LoroMovableList, LoroText, type LoroDoc, type LoroTreeNode, type TreeID } from "loro-crdt";
 import { APP_EDIT_ORIGIN } from "../vendor/loro-prosemirror";
 import { bodyTree } from "../vendor/loro-prosemirror/tree";
+import type { DayLine, DayPart } from "../bindings/commands";
 import { newBid } from "./ids";
 
 export const META = "meta";
@@ -209,6 +210,72 @@ export function bodyLines(doc: LoroDoc): string[] {
   };
   walk(bodyJson(doc), 0);
   return out;
+}
+
+/** A line of a body with its links, for the journal's days without an
+ *  editor. Same output as `folio_core::body::lines`. */
+export function dayLines(doc: LoroDoc): DayLine[] {
+  const out: DayLine[] = [];
+  const visit = (nodes: LoroTreeNode[] | undefined, lists: number) => {
+    for (const node of nodes ?? []) {
+      const inline = node.data.get("children");
+      if (inline instanceof LoroMovableList) {
+        const parts = inlineParts(inline);
+        if (parts.some((p) => p.text || p.block !== undefined)) out.push(lists > 1 ? { depth: lists - 1, parts } : { parts });
+      } else visit(node.children(), lists + (LISTS.has(String(node.data.get("nodeName") ?? "")) ? 1 : 0));
+    }
+  };
+  visit(bodyTree(doc).roots(), 0);
+  return out;
+}
+
+function inlineParts(inline: LoroMovableList): DayPart[] {
+  const parts: DayPart[] = [];
+  const plain = (p: DayPart) => p.card === undefined && p.block === undefined && p.tag === undefined;
+  const push = (p: DayPart) => {
+    const last = parts[parts.length - 1];
+    // Runs differing only in styles the view does not draw are one part.
+    if (last && plain(last) && plain(p) && last.href === p.href) last.text = (last.text ?? "") + (p.text ?? "");
+    else parts.push(p);
+    // As serialized from Rust: no empty text.
+    if (parts[parts.length - 1].text === "") delete parts[parts.length - 1].text;
+  };
+  for (let i = 0; i < inline.length; i++) {
+    const item = inline.get(i);
+    if (item instanceof LoroText) {
+      for (const d of item.toDelta()) {
+        if (typeof d.insert !== "string") continue;
+        const link = d.attributes?.link as { href?: unknown } | undefined;
+        const href = link && typeof link.href === "string" && link.href ? link.href : undefined;
+        push(href ? { text: d.insert, href } : { text: d.insert });
+      }
+    } else if (typeof item === "string") push({ text: item });
+    else if (item instanceof LoroMap) {
+      const attrs = item.get("attributes");
+      const a = (k: string) => {
+        const v = attrs instanceof LoroMap ? attrs.get(k) : undefined;
+        return typeof v === "string" ? v : "";
+      };
+      switch (item.get("nodeName")) {
+        case "cardLink":
+          push({ text: a("title"), card: a("cardId") });
+          break;
+        case "blockRef":
+          push({ block: a("bid") });
+          break;
+        case "tag":
+          push({ text: `#${a("name")}`, tag: a("name") });
+          break;
+        case "hardBreak":
+          push({ text: " " });
+          break;
+        case "inlineMath":
+          push({ text: a("latex") });
+          break;
+      }
+    }
+  }
+  return parts;
 }
 
 /** What the details panel shows about a card body: its headings (the

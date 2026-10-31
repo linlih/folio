@@ -31,3 +31,21 @@ fn layout_2_editor_documents_migrate_to_the_tree() {
     assert!(migrate_to_tree(&old).unwrap());
     assert_eq!(summarize(&old).text, summarize(&new).text);
 }
+
+/// The journal's read-only days draw links from the lines: as the editor
+/// stores card links, block references and web links.
+#[test]
+fn lines_find_the_links_the_editor_wrote() {
+    use folio_core::body::{lines, Part};
+    let doc = load(include_bytes!("../../folio-io/tests/fixtures/card-rich.loro"));
+    let all = lines(&doc);
+    let link = &all[1].parts;
+    assert!(link.contains(&Part { text: "link".into(), href: Some("https://example.com".into()), ..Default::default() }), "{link:?}");
+    // Bold, italic and code are not drawn: one plain part around them.
+    assert_eq!(link[0], Part { text: "Some bold and italic text, code, a ".into(), ..Default::default() });
+    let refs = &all[2].parts;
+    assert!(refs.contains(&Part { text: "Other card".into(), card: Some("card-2".into()), ..Default::default() }), "{refs:?}");
+    assert!(refs.contains(&Part { block: Some("blk-9".into()), ..Default::default() }), "{refs:?}");
+    let text: Vec<String> = all.iter().map(|l| format!("{}{}", "\t".repeat(l.depth), l.parts.iter().map(|p| p.text.as_str()).collect::<String>())).collect();
+    assert_eq!(text.join("\n"), summarize(&doc).text, "same lines as the text");
+}

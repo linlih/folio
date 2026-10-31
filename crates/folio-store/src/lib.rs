@@ -256,6 +256,8 @@ pub struct JournalDay {
     pub date: String,
     /// One line per block; tabs mark outline depth.
     pub text: String,
+    /// The same lines with their links and tags.
+    pub lines: Vec<folio_core::body::Line>,
     pub updated_at: i64,
 }
 
@@ -802,12 +804,19 @@ impl Store {
     /// document, newest first, with their text for read-only display.
     pub fn journal_days(&self, from: &str, to: &str) -> Result<Vec<JournalDay>> {
         let mut stmt = self.conn.prepare_cached(
-            "SELECT card_id, text, updated_at FROM idx.cards
+            "SELECT card_id, text, updated_at, lines FROM idx.cards
              WHERE card_id BETWEEN ?1 AND ?2 AND kind = 'journal' AND deleted_at IS NULL ORDER BY card_id DESC",
         )?;
         let rows = stmt.query_map(params![format!("journal:{from}"), format!("journal:{to}")], |r| {
             let id: String = r.get(0)?;
-            Ok(JournalDay { date: id.trim_start_matches("journal:").to_owned(), id, text: r.get(1)?, updated_at: r.get(2)? })
+            let lines: Option<String> = r.get(3)?;
+            Ok(JournalDay {
+                date: id.trim_start_matches("journal:").to_owned(),
+                id,
+                text: r.get(1)?,
+                lines: lines.and_then(|l| serde_json::from_str(&l).ok()).unwrap_or_default(),
+                updated_at: r.get(2)?,
+            })
         })?;
         Ok(rows.collect::<std::result::Result<_, _>>()?)
     }
@@ -1215,12 +1224,12 @@ impl Store {
         let s = card::summarize(self.doc_mut(id, DocKind::Card)?);
         self.conn.execute(
             "INSERT INTO idx.cards(card_id, kind, title, preview, text, created_at, updated_at, deleted_at, pinned_at,
-                                   inbox_at, clip, clip_text, props)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)
+                                   inbox_at, clip, clip_text, props, lines)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)
              ON CONFLICT(card_id) DO UPDATE SET kind = excluded.kind, title = excluded.title, preview = excluded.preview,
                text = excluded.text, created_at = excluded.created_at, updated_at = excluded.updated_at,
                deleted_at = excluded.deleted_at, pinned_at = excluded.pinned_at, inbox_at = excluded.inbox_at,
-               clip = excluded.clip, clip_text = excluded.clip_text, props = excluded.props",
+               clip = excluded.clip, clip_text = excluded.clip_text, props = excluded.props, lines = excluded.lines",
             params![
                 id.as_str(),
                 s.kind,
@@ -1234,7 +1243,8 @@ impl Store {
                 s.inbox_at,
                 s.clip.as_ref().map(|c| serde_json::to_string(c).expect("plain struct")),
                 clip_text(&s),
-                s.props
+                s.props,
+                s.lines
             ],
         )?;
         let x = folio_core::index::extract(self.doc_mut(id, DocKind::Card)?);
@@ -1542,6 +1552,8 @@ mod tests {
         let days = s.journal_days("2026-10-01", "2026-10-31").unwrap();
         assert_eq!(days.len(), 1);
         assert_eq!((days[0].date.as_str(), days[0].text.as_str()), ("2026-10-23", "今天"));
+        assert_eq!(days[0].lines, folio_core::body::lines(&doc), "with their links, for the read-only view");
+        assert_eq!(days[0].lines[0].parts[0].text, "今天");
         assert!(s.list_cards(10).unwrap().is_empty(), "journal days stay out of the card library");
     }
 

@@ -97,7 +97,27 @@ export interface JournalDay {
   date: string;
   /** One line per block; tabs mark outline depth. */
   text: string;
+  /** The same lines with their links and tags. */
+  lines: DayLine[];
   updatedAt: number;
+}
+
+/** A line of a journal day as the read-only view draws it. */
+export interface DayLine {
+  /** Outline depth; left out when 0. */
+  depth?: number;
+  parts: DayPart[];
+}
+
+/** Text, or a card link (`card`, with the title it was made with), a block
+ *  reference (`block`), a #tag (`tag`) or text linked to a web address. */
+export interface DayPart {
+  /** Left out when empty. */
+  text?: string;
+  card?: string;
+  block?: string;
+  tag?: string;
+  href?: string;
 }
 
 export interface Backlink {

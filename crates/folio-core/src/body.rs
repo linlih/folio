@@ -11,6 +11,8 @@ use loro::{
     ValueOrContainer,
 };
 
+use serde::{Deserialize, Serialize};
+
 use crate::card::{configure_text_styles, ATTRIBUTES, BODY_ROOT, CHILDREN, NODE_NAME};
 
 /// The root container of layout 3.
@@ -53,6 +55,123 @@ pub fn body_value(doc: &LoroDoc) -> LoroValue {
     out.insert(ATTRIBUTES.to_owned(), LoroValue::Map(Default::default()));
     out.insert(CHILDREN.to_owned(), LoroValue::List(children(&tree, None).into_iter().map(|c| node_value(&tree, c)).collect::<Vec<_>>().into()));
     LoroValue::Map(out.into())
+}
+
+/// A line of a body as a read-only view draws it (the journal's days without
+/// an editor): its outline depth, as in `summarize(..).text`, and its parts.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Line {
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub depth: usize,
+    pub parts: Vec<Part>,
+}
+
+/// Text, or an inline node: a card link (`card`, the title it was made
+/// with), a block reference (`block`), a #tag (`tag`), or text linked to a
+/// web address (`href`).
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Part {
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub text: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub card: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub block: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tag: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub href: Option<String>,
+}
+
+fn is_zero(n: &usize) -> bool {
+    *n == 0
+}
+
+const LISTS: [&str; 3] = ["bulletList", "orderedList", "taskList"];
+
+/// The body's lines with their links: one per text block, as
+/// `summarize(..).text` has them (a line holding only a block reference,
+/// empty there, is kept here).
+pub fn lines(doc: &LoroDoc) -> Vec<Line> {
+    fn walk(tree: &LoroTree, parent: Option<TreeID>, lists: usize, out: &mut Vec<Line>) {
+        for id in children(tree, parent) {
+            let Ok(meta) = tree.get_meta(id) else { continue };
+            let name = match meta.get(NODE_NAME) {
+                Some(ValueOrContainer::Value(LoroValue::String(s))) => s.to_string(),
+                _ => String::new(),
+            };
+            match meta.get(CHILDREN) {
+                Some(ValueOrContainer::Container(Container::MovableList(inline))) => {
+                    let parts = inline_parts(&inline);
+                    if parts.iter().any(|p| !p.text.is_empty() || p.block.is_some()) {
+                        out.push(Line { depth: lists.saturating_sub(1), parts });
+                    }
+                }
+                _ => walk(tree, Some(id), lists + usize::from(LISTS.contains(&name.as_str())), out),
+            }
+        }
+    }
+    let mut out = Vec::new();
+    walk(&tree(doc), None, 0, &mut out);
+    out
+}
+
+fn inline_parts(inline: &LoroMovableList) -> Vec<Part> {
+    let mut parts: Vec<Part> = Vec::new();
+    let mut push = |part: Part| match parts.last_mut() {
+        // Runs differing only in styles the view does not draw are one part.
+        Some(last) if part.card.is_none() && part.block.is_none() && part.tag.is_none() && last.card.is_none()
+            && last.block.is_none() && last.tag.is_none() && last.href == part.href =>
+        {
+            last.text.push_str(&part.text)
+        }
+        _ => parts.push(part),
+    };
+    for i in 0..inline.len() {
+        match inline.get(i) {
+            Some(ValueOrContainer::Container(Container::Text(text))) => {
+                for d in text.to_delta() {
+                    let loro::TextDelta::Insert { insert, attributes } = d else { continue };
+                    let href = attributes.as_ref().and_then(|a| match a.get("link") {
+                        Some(LoroValue::Map(m)) => match m.get("href") {
+                            Some(LoroValue::String(h)) if !h.is_empty() => Some(h.to_string()),
+                            _ => None,
+                        },
+                        _ => None,
+                    });
+                    push(Part { text: insert, href, ..Default::default() });
+                }
+            }
+            Some(ValueOrContainer::Value(LoroValue::String(s))) => push(Part { text: s.to_string(), ..Default::default() }),
+            Some(ValueOrContainer::Container(Container::Map(node))) => {
+                let LoroValue::Map(v) = node.get_deep_value() else { continue };
+                let attr = |k: &str| match v.get(ATTRIBUTES) {
+                    Some(LoroValue::Map(a)) => match a.get(k) {
+                        Some(LoroValue::String(s)) => s.to_string(),
+                        _ => String::new(),
+                    },
+                    _ => String::new(),
+                };
+                let name = match v.get(NODE_NAME) {
+                    Some(LoroValue::String(s)) => s.to_string(),
+                    _ => String::new(),
+                };
+                match name.as_str() {
+                    "cardLink" => push(Part { text: attr("title"), card: Some(attr("cardId")), ..Default::default() }),
+                    "blockRef" => push(Part { block: Some(attr("bid")), ..Default::default() }),
+                    "tag" => {
+                        let tag = attr("name");
+                        push(Part { text: format!("#{tag}"), tag: Some(tag), ..Default::default() })
+                    }
+                    "hardBreak" => push(Part { text: " ".into(), ..Default::default() }),
+                    "inlineMath" => push(Part { text: attr("latex"), ..Default::default() }),
+                    _ => {}
+                }
+            }
+            _ => {}
+        }
+    }
+    parts
 }
 
 /// Adds a block at the end of `parent`'s children (the top level for None).

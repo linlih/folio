@@ -284,6 +284,9 @@ pub struct CardSummary {
     pub preview: String,
     /// All body text, one line per block.
     pub text: String,
+    /// A journal day's lines with their links, as JSON (`body::Line`), for
+    /// the journal's days without an editor; empty for other cards.
+    pub lines: String,
 }
 
 const PREVIEW_CHARS: usize = 160;
@@ -323,6 +326,11 @@ pub fn summarize(doc: &LoroDoc) -> CardSummary {
         props: props_json(doc),
         preview,
         text,
+        lines: if string("kind") == CardKind::Journal.as_str() {
+            serde_json::to_string(&crate::body::lines(doc)).expect("plain structs")
+        } else {
+            String::new()
+        },
     }
 }
 
@@ -471,6 +479,50 @@ mod tests {
         let s = summarize(&doc);
         assert_eq!(s.text, "parent\n\tchild\nsibling");
         assert_eq!(s.preview, "parent child sibling");
+    }
+
+    #[test]
+    fn journal_lines_keep_their_links() {
+        use crate::body::{add_block, inline, lines, push_inline, push_text, Line, Part};
+        let doc = LoroDoc::new();
+        init_card(&doc, CardKind::Journal, "", 1).unwrap();
+        configure_text_styles(&doc);
+        let list = add_block(&doc, None, "bulletList", &[]).unwrap();
+        let item = add_block(&doc, Some(list), "listItem", &[]).unwrap();
+        let p = add_block(&doc, Some(item), "paragraph", &[]).unwrap();
+        push_text(&doc, p, "读了 ").unwrap();
+        push_inline(&doc, p, "cardLink", &[("cardId", "c1"), ("title", "一本书")]).unwrap();
+        push_text(&doc, p, " 见官网").unwrap();
+        let t = inline(&doc, p).unwrap().get(2).unwrap().into_container().unwrap().into_text().unwrap();
+        let mut href = loro::LoroMapValue::default();
+        href.make_mut().insert("href".into(), "https://example.com".into());
+        t.mark(2..4, "link", LoroValue::Map(href)).unwrap();
+        push_inline(&doc, p, "tag", &[("name", "读书")]).unwrap();
+        let nested = add_block(&doc, Some(item), "bulletList", &[]).unwrap();
+        let child = add_block(&doc, Some(add_block(&doc, Some(nested), "listItem", &[]).unwrap()), "paragraph", &[]).unwrap();
+        push_inline(&doc, child, "blockRef", &[("bid", "b9")]).unwrap();
+        doc.commit();
+
+        let text = |t: &str| Part { text: t.into(), ..Default::default() };
+        assert_eq!(
+            lines(&doc),
+            vec![
+                Line {
+                    depth: 0,
+                    parts: vec![
+                        text("读了 "),
+                        Part { text: "一本书".into(), card: Some("c1".into()), ..Default::default() },
+                        text(" 见"),
+                        Part { text: "官网".into(), href: Some("https://example.com".into()), ..Default::default() },
+                        Part { text: "#读书".into(), tag: Some("读书".into()), ..Default::default() },
+                    ],
+                },
+                Line { depth: 1, parts: vec![Part { block: Some("b9".into()), ..Default::default() }] },
+            ]
+        );
+        let s = summarize(&doc);
+        assert_eq!(s.text, "读了 一本书 见官网#读书");
+        assert_eq!(serde_json::from_str::<Vec<Line>>(&s.lines).unwrap(), lines(&doc));
     }
 
     /// A layout-2 body (as the editor wrote it before layout 3) moves into

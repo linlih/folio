@@ -58,7 +58,7 @@ pub fn has_pending_migrations(conn: &Connection) -> rusqlite::Result<bool> {
 }
 
 /// Bump whenever `INDEX_TABLES` changes.
-const INDEX_VERSION: i64 = 9;
+const INDEX_VERSION: i64 = 10;
 
 const INDEX_TABLES: &str = "
   CREATE TABLE idx.cards (
@@ -68,7 +68,9 @@ const INDEX_TABLES: &str = "
     -- as JSON; the link's site, author and summary for substring search.
     inbox_at INTEGER, clip TEXT, clip_text TEXT,
     -- Database field values by field id, JSON (design/inbox-and-tags.md §3).
-    props TEXT
+    props TEXT,
+    -- A journal day's lines with their links, JSON (folio_core::body::Line).
+    lines TEXT
   );
   CREATE INDEX idx.cards_by_inbox ON cards(inbox_at);
   CREATE INDEX idx.cards_by_updated ON cards(updated_at);

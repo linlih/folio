@@ -1,6 +1,6 @@
 import { LoroDoc } from "loro-crdt";
 import type { AssetEvent, BackupInfo, Backlink, CardRow, ChildBlock, JournalDay, SearchHit } from "../bindings/commands";
-import { appendBlocks, bodyLines, initCard, preview, readCardTopics, readMeta, readProps, setClip, setDeleted, setInbox, setPinned } from "../docs/card";
+import { appendBlocks, bodyLines, dayLines, initCard, preview, readCardTopics, readMeta, readProps, setClip, setDeleted, setInbox, setPinned } from "../docs/card";
 import { isJournalId, journalDate, localDate, uuidv7 } from "../docs/ids";
 import { extractIndex } from "../docs/index";
 import { isBoardId } from "../docs/board";
@@ -158,7 +158,7 @@ export function memoryBackend(now: () => number = Date.now): Backend {
         if (!isJournalId(id) || readMeta(e.doc).deletedAt !== null) continue;
         const date = journalDate(id);
         if (date < from || date > to) continue;
-        days.push({ id, date, text: bodyLines(e.doc).join("\n"), updatedAt: e.updatedAt });
+        days.push({ id, date, text: bodyLines(e.doc).join("\n"), lines: dayLines(e.doc), updatedAt: e.updatedAt });
       }
       return days.sort((a, b) => (a.date < b.date ? 1 : -1));
     },

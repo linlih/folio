@@ -11,6 +11,9 @@ import { extractExtension } from "../editor/extract";
 import { openTag, TAG_STOP } from "../editor/tag";
 import { toSide, useShell } from "../shell/tabs";
 import { backend } from "../platform";
+import type { DayLine, JournalDay } from "../bindings/commands";
+import { blockCache, linkTitle, titleCache } from "../editor/refs";
+import { openAt } from "../card/reveal";
 import "./journal.css";
 
 const PAGE = 14;
@@ -45,7 +48,7 @@ export function JournalView() {
   const open = useShell((s) => s.open);
   const today = useToday();
   const [count, setCount] = useState(PAGE);
-  const [texts, setTexts] = useState<Map<string, string>>(new Map());
+  const [texts, setTexts] = useState<Map<string, JournalDay>>(new Map());
   // Most recently used first; today starts with an editor.
   const [editing, setEditing] = useState<string[]>([today]);
   const sentinel = useRef<HTMLDivElement>(null);
@@ -73,7 +76,7 @@ export function JournalView() {
     setTexts((prev) => {
       const next = new Map(prev);
       for (let d = from; d <= to; d = addDays(d, 1)) next.delete(d);
-      for (const r of rows) next.set(r.date, r.text);
+      for (const r of rows) next.set(r.date, r);
       return next;
     });
   }, []);
@@ -212,7 +215,12 @@ export function JournalView() {
                 />
               </div>
             ) : (
-              <ReadOnlyDay text={text} onEdit={() => edit(date)} emptyLabel={t("journal.empty")} />
+              <ReadOnlyDay
+                day={text}
+                onEdit={() => edit(date)}
+                onOpenCard={(id, title, side) => open({ kind: "card", cardId: id }, title, side)}
+                emptyLabel={t("journal.empty")}
+              />
             )}
           </section>
         );
@@ -246,10 +254,35 @@ function DayMenu({ date }: { date: string }) {
   );
 }
 
-/** A day without a mounted editor: the indexed text, one line per block;
- *  leading tabs are outline depth. A click starts editing. */
-function ReadOnlyDay({ text, onEdit, emptyLabel }: { text?: string; onEdit: () => void; emptyLabel: string }) {
-  const lines = text ? text.split("\n") : [];
+/** A day without a mounted editor: its indexed lines, with card links,
+ *  block references, tags and web links drawn as in the editor (outline
+ *  depth as indentation). A click starts editing; one on a link follows it. */
+function ReadOnlyDay({
+  day,
+  onEdit,
+  onOpenCard,
+  emptyLabel,
+}: {
+  day?: JournalDay;
+  onEdit: () => void;
+  onOpenCard: (id: string, title: string, side: boolean) => void;
+  emptyLabel: string;
+}) {
+  // Linked titles and referenced blocks are looked up; draw again when known.
+  const [, redraw] = useState(0);
+  useEffect(() => {
+    const again = () => redraw((n) => n + 1);
+    const offTitles = titleCache.subscribe(again);
+    const offBlocks = blockCache.subscribe(again);
+    return () => (offTitles(), offBlocks());
+  }, []);
+  // An index written before lines were kept has only the text.
+  const lines: DayLine[] = day?.lines?.length
+    ? day.lines
+    : (day?.text ? day.text.split("\n") : []).map((line) => {
+        const depth = line.length - line.replace(/^\t+/, "").length;
+        return { depth, parts: [{ text: line.slice(depth) }] };
+      });
   return (
     <div
       className="prose journal-static"
@@ -261,20 +294,80 @@ function ReadOnlyDay({ text, onEdit, emptyLabel }: { text?: string; onEdit: () =
       {lines.length === 0 ? (
         <p className="journal-empty">{emptyLabel}</p>
       ) : (
-        lines.map((line, i) => {
-          const depth = line.length - line.replace(/^\t+/, "").length;
-          return (
-            <div key={i} className="journal-line" style={{ paddingLeft: `${1.1 + depth * 1.4}em` }}>
-              <LineText text={line.slice(depth)} />
-            </div>
-          );
-        })
+        lines.map((line, i) => (
+          <div key={i} className="journal-line" style={{ paddingLeft: `${1.1 + (line.depth ?? 0) * 1.4}em` }}>
+            <LineParts line={line} onOpenCard={onOpenCard} />
+          </div>
+        ))
       )}
     </div>
   );
 }
 
-/** Tags in the indexed text (`#name`) look and open as in the editor. */
+function LineParts({ line, onOpenCard }: { line: DayLine; onOpenCard: (id: string, title: string, side: boolean) => void }) {
+  const { t } = useTranslation();
+  return (
+    <>
+      {line.parts.map((p, i) => {
+        if (p.card !== undefined) {
+          const title = linkTitle(p.card, p.text ?? "") || "…";
+          return (
+            <span
+              key={i}
+              className="card-link"
+              data-card-id={p.card}
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpenCard(p.card!, title, toSide(e));
+              }}
+            >
+              {title}
+            </span>
+          );
+        }
+        if (p.block !== undefined) {
+          const e = blockCache.get(p.block);
+          return (
+            <span
+              key={i}
+              className={`block-ref${e?.missing ? " missing" : ""}`}
+              onClick={(ev) => {
+                ev.stopPropagation();
+                if (e?.cardId) openAt(e.cardId, null, p.block!, toSide(ev));
+              }}
+            >
+              {e ? (e.missing ? t("refs.missing") : e.text || t("backlinks.emptyBlock")) : "…"}
+            </span>
+          );
+        }
+        if (p.tag !== undefined) {
+          const name = p.tag;
+          return (
+            <span
+              key={i}
+              className="tag-pill"
+              onClick={(e) => {
+                e.stopPropagation();
+                openTag(name, toSide(e));
+              }}
+            >
+              #{name}
+            </span>
+          );
+        }
+        if (p.href !== undefined)
+          return (
+            <span key={i} className="journal-href" title={p.href}>
+              {p.text}
+            </span>
+          );
+        return <LineText key={i} text={p.text ?? ""} />;
+      })}
+    </>
+  );
+}
+
+/** Tags in text-only lines (`#name`) look and open as in the editor. */
 const TAG_IN_TEXT = new RegExp(`(^|\\s)#([^${TAG_STOP}]+)`, "g");
 
 function LineText({ text }: { text: string }) {
