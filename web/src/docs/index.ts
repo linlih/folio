@@ -81,7 +81,7 @@ function walk(nodes: Json[], parent: string | null, out: IndexExtract) {
       const nested: Json[] = [];
       for (const c of kids(n)) {
         if (typeof c === "string") continue;
-        if (LISTS.has(c.nodeName ?? "")) nested.push(c);
+        if (LISTS.has(c.nodeName ?? "") || c.nodeName === "table") nested.push(c);
         else if (TEXTBLOCKS.has(c.nodeName ?? "") || c.nodeName === "blockquote") {
           const t = inline(c, bid, out);
           if (t) texts.push(t);
@@ -92,6 +92,24 @@ function walk(nodes: Json[], parent: string | null, out: IndexExtract) {
     } else if (TEXTBLOCKS.has(kind)) {
       const bid = attr(n, "bid");
       const text = inline(n, bid, out);
+      if (bid) out.blocks.push({ bid, parent, kind, text });
+    } else if (kind === "table") {
+      // One block (folio-core's `table_text`): rows on lines, cells joined
+      // by " | "; links and tags in a cell belong to the table.
+      const bid = attr(n, "bid");
+      const text = kids(n)
+        .map((row) =>
+          kids(row as Json)
+            .map((cell) =>
+              kids(cell as Json)
+                .filter((p) => typeof p !== "string" && TEXTBLOCKS.has(p.nodeName ?? ""))
+                .map((p) => inline(p as Json, bid, out))
+                .filter(Boolean)
+                .join(" "),
+            )
+            .join(" | "),
+        )
+        .join("\n");
       if (bid) out.blocks.push({ bid, parent, kind, text });
     }
   }

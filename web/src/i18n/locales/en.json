@@ -191,7 +191,8 @@
     "time": "Current time",
     "datePicker": "Date picker",
     "numbered": "Numbered list",
-    "numberedChildren": "Number children"
+    "numberedChildren": "Number children",
+    "table": "Table"
   },
   "suggest": {
     "none": "No matches",
@@ -864,5 +865,18 @@
       "later": "Later",
       "undated": "No date"
     }
+  },
+  "table": {
+    "bar": "Table actions",
+    "rowAbove": "Insert row above",
+    "rowBelow": "Insert row below",
+    "colLeft": "Insert column left",
+    "colRight": "Insert column right",
+    "deleteRow": "Delete row",
+    "deleteCol": "Delete column",
+    "header": "First row as header",
+    "deleteTable": "Delete table",
+    "addRow": "Add a row",
+    "addCol": "Add a column"
   }
 }

@@ -2,6 +2,7 @@
 // commands follow Logseq's `commands-map` group by group; the spec's table
 // says what is covered and what waits for later milestones.
 
+import { insertNewTable } from "../table";
 import { computePosition, flip, offset, shift } from "@floating-ui/dom";
 import { Extension, type Editor, type Range } from "@tiptap/core";
 import type { Node as PMNode } from "@tiptap/pm/model";
@@ -216,6 +217,7 @@ const ICON = {
   file: svg(`<path d="M11.5 3H6a1.5 1.5 0 00-1.5 1.5v11A1.5 1.5 0 006 17h8a1.5 1.5 0 001.5-1.5V7z"/><path d="M11.5 3v4h4"/>`),
   underline: svg(`<path d="M6 4v5a4 4 0 008 0V4M5 16h10"/>`),
   code: svg(`<path d="M7.5 6L4 10l3.5 4M12.5 6L16 10l-3.5 4"/>`),
+  table: svg(`<rect x="3" y="4" width="14" height="12" rx="2"/><path d="M3 8h14M3 12h14M8 4v12"/>`),
   quote: svg(`<path d="M5 6h4v4c0 2-1 3-3 4M11 6h4v4c0 2-1 3-3 4"/>`),
   math: svg(`<path d="M15 5H6l4 5-4 5h9"/>`),
   text: svg(`<path d="M5 5h10M10 5v10"/>`),
@@ -277,6 +279,10 @@ function slashChoices(): Choice[] {
     {
       id: "code", group: g("format"), label: t("slash.code"), hint: "```", icon: ICON.code, keywords: "code block",
       run: (editor, range) => insertBlock(editor, range, editor.schema.nodes.codeBlock.create(), true),
+    },
+    {
+      id: "table", group: g("format"), label: t("slash.table"), hint: "| |", icon: ICON.table, keywords: "table grid sheet biaoge",
+      run: (editor, range) => insertNewTable(editor, range),
     },
     {
       id: "quote", group: g("format"), label: t("slash.quote"), hint: ">", icon: ICON.quote, keywords: "quote blockquote",

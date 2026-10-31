@@ -1,4 +1,5 @@
 import { Extension } from "@tiptap/core";
+import { inTable } from "../table";
 import { TextSelection, type EditorState, type Transaction } from "@tiptap/pm/state";
 import type { EditorView } from "@tiptap/pm/view";
 import { focusedBid } from "./focus";
@@ -66,7 +67,7 @@ export const OutlinerKeys = Extension.create<OutlinerKeysOptions>({
       view.dispatch(selectBlocks(state.tr, line.item, line.item));
       return true;
     };
-    return {
+    const keys: Record<string, () => boolean> = {
       Enter: () => {
         const { state, view } = this.editor;
         const item = itemAt(state.selection.$head);
@@ -122,6 +123,9 @@ export const OutlinerKeys = Extension.create<OutlinerKeysOptions>({
         return line ? s.tr.delete(line.start, s.selection.head) : null;
       }),
     };
+    // In a table cell the keys are the table's (table.ts): Tab moves between
+    // cells, Enter goes down, and nothing joins or splits the block.
+    return Object.fromEntries(Object.entries(keys).map(([k, f]) => [k, () => !inTable(this.editor.state) && f()]));
   },
   addProseMirrorPlugins() {
     return [dragDropPlugin()];

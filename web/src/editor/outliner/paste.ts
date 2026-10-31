@@ -2,6 +2,7 @@
 // several blocks becomes several blocks after the current one, keeping list
 // nesting; Markdown text is parsed; one line goes into the current block.
 
+import { inTable } from "../table";
 import { Extension } from "@tiptap/core";
 import { Fragment, Node as PMNode, Slice, type Schema } from "@tiptap/pm/model";
 import { Plugin, PluginKey, TextSelection } from "@tiptap/pm/state";
@@ -198,7 +199,8 @@ export const OutlinePaste = Extension.create({
               view.dispatch(state.tr.addMark(from, to, state.schema.marks.link.create({ href: text.trim() })));
               return true;
             }
-            if (!itemAt(state.selection.$head)) return false;
+            // In a table, pasting cells is the table's own.
+            if (!itemAt(state.selection.$head) || inTable(state)) return false;
             if (plainOnce) {
               plainOnce = false;
               const parts = text.replace(/\r\n/g, "\n").split("\n");

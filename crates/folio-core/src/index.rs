@@ -153,7 +153,7 @@ fn walk(nodes: &[LoroValue], parent: Option<&str>, out: &mut Extract) {
             let mut nested = Vec::new();
             for child in children(node) {
                 let n = name(&child);
-                if LISTS.contains(&n) {
+                if LISTS.contains(&n) || n == "table" {
                     nested.push(child);
                 } else if is_textblock(n) || n == "blockquote" {
                     let t = inline_text(&child, &bid, out);
@@ -179,8 +179,32 @@ fn walk(nodes: &[LoroValue], parent: Option<&str>, out: &mut Extract) {
             }
         } else if kind == "blockquote" {
             walk(&children(node), parent, out);
+        } else if kind == "table" {
+            // One block: its cells' text, `|` between cells and a line per
+            // row; links and tags in a cell belong to the table.
+            let bid = attr(node, "bid").unwrap_or_default();
+            let text = table_text(node, &bid, out);
+            if !bid.is_empty() {
+                out.blocks.push(Block { bid, parent: parent.map(str::to_owned), ord, kind: kind.to_owned(), text, task: None });
+                ord += 1;
+            }
         }
     }
+}
+
+/// A table's text: rows on lines of their own, cells joined by ` | `.
+fn table_text(table: &LoroValue, bid: &str, out: &mut Extract) -> String {
+    let rows: Vec<String> = children(table)
+        .iter()
+        .map(|row| {
+            let cells: Vec<String> = children(row)
+                .iter()
+                .map(|cell| children(cell).iter().filter(|p| is_textblock(name(p))).map(|p| inline_text(p, bid, out)).filter(|t| !t.is_empty()).collect::<Vec<_>>().join(" "))
+                .collect();
+            cells.join(" | ")
+        })
+        .collect();
+    rows.join("\n")
 }
 
 /// The files image and file blocks point at, wherever they sit.

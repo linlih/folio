@@ -303,6 +303,7 @@ fn blocks(tree: &LoroTree, nodes: &[Block], links: &Links, out: &mut Vec<String>
             "image" => out.push(image(node, links)),
             "file" => out.push(file(node, links)),
             "blockMath" => out.push(format!("$$\n{}\n$$", attr_str(node, "latex").unwrap_or_default())),
+            "table" => out.push(table(tree, *id, links)),
             k if LISTS.contains(&k) => out.push(list(tree, *id, node, links)),
             _ => {
                 let mut inner = Vec::new();
@@ -311,6 +312,31 @@ fn blocks(tree: &LoroTree, nodes: &[Block], links: &Links, out: &mut Vec<String>
             }
         }
     }
+}
+
+/// A table, as a GitHub (GFM) table: the first row is its header, a cell's
+/// lines are joined by `<br>`, and `|` in a cell is escaped.
+fn table(tree: &LoroTree, id: TreeID, links: &Links) -> String {
+    let rows: Vec<Vec<String>> = block_children(tree, Some(id))
+        .into_iter()
+        .map(|(row, _)| {
+            block_children(tree, Some(row))
+                .into_iter()
+                .map(|(cell, _)| {
+                    let lines: Vec<String> = block_children(tree, Some(cell)).iter().map(|(_, p)| inline_markdown(p, links).replace('\n', "<br>")).collect();
+                    lines.join("<br>").replace('|', "\\|")
+                })
+                .collect()
+        })
+        .collect();
+    let cols = rows.iter().map(Vec::len).max().unwrap_or(0).max(1);
+    let line = |cells: &[String]| {
+        let padded: Vec<&str> = (0..cols).map(|i| cells.get(i).map_or("", String::as_str)).collect();
+        format!("| {} |", padded.join(" | "))
+    };
+    let mut out = vec![line(rows.first().map_or(&[][..], Vec::as_slice)), format!("|{}", " --- |".repeat(cols))];
+    out.extend(rows.iter().skip(1).map(|r| line(r)));
+    out.join("\n")
 }
 
 /// A list, with nested lists indented under their item.
@@ -329,6 +355,10 @@ fn list(tree: &LoroTree, id: TreeID, node: &LoroMap, links: &Links) -> String {
         let task = if kind == "taskItem" { checkbox(&item) } else { "" };
         let mut first = true;
         for part in block_children(tree, Some(item_id)) {
+            // A table starts a block of its own: a blank line before it.
+            if !first && name(&part.1) == "table" {
+                lines.push(String::new());
+            }
             let rendered = if LISTS.contains(&name(&part.1).as_str()) {
                 list(tree, part.0, &part.1, links)
             } else {

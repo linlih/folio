@@ -19,6 +19,7 @@ import { OutlinePaste } from "./outliner/paste";
 import { Suggestions } from "./outliner/suggest";
 import { OutlineTasks } from "./outliner/tasks";
 import { PasteIds } from "./pasteIds";
+import { TableKeys, TableNodes } from "./table";
 
 /** Any list holds plain items and tasks alike (Logseq: a status is a
  *  property of a block, not a kind of list). */
@@ -69,6 +70,9 @@ export function baseExtensions(isRemote: RemoteTxPredicate, placeholder = "", mo
     // Images and attachments (design/attachments.md).
     CardImage,
     FileBlock,
+    // Tables (table.ts): in a card or under an outline item.
+    ...TableNodes,
+    TableKeys,
     Mathematics.configure({ katexOptions: { throwOnError: false } }),
     MathEditing,
     OutlineTasks,

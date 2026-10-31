@@ -216,16 +216,33 @@ export function bodyLines(doc: LoroDoc): string[] {
  *  editor. Same output as `folio_core::body::lines`. */
 export function dayLines(doc: LoroDoc): DayLine[] {
   const out: DayLine[] = [];
-  const visit = (nodes: LoroTreeNode[] | undefined, lists: number) => {
+  const visit = (nodes: LoroTreeNode[] | undefined, lists: number, out: DayLine[]) => {
     for (const node of nodes ?? []) {
+      if (node.data.get("nodeName") === "table") {
+        // A line per row, its cells side by side.
+        for (const row of node.children() ?? []) {
+          const parts: DayPart[] = [];
+          (row.children() ?? []).forEach((cell, i) => {
+            if (i > 0) parts.push({ text: " | " });
+            const lines: DayLine[] = [];
+            visit(cell.children(), 1, lines);
+            lines.forEach((l, j) => {
+              if (j > 0) parts.push({ text: " " });
+              parts.push(...l.parts);
+            });
+          });
+          if (parts.some((p) => (p.text ?? "").replace(/^[ |]+|[ |]+$/g, "") || p.block !== undefined || p.card !== undefined)) out.push(lists > 1 ? { depth: lists - 1, parts } : { parts });
+        }
+        continue;
+      }
       const inline = node.data.get("children");
       if (inline instanceof LoroMovableList) {
         const parts = inlineParts(inline);
         if (parts.some((p) => p.text || p.block !== undefined)) out.push(lists > 1 ? { depth: lists - 1, parts } : { parts });
-      } else visit(node.children(), lists + (LISTS.has(String(node.data.get("nodeName") ?? "")) ? 1 : 0));
+      } else visit(node.children(), lists + (LISTS.has(String(node.data.get("nodeName") ?? "")) ? 1 : 0), out);
     }
   };
-  visit(bodyTree(doc).roots(), 0);
+  visit(bodyTree(doc).roots(), 0, out);
   return out;
 }
 

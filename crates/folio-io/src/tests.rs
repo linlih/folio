@@ -138,3 +138,17 @@ fn without_a_place_for_files_they_are_named() {
     assert!(md.starts_with("![My shot.png](My%20shot.png)"), "{md}");
     assert!(md.contains("[my shot.PNG](my%20shot.PNG)"), "{md}");
 }
+
+/// Tables as the editor writes them (web/test/fixtures.test.ts), as GitHub
+/// tables: a header row, `|` escaped, a cell's lines joined by `<br>`; one
+/// under a list item stays in the item, after a blank line.
+#[test]
+fn tables_as_github_tables() {
+    let doc = LoroDoc::new();
+    doc.import(include_bytes!("../tests/fixtures/card-table.loro")).unwrap();
+    let md = body_markdown(&doc, &Links::STORED);
+    assert_eq!(
+        md,
+        "Before\n\n| Name | **Note** |\n| --- | --- |\n| [[Other card]] | a\\|b<br>second line |\n| #x |  |\n\n- item\n\n  | k | v |\n  | --- | --- |\n  | 1 | 2 |\n"
+    );
+}

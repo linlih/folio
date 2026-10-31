@@ -16,6 +16,7 @@ export const BLOCK_TYPES = [
   "image",
   "file",
   "blockMath",
+  "table",
 ] as const;
 
 const BLOCK_SET = new Set<string>(BLOCK_TYPES);

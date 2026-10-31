@@ -68,3 +68,27 @@ fn tasks_are_read_as_the_editor_wrote_them() {
         ]
     );
 }
+
+/// A table is one block: its cells' text, a line per row; links in a cell
+/// belong to it. The journal's read-only lines show a row per line.
+#[test]
+fn tables_are_one_block_and_a_line_per_row() {
+    use folio_core::body::lines;
+    use folio_core::index::extract;
+    let doc = load(include_bytes!("../../folio-io/tests/fixtures/card-table.loro"));
+    let x = extract(&doc);
+    let tables: Vec<_> = x.blocks.iter().filter(|b| b.kind == "table").collect();
+    assert_eq!(tables.len(), 2);
+    assert_eq!(tables[0].text, "Name | Note\nOther card | a|b second line\n#x | ");
+    assert_eq!(tables[0].parent, None);
+    assert_eq!(tables[1].text, "k | v\n1 | 2");
+    let item = x.blocks.iter().find(|b| b.text == "item").unwrap();
+    assert_eq!(tables[1].parent.as_deref(), Some(item.bid.as_str()));
+    assert_eq!(x.links, vec![(tables[0].bid.clone(), "card-2".to_owned())]);
+    // No block of its own for each cell's line.
+    assert!(!x.blocks.iter().any(|b| b.text == "Name" || b.text == "second line"));
+
+    let text = |l: &folio_core::body::Line| l.parts.iter().map(|p| p.text.as_str()).collect::<String>();
+    let shown: Vec<String> = lines(&doc).iter().map(text).collect();
+    assert_eq!(shown, ["Before", "Name | Note", "Other card | a|b second line", "#x | ", "item", "k | v", "1 | 2"]);
+}

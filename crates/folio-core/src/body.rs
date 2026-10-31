@@ -100,6 +100,29 @@ pub fn lines(doc: &LoroDoc) -> Vec<Line> {
                 Some(ValueOrContainer::Value(LoroValue::String(s))) => s.to_string(),
                 _ => String::new(),
             };
+            if name == "table" {
+                // A line per row, its cells side by side.
+                for row in children(tree, Some(id)) {
+                    let mut parts: Vec<Part> = Vec::new();
+                    for (i, cell) in children(tree, Some(row)).into_iter().enumerate() {
+                        if i > 0 {
+                            parts.push(Part { text: " | ".into(), ..Default::default() });
+                        }
+                        let mut lines = Vec::new();
+                        walk(tree, Some(cell), 1, &mut lines);
+                        for (j, line) in lines.into_iter().enumerate() {
+                            if j > 0 {
+                                parts.push(Part { text: " ".into(), ..Default::default() });
+                            }
+                            parts.extend(line.parts);
+                        }
+                    }
+                    if parts.iter().any(|p| !p.text.trim_matches([' ', '|']).is_empty() || p.block.is_some() || p.card.is_some()) {
+                        out.push(Line { depth: lists.saturating_sub(1), parts });
+                    }
+                }
+                continue;
+            }
             match meta.get(CHILDREN) {
                 Some(ValueOrContainer::Container(Container::MovableList(inline))) => {
                     let parts = inline_parts(&inline);

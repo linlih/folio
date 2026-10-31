@@ -60,4 +60,31 @@ describe("fixtures for Rust", () => {
     writeFileSync(resolve(IO_OUT, "card-rich.loro"), doc.export({ mode: "snapshot" }));
     expect(true).toBe(true);
   });
+  // Tables (crates/folio-io and folio-core tests): at the top level, with a
+  // link, marks, a `|` and two lines in a cell; and under an outline item.
+  it.runIf(process.env.UPDATE_FIXTURES)("card with tables", async () => {
+    const doc = device(9n);
+    initCard(doc, "note", "Tables", 1_000);
+    const { editor } = await bind(doc);
+    const cell = (type: string, ...lines: JSONContent[]) => ({ type, content: lines });
+    const row = (...cells: JSONContent[]) => ({ type: "tableRow", content: cells });
+    editor.commands.setContent({
+      type: "doc",
+      content: [
+        p(t("Before")),
+        {
+          type: "table",
+          content: [
+            row(cell("tableHeader", p(t("Name"))), cell("tableHeader", p(t("Note", { type: "bold" })))),
+            row(cell("tableCell", p({ type: "cardLink", attrs: { cardId: "card-2", title: "Other card" } })), cell("tableCell", p(t("a|b")), p(t("second line")))),
+            row(cell("tableCell", p(t("#x"))), cell("tableCell", p())),
+          ],
+        },
+        { type: "bulletList", content: [item("listItem", {}, p(t("item")), { type: "table", content: [row(cell("tableHeader", p(t("k"))), cell("tableHeader", p(t("v")))), row(cell("tableCell", p(t("1"))), cell("tableCell", p(t("2"))))] })] },
+      ],
+    });
+    await settle();
+    writeFileSync(resolve(IO_OUT, "card-table.loro"), doc.export({ mode: "snapshot" }));
+    expect(true).toBe(true);
+  });
 });

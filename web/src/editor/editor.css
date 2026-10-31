@@ -408,3 +408,70 @@ li.dragging { opacity: 0.4; }
 .block-ref:hover { background: color-mix(in srgb, var(--accent) 14%, transparent); }
 .block-ref.missing { color: var(--muted); border-bottom-style: dotted; }
 .block-ref.ProseMirror-selectednode { outline: 2px solid var(--accent); }
+
+/* ---- tables (table.ts) ---- */
+/* Wide tables scroll sideways in their wrapper, not the page. */
+.card-body .tableWrapper { overflow-x: auto; margin: 4px 0; }
+.card-body table { border-collapse: collapse; table-layout: auto; width: 100%; font-size: 0.95em; }
+.card-body :is(td, th) {
+  position: relative;
+  min-width: 4em;
+  padding: 5px 9px;
+  border: 1px solid var(--border);
+  vertical-align: top;
+  text-align: left;
+}
+.card-body th { font-weight: 600; background: var(--surface); }
+.card-body :is(td, th) p { min-height: 1.5em; }
+/* Cells chosen by dragging across them (prosemirror-tables). */
+.card-body .selectedCell::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  pointer-events: none;
+}
+.card-body.ProseMirror-hideselection .selectedCell *::selection { background: transparent; }
+
+/* The bar over the table the cursor is in, and the + along its edges. */
+.table-bar {
+  position: fixed;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  box-shadow: 0 4px 14px rgb(0 0 0 / 0.08);
+}
+.table-bar-button {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 26px;
+  border-radius: 5px;
+  color: var(--secondary);
+}
+.table-bar-button:hover { background: var(--hover); color: var(--text); }
+.table-bar-button.danger:hover { color: #c9524a; }
+.table-bar-sep { width: 1px; height: 16px; margin: 0 3px; background: var(--border); }
+.table-add {
+  position: fixed;
+  z-index: 39;
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  color: var(--muted);
+  background: color-mix(in srgb, var(--hover) 70%, transparent);
+  opacity: 0.55;
+}
+.table-add:hover { opacity: 1; color: var(--text); background: var(--hover); }
+.table-add[hidden], .table-bar[hidden] { display: none; }
+@media (pointer: coarse) {
+  .table-bar-button { width: 36px; height: 34px; }
+  .table-add { opacity: 0.9; }
+  .table-add-row { height: 26px; }
+  .table-add-col { width: 26px; }
+}

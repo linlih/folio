@@ -2,6 +2,7 @@
 // built-in status / priority / deadline / scheduled properties. A task is a
 // `taskItem`; done is its `checked`, the other statuses its `status`.
 
+import { inTable } from "../table";
 import { Extension, InputRule } from "@tiptap/core";
 import { Fragment, type Node as PMNode } from "@tiptap/pm/model";
 import type { EditorState, Transaction } from "@tiptap/pm/state";
@@ -125,6 +126,7 @@ export const OutlineTasks = Extension.create({
   addKeyboardShortcuts() {
     return {
       "Mod-Enter": ({ editor }) => {
+        if (inTable(editor.state)) return true;
         const item = itemAt(editor.state.selection.$head);
         if (item) {
           const tr = editor.state.tr;

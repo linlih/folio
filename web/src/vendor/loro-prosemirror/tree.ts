@@ -176,14 +176,23 @@ export function syncTreeFromPm(doc: LoroDoc, pmDoc: Node, mapping: LoroNodeMappi
     WEAK_NODE_TO_LORO_CONTAINER_MAPPING.set(pm, data.id);
   };
 
+  // folio patch: blocks of a type this schema doesn't know (written by a
+  // newer version of the app) are not shown, and must survive edits here:
+  // they keep their place among the blocks around them and are never pruned.
+  const schema = pmDoc.type.schema;
+  const unknown = (t: LoroTreeNode) => !schema.nodes[nameOf(t)];
+
   const place = (parent: LoroTreeNode | undefined, pms: Node[]) => {
     placed.push(parent);
     const kids = childrenOf(tree, parent);
-    pms.forEach((pm, i) => {
-      const here = kids[i];
+    let at = 0;
+    pms.forEach((pm) => {
+      while (kids[at] && unknown(kids[at])) used.add(kids[at++].id);
+      const here = kids[at];
       // Unchanged since the last sync (remote changes clear the cache).
       if (here && !used.has(here.id) && mapping.get(here.data.id) === pm) {
         used.add(here.id);
+        at++;
         return;
       }
       const bid = typeof pm.attrs.bid === "string" && pm.attrs.bid ? (pm.attrs.bid as string) : null;
@@ -198,16 +207,17 @@ export function syncTreeFromPm(doc: LoroDoc, pmDoc: Node, mapping: LoroNodeMappi
       }
       if (node) {
         if (node.id !== here?.id) {
-          tree.move(node.id, parent?.id, i);
-          const at = kids.findIndex((k) => k.id === node!.id);
-          if (at >= 0) kids.splice(at, 1);
-          kids.splice(i, 0, node);
+          tree.move(node.id, parent?.id, at);
+          const was = kids.findIndex((k) => k.id === node!.id);
+          if (was >= 0) kids.splice(was, 1);
+          kids.splice(at, 0, node);
         }
       } else {
-        node = tree.createNode(parent?.id, i);
-        kids.splice(i, 0, node);
+        node = tree.createNode(parent?.id, at);
+        kids.splice(at, 0, node);
         initData(node.data as unknown as LoroNode, pm, mapping);
       }
+      at++;
       used.add(node.id);
       syncNode(node, pm);
     });
@@ -220,7 +230,7 @@ export function syncTreeFromPm(doc: LoroDoc, pmDoc: Node, mapping: LoroNodeMappi
   for (const parent of placed) {
     if (parent && (parent.isDeleted() || !used.has(parent.id))) continue;
     for (const n of childrenOf(tree, parent)) {
-      if (used.has(n.id)) continue;
+      if (used.has(n.id) || unknown(n)) continue;
       mapping.delete(n.data.id);
       tree.delete(n.id);
     }

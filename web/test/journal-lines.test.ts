@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import { LoroDoc } from "loro-crdt";
 import { describe, expect, it } from "vitest";
 import { bodyLines, dayLines, initCard } from "../src/docs/card";
+import { extractIndex } from "../src/docs/index";
 import { bind, device, settle } from "./helpers";
 
 describe("a journal day's lines", () => {
@@ -45,5 +46,16 @@ describe("a journal day's lines", () => {
     expect(lines[2].parts).toContainEqual({ block: "blk-9" });
     const text = lines.map((l) => "\t".repeat(l.depth ?? 0) + l.parts.map((p) => p.text ?? "").join(""));
     expect(text).toEqual(bodyLines(doc));
+  });
+  it("show a table a row per line, as the desktop app does", () => {
+    // Same fixture and expectations as crates/folio-core/tests/editor_fixtures.rs.
+    const doc = new LoroDoc();
+    doc.import(readFileSync(resolve(process.cwd(), "../crates/folio-io/tests/fixtures/card-table.loro")));
+    expect(dayLines(doc).map((l) => l.parts.map((p) => p.text ?? "").join(""))).toEqual(["Before", "Name | Note", "Other card | a|b second line", "#x | ", "item", "k | v", "1 | 2"]);
+    const x = extractIndex(doc);
+    const tables = x.blocks.filter((b) => b.kind === "table");
+    expect(tables.map((b) => b.text)).toEqual(["Name | Note\nOther card | a|b second line\n#x | ", "k | v\n1 | 2"]);
+    expect(tables[1].parent).toBe(x.blocks.find((b) => b.text === "item")!.bid);
+    expect(x.links).toEqual([[tables[0].bid, "card-2"]]);
   });
 });
