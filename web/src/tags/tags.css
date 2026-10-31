@@ -66,11 +66,15 @@
 .db-field-form-actions { display: flex; justify-content: flex-end; padding: 6px 4px 2px; }
 
 /* Board: columns side by side, scrolling sideways. */
-.db-board-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin: -8px 0 10px -8px; }
-.db-chip { display: inline-flex; align-items: center; gap: 5px; height: 26px; padding: 0 8px; border-radius: var(--radius); color: var(--secondary); font-size: 13px; }
-.db-chip:hover, .db-chip[data-popup-open] { background: var(--hover); color: var(--text); }
-.db-chip svg { color: var(--muted); }
-.db-chip-caret { margin-left: -1px; }
+/* The board's grouping and order buttons, lined up under the view
+ * switcher: box edge to its border, icon to its first icon (1px border +
+ * 2px padding + 10px). */
+.db-board-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin: -8px 0 10px; }
+.db-bar-button { display: inline-flex; align-items: center; gap: 5px; height: 26px; padding: 0 8px 0 13px; border-radius: var(--radius); color: var(--secondary); font-size: 13px; }
+.db-bar-button + .db-bar-button { padding-left: 8px; }
+.db-bar-button:hover, .db-bar-button[data-popup-open] { background: var(--hover); color: var(--text); }
+.db-bar-button svg { color: var(--muted); }
+.db-bar-caret { margin-left: -1px; }
 .db-menu-note { max-width: 220px; line-height: 1.5; }
 .db-board { display: flex; gap: 12px; align-items: flex-start; overflow-x: auto; padding-bottom: 12px; }
 .db-column { flex: 0 0 260px; display: grid; gap: 8px; padding: 8px; border-radius: 8px; background: var(--hover); }
