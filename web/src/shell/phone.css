@@ -11,7 +11,10 @@
 .pane.scrolled > .phone-top { border-bottom-color: var(--border); }
 .phone-top .icon-button { width: 40px; height: 40px; }
 .phone-top > .icon-button:last-child { margin-left: auto; }
-.phone-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; font-weight: 500; color: var(--text); }
+.phone-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; font-weight: 500; color: var(--text); transition: opacity 0.15s; }
+/* A page with its own title on it: the bar names it only once that title
+   has scrolled away, not twice (shell/AppShell.tsx PaneView). */
+.pane:has(> .view:not([hidden]) [data-page-title]):not(.title-away) .phone-title { opacity: 0; }
 
 .phone-nav {
   grid-row: 2;

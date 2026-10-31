@@ -107,7 +107,7 @@ function TagTitle({ name }: { name: string }) {
 
   return (
     <>
-      <h1 className="tag-title">
+      <h1 className="tag-title" data-page-title>
         <Hash size={22} strokeWidth={1.75} />
         {renaming ? (
           <NameInput initial={name} onDone={(v) => void submit(v)} big />

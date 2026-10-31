@@ -184,7 +184,7 @@ export function CardView({ cardId, pane, active = true }: { cardId: string; pane
   return (
     <div className="page card-page">
       {handle && (
-        <div className="card-title-row">
+        <div className="card-title-row" data-page-title>
           <textarea
             ref={titleRef}
             className="card-page-title"

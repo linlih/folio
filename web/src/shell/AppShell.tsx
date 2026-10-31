@@ -63,19 +63,28 @@ function PaneView({ pane, focused, last, narrow, leading, phone }: { pane: Pane;
   // The line under the tab bar shows only once the page has scrolled under
   // it, as in Claude's app; at the top the bar and page are one surface.
   const [scrolled, setScrolled] = useState(false);
+  // A page showing its own title ([data-page-title]): on a phone the bar
+  // shows the name only once that title has scrolled out of sight.
+  const [titleAway, setTitleAway] = useState(false);
   const self = useRef<HTMLElement>(null);
+  const measure = (view: HTMLElement) => {
+    setScrolled(view.scrollTop > 0);
+    const title = view.querySelector("[data-page-title]");
+    setTitleAway(!!title && title.getBoundingClientRect().bottom <= view.getBoundingClientRect().top);
+  };
   useEffect(() => {
     const view = self.current?.querySelector<HTMLElement>(":scope > .view:not([hidden])");
-    setScrolled((view?.scrollTop ?? 0) > 0);
+    if (view) measure(view);
+    else setScrolled(false);
   }, [pane.active]);
   const onScroll = (e: React.UIEvent) => {
     const el = e.target as HTMLElement;
-    if (el.classList.contains("view")) setScrolled(el.scrollTop > 0);
+    if (el.classList.contains("view")) measure(el);
   };
   return (
     <section
       ref={self}
-      className={`pane${focused ? " focused" : ""}${scrolled ? " scrolled" : ""}`}
+      className={`pane${focused ? " focused" : ""}${scrolled ? " scrolled" : ""}${titleAway ? " title-away" : ""}`}
       onMouseDownCapture={focus}
       onFocusCapture={focus}
       onScrollCapture={onScroll}

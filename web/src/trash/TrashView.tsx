@@ -47,7 +47,7 @@ export function TrashView() {
   return (
     <div className="page trash">
       <header className="page-header">
-        <h1>{t("trash.title")}</h1>
+        <h1 data-page-title>{t("trash.title")}</h1>
         {rows && rows.length > 0 && !confirming && (
           <button className="button danger" onClick={() => setConfirming(true)}>
             <Trash2 size={13} />
