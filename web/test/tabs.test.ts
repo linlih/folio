@@ -18,6 +18,26 @@ describe("tabs", () => {
     expect(focused().active).toBe("card:a");
   });
 
+  it("follows a tag to its new name, or into the tag it merged with", () => {
+    const { open, renameTag } = useShell.getState();
+    open({ kind: "tag", name: "想法" });
+    renameTag("想法", "灵感");
+    expect(keys()).toEqual(["library", "tag:灵感"]);
+    expect(focused().active).toBe("tag:灵感");
+    expect(focused().tabs[1].target).toEqual({ kind: "tag", name: "灵感" });
+    // Merged into a tag whose page is open: one tab left, the merged one.
+    open({ kind: "tag", name: "idea" });
+    renameTag("idea", "灵感");
+    expect(keys()).toEqual(["library", "tag:灵感"]);
+    expect(focused().active).toBe("tag:灵感");
+    // Only the case changed: same tab, new spelling.
+    renameTag("灵感", "灵感");
+    open({ kind: "tag", name: "Todo" });
+    renameTag("Todo", "TODO");
+    expect(keys()).toEqual(["library", "tag:灵感", "tag:todo"]);
+    expect(focused().tabs[2].target).toEqual({ kind: "tag", name: "TODO" });
+  });
+
   it("opens new tabs after the active one", () => {
     const { open, activate } = useShell.getState();
     open({ kind: "card", cardId: "a" });

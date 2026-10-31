@@ -89,6 +89,9 @@ interface ShellState {
   renameCard(cardId: string, title: string): void;
   /** Closes a card's tabs and drops it from the recent list (moved to trash). */
   forgetCard(cardId: string): void;
+  /** Points a tag's tabs at its new name (renamed, or merged into a tag
+   *  whose tab may be open already). */
+  renameTag(from: string, to: string): void;
   /** Restores a saved layout (startup). */
   restore(layout: { panes: Pane[]; focused: string; split: number }): void;
   setNotice(text: string | null): void;
@@ -280,6 +283,21 @@ export const useShell = create<ShellState>((set) => {
       set((s) => {
         const key = `card:${cardId}`;
         return { ...tidy(s.panes.map((p) => withoutTab(p, key)), s.focused), recent: s.recent.filter((r) => r.cardId !== cardId) };
+      }),
+
+    renameTag: (from, to) =>
+      set((s) => {
+        const old = tabKey({ kind: "tag", name: from });
+        const tab: Tab = { key: tabKey({ kind: "tag", name: to }), target: { kind: "tag", name: to }, title: null };
+        const panes = s.panes.map((p) => {
+          if (!p.tabs.some((t) => t.key === old)) return p;
+          if (old !== tab.key && p.tabs.some((t) => t.key === tab.key)) {
+            const rest = withoutTab(p, old);
+            return p.active === old ? { ...rest, active: tab.key } : rest;
+          }
+          return { ...p, tabs: p.tabs.map((t) => (t.key === old ? tab : t)), active: p.active === old ? tab.key : p.active };
+        });
+        return { panes };
       }),
 
     restore: (layout) =>

@@ -182,6 +182,96 @@ export function setView(doc: LoroDoc, tag: string, view: Partial<DbView>) {
   doc.commit({ origin: TOPIC_ORIGIN });
 }
 
+// ---- renaming a tag ----
+
+/** A field of the renamed tag that becomes one the other tag already has
+ *  (same name and type): its values go to `to`, select choices matched by
+ *  name. */
+export interface FieldMerge {
+  field: string;
+  to: string;
+  options: Record<string, string>;
+}
+
+/** First step of renaming `from` to `to` (or merging it into `to`): pairs
+ *  the fields both tags have, adding to `to` the choices it lacks. Only
+ *  adds, so running it again (an interrupted rename) is harmless. */
+export function pairFields(doc: LoroDoc, from: string, to: string, now = Date.now()): FieldMerge[] {
+  if (tagKey(from) === tagKey(to)) return [];
+  const theirs = readDatabase(doc, to).fields;
+  const merges: FieldMerge[] = [];
+  for (const f of readDatabase(doc, from).fields) {
+    const same = theirs.find((g) => g.type === f.type && g.name.trim().toLowerCase() === f.name.trim().toLowerCase());
+    if (!same) continue;
+    const options: Record<string, string> = {};
+    for (const o of f.options) {
+      const match = readDatabase(doc, to).fields.find((g) => g.id === same.id)?.options.find((x) => x.name.trim().toLowerCase() === o.name.trim().toLowerCase());
+      const id = match?.id ?? addOption(doc, to, same.id, o.name, now);
+      if (id) options[o.id] = id;
+    }
+    merges.push({ field: f.id, to: same.id, options });
+  }
+  return merges;
+}
+
+/** A card's values for the paired fields, to set on it: only where it has
+ *  a value under the old field and none under the new one. */
+export function pairedValues(props: Record<string, PropValue>, merges: FieldMerge[]): Record<string, PropValue> {
+  const out: Record<string, PropValue> = {};
+  for (const m of merges) {
+    const v = props[m.field];
+    if (v === undefined || v === null || props[m.to] !== undefined) continue;
+    out[m.to] = typeof v === "string" && m.options[v] ? m.options[v] : v;
+  }
+  return out;
+}
+
+/** Last step, once the cards say `#to`: the fields of `from` not paired move
+ *  to `to` under their own ids (cards keep their values), `from`'s view
+ *  becomes `to`'s if it has none, and `from`'s fields are marked removed,
+ *  values left on the cards. */
+export function moveFields(doc: LoroDoc, from: string, to: string, merges: FieldMerge[], now = Date.now()) {
+  if (tagKey(from) === tagKey(to)) return;
+  const src = entry(doc, from);
+  const fields = src?.get("fields");
+  if (!src || !(fields instanceof LoroMap)) return;
+  const paired = new Map(merges.map((m) => [m.field, m.to]));
+  const hadView = entry(doc, to)?.get("view") instanceof LoroMap;
+  const target = ensureEntry(doc, to).ensureMergeableMap("fields");
+  let order = Math.max(0, ...readDatabase(doc, to).fields.map((f) => f.order + 1));
+  for (const f of readDatabase(doc, from).fields) {
+    const raw = fields.get(f.id) as LoroMap;
+    if (!paired.has(f.id)) {
+      const copy = target.ensureMergeableMap(f.id);
+      copy.set("name", f.name);
+      copy.set("type", f.type);
+      copy.set("order", order++);
+      copy.set("created_at", num(raw, "created_at") ?? now);
+      const opts = raw.get("options");
+      if (opts instanceof LoroMap) {
+        const into = copy.ensureMergeableMap("options");
+        for (const oid of opts.keys()) {
+          const o = opts.get(oid);
+          if (!(o instanceof LoroMap)) continue;
+          const c = into.ensureMergeableMap(oid);
+          for (const k of ["name", "color", "order", "deleted_at"]) if (o.get(k) !== undefined) c.set(k, o.get(k) as string | number);
+        }
+      }
+    }
+    raw.set("deleted_at", now);
+  }
+  const v = src.get("view");
+  if (!hadView && v instanceof LoroMap) {
+    const into = ensureEntry(doc, to).ensureMergeableMap("view");
+    const field = (id: unknown) => (typeof id === "string" ? (paired.get(id) ?? id) : id);
+    for (const k of ["mode", "group_by", "sort_by", "sort_desc"]) {
+      const val = k === "group_by" || k === "sort_by" ? field(v.get(k)) : v.get(k);
+      if (val !== undefined) into.set(k, val as string | boolean);
+    }
+  }
+  doc.commit({ origin: TOPIC_ORIGIN });
+}
+
 // ---- rows ----
 
 export interface DbRow extends Omit<TagCard, "props"> {

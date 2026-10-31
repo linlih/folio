@@ -2,7 +2,8 @@
 // Both sides must agree on these names; the Rust tests and test/card.test.ts
 // pin the shared behaviour.
 
-import { LoroMap, LoroText, type LoroDoc, type LoroTreeNode, type TreeID } from "loro-crdt";
+import { LoroMap, LoroMovableList, LoroText, type LoroDoc, type LoroTreeNode, type TreeID } from "loro-crdt";
+import { APP_EDIT_ORIGIN } from "../vendor/loro-prosemirror";
 import { bodyTree } from "../vendor/loro-prosemirror/tree";
 import { newBid } from "./ids";
 
@@ -27,6 +28,10 @@ export type EditorMode = "document" | "outline";
 
 /** Origins of edits that are not the user's editing and must not be undone. */
 export const META_ORIGIN = "meta:";
+
+/** A tag renamed everywhere (tags/rename.ts): open editors show it, and
+ *  Mod+Z in one card does not take it back there alone. */
+export const TAG_RENAME_ORIGIN = `${APP_EDIT_ORIGIN}tag`;
 
 export interface CardMeta {
   kind: CardKind;
@@ -297,6 +302,45 @@ export function appendTag(doc: LoroDoc, tag: string) {
   node.set("nodeName", "tag");
   node.ensureMergeableMap("attributes").set("name", tag);
   node.ensureMergeableMovableList("children");
+}
+
+/** Renames every `#from` (any case) in the body to `#to`: only the tag's
+ *  name changes, so blocks keep their ids and another device's edits to
+ *  the same lines merge. A line that has `#to` already loses its `#from`
+ *  instead (merging two tags), rather than saying `#to` twice. Answers how
+ *  many it changed; the caller commits. */
+export function renameTagIn(doc: LoroDoc, from: string, to: string): number {
+  const key = from.trim().toLowerCase();
+  const toKey = to.trim().toLowerCase();
+  let changed = 0;
+  const nameOf = (item: unknown) => {
+    if (!(item instanceof LoroMap) || item.get("nodeName") !== "tag") return null;
+    const attrs = item.get("attributes");
+    const name = attrs instanceof LoroMap ? attrs.get("name") : undefined;
+    return typeof name === "string" ? { attrs: attrs as LoroMap, name } : null;
+  };
+  const visit = (nodes: LoroTreeNode[] | undefined) => {
+    for (const node of nodes ?? []) {
+      const inline = node.data.get("children");
+      if (inline instanceof LoroMovableList) {
+        let hasTo = false;
+        for (let i = 0; i < inline.length && key !== toKey; i++) if (nameOf(inline.get(i))?.name.trim().toLowerCase() === toKey) hasTo = true;
+        const drop: number[] = [];
+        for (let i = 0; i < inline.length; i++) {
+          const tag = nameOf(inline.get(i));
+          if (!tag || tag.name.trim().toLowerCase() !== key || tag.name === to) continue;
+          if (hasTo) drop.push(i);
+          else tag.attrs.set("name", to);
+          hasTo = key !== toKey;
+          changed++;
+        }
+        for (const i of drop.reverse()) inline.delete(i, 1);
+      }
+      visit(node.children());
+    }
+  };
+  visit(bodyTree(doc).roots());
+  return changed;
 }
 
 /** Appends one block per line: paragraphs in a document card, items of the

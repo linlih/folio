@@ -301,7 +301,7 @@ export function TopicHeader({ topicId, onNewSub }: { topicId: string; onNewSub: 
 
 /** A choice of topic under the header (a native list: a phone shows its own
  *  picker), with a button to act and one to cancel. */
-function ChooseTopic({ text, options, action, onChoose, onCancel }: { text: string; options: { id: string; label: string }[]; action: string; onChoose: (id: string) => void; onCancel: () => void }) {
+export function ChooseTopic({ text, options, action, onChoose, onCancel }: { text: string; options: { id: string; label: string }[]; action: string; onChoose: (id: string) => void; onCancel: () => void }) {
   const { t } = useTranslation();
   const [value, setValue] = useState(options[0]?.id ?? "");
   return (
@@ -325,7 +325,7 @@ function ChooseTopic({ text, options, action, onChoose, onCancel }: { text: stri
 }
 
 /** A name being typed: Enter or leaving the field keeps it, Esc drops it. */
-function NameInput({ initial = "", placeholder, onDone, big = false }: { initial?: string; placeholder?: string; onDone: (value: string) => void; big?: boolean }) {
+export function NameInput({ initial = "", placeholder, onDone, big = false }: { initial?: string; placeholder?: string; onDone: (value: string) => void; big?: boolean }) {
   const [value, setValue] = useState(initial);
   const [done, setDone] = useState(false);
   const finish = (v: string) => {
@@ -337,6 +337,8 @@ function NameInput({ initial = "", placeholder, onDone, big = false }: { initial
     <input
       className={`topic-name-input${big ? " big" : ""}`}
       autoFocus
+      // A rename starts with the whole name chosen, to type over.
+      onFocus={(e) => e.currentTarget.select()}
       value={value}
       placeholder={placeholder}
       onChange={(e) => setValue(e.target.value)}

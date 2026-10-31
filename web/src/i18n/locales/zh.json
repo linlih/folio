@@ -374,7 +374,20 @@
   "tags": {
     "count": "{{blocks}} 个块，{{cards}} 张卡片",
     "empty": "还没有内容带这个标签",
-    "emptyHint": "在任意段落里写 #{{name}}，它就会出现在这里。"
+    "emptyHint": "在任意段落里写 #{{name}}，它就会出现在这里。",
+    "menu": "标签操作",
+    "rename": "重命名",
+    "merge": "合并到…",
+    "mergeInto": "把 #{{from}} 合并到：所有 #{{from}} 改成所选标签，字段并入它。",
+    "mergeConfirm": "#{{to}} 已经存在。合并后所有 #{{from}} 都改成 #{{to}}，同名的字段合成一个，其余字段并入 #{{to}}。",
+    "mergeDo": "合并",
+    "mergeNone": "还没有别的标签可以合并。",
+    "renaming": "正在修改…",
+    "renamed_one": "已把 {{count}} 处 #{{from}} 改成 #{{to}}",
+    "renamed_other": "已把 {{count}} 处 #{{from}} 改成 #{{to}}",
+    "merged_one": "已把 #{{from}} 合并到 #{{to}}（{{count}} 处）",
+    "merged_other": "已把 #{{from}} 合并到 #{{to}}（{{count}} 处）",
+    "badName": "标签名不能有空格或标点。"
   },
   "markdown": {
     "copy": "复制为 Markdown",

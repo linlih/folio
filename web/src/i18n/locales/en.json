@@ -374,7 +374,20 @@
   "tags": {
     "count": "{{blocks}} blocks in {{cards}} cards",
     "empty": "Nothing has this tag yet",
-    "emptyHint": "Write #{{name}} in any paragraph and it shows up here."
+    "emptyHint": "Write #{{name}} in any paragraph and it shows up here.",
+    "menu": "Tag actions",
+    "rename": "Rename",
+    "merge": "Merge into…",
+    "mergeInto": "Merge #{{from}} into: every #{{from}} becomes the chosen tag, and its fields join it.",
+    "mergeConfirm": "#{{to}} already exists. Merging changes every #{{from}} to #{{to}}; fields with the same name become one, the others join #{{to}}.",
+    "mergeDo": "Merge",
+    "mergeNone": "There is no other tag to merge into yet.",
+    "renaming": "Renaming…",
+    "renamed_one": "Changed {{count}} #{{from}} to #{{to}}",
+    "renamed_other": "Changed {{count}} #{{from}} to #{{to}}",
+    "merged_one": "Merged #{{from}} into #{{to}} ({{count}} place)",
+    "merged_other": "Merged #{{from}} into #{{to}} ({{count}} places)",
+    "badName": "A tag name has no spaces or punctuation."
   },
   "markdown": {
     "copy": "Copy as Markdown",

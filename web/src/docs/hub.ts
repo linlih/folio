@@ -1,6 +1,6 @@
 import { LoroDoc, UndoManager } from "loro-crdt";
 import type { Backend } from "../platform/backend";
-import { initCard, META_ORIGIN } from "./card";
+import { initCard, META_ORIGIN, TAG_RENAME_ORIGIN } from "./card";
 import { afterComposition, trackComposition } from "./composition";
 import { isJournalId } from "./ids";
 import { Persistence } from "./persistence";
@@ -129,6 +129,7 @@ export class DocHub {
     // step; typing merges within the window.
     const undo = new UndoManager(doc, { mergeInterval: board ? 0 : UNDO_MERGE_MS, maxUndoSteps: 500 });
     undo.addExcludeOriginPrefix(META_ORIGIN);
+    undo.addExcludeOriginPrefix(TAG_RENAME_ORIGIN);
     const persistence = new Persistence(id, doc, this.backend, {
       born,
       onError: this.onError,

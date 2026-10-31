@@ -314,6 +314,12 @@ fn take_shared(app: tauri::AppHandle) -> CmdResult<Option<String>> {
     }
 }
 
+/// Every document with the tag, journal days and trash included.
+#[tauri::command]
+fn tag_docs(state: tauri::State<AppState>, tag: String) -> CmdResult<Vec<String>> {
+    Ok(lock(&state)?.tag_docs(&tag)?)
+}
+
 /// The cards of a tag's database with their field values.
 #[tauri::command]
 fn tag_cards(state: tauri::State<AppState>, tag: String) -> CmdResult<Vec<folio_store::TagCard>> {
@@ -1215,6 +1221,7 @@ pub fn run() {
             take_shared,
             to_background,
             tag_cards,
+            tag_docs,
             topic_cards,
             topic_counts,
             card_topic_pairs,

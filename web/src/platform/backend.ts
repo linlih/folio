@@ -44,6 +44,8 @@ export interface Backend {
   takeShared(): Promise<string | null>;
   /** Android: leaves for the background, as Home does. */
   toBackground(): Promise<void>;
+  /** Every document with the tag: journal days and the trash too. */
+  tagDocs(tag: string): Promise<string[]>;
   /** The cards of a tag's database with their field values (§3). */
   tagCards(tag: string): Promise<TagCard[]>;
   /** Written journal days between two dates (inclusive), newest first. */

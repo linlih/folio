@@ -114,6 +114,13 @@ export function memoryBackend(now: () => number = Date.now): Backend {
     setInbox: async (id, inbox) => edit(id, (d) => setInbox(d, inbox ? now() : null)),
     takeShared: async () => null,
     toBackground: async () => {},
+    tagDocs: async (tag) => {
+      const key = tag.trim().toLowerCase();
+      return cards()
+        .filter(([, e]) => extractIndex(e.doc).tags.some(([, name]) => name.trim().toLowerCase() === key))
+        .map(([id]) => id)
+        .sort();
+    },
     tagCards: async (tag) => {
       const key = tag.trim().toLowerCase();
       return live()

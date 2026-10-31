@@ -781,6 +781,14 @@ impl Store {
         Ok(rows.collect::<std::result::Result<_, _>>()?)
     }
 
+    /// Every document with the tag: cards and journal days, in the trash
+    /// too (renaming a tag reaches them all).
+    pub fn tag_docs(&self, tag: &str) -> Result<Vec<String>> {
+        let mut stmt = self.conn.prepare_cached("SELECT DISTINCT card_id FROM idx.tags WHERE tag = ?1 ORDER BY card_id")?;
+        let rows = stmt.query_map([tag_key(tag)], |r| r.get(0))?;
+        Ok(rows.collect::<std::result::Result<_, _>>()?)
+    }
+
     /// Cards in the trash, most recently trashed first.
     pub fn list_trash(&self, limit: u32) -> Result<Vec<CardRow>> {
         self.query_cards(
@@ -1681,6 +1689,21 @@ mod tests {
         assert_eq!(todo, vec![(b.to_string(), "b1".to_owned(), "tag".to_owned()), (a.to_string(), "a1".to_owned(), "tag".to_owned())]);
         // Tags are part of the block's text, so search finds them too.
         assert!(s.search("#会议", 10).unwrap().iter().any(|h| h.bid.as_deref() == Some("a1")));
+    }
+
+    #[test]
+    fn renaming_a_tag_reaches_every_document_with_it() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut s = Store::open(dir.path()).unwrap();
+        let a = write_tagged(&mut s, "周会", &[("a1", "讨论 ", &["会议"]), ("a2", "又一条 ", &["会议"])], 1);
+        let trashed = write_tagged(&mut s, "Old", &[("c1", "gone ", &["會議", "会议"])], 3);
+        s.trash_card(&trashed, 4).unwrap();
+        write_tagged(&mut s, "Other", &[("d1", "x ", &["别的"])], 5);
+        let mut want = vec![a.to_string(), trashed.to_string()];
+        want.sort();
+        // Once per document, the trash included, any spelling of the case.
+        assert_eq!(s.tag_docs("会议").unwrap(), want);
+        assert!(s.tag_docs("none").unwrap().is_empty());
     }
 
     #[test]

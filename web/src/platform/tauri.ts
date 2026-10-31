@@ -78,6 +78,7 @@ export function tauriBackend(): Backend {
     takeShared: () => invoke<string | null>("take_shared"),
     toBackground: () => invoke<void>("to_background"),
     tagCards: (tag) => invoke<TagCard[]>("tag_cards", { tag }),
+    tagDocs: (tag) => invoke<string[]>("tag_docs", { tag }),
     syncStatus: () => invoke<SyncStatus>("sync_status"),
     syncCreate: (server, token, passphrase) => invoke<SyncStatus>("sync_create", { server, token, passphrase }),
     syncJoin: (code, passphrase) => invoke<SyncStatus>("sync_join", { code, passphrase }),
