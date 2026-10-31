@@ -20,6 +20,8 @@
    page, and clicking its empty part writes at the end (Logseq). */
 .journal-body { cursor: text; min-height: 2em; }
 .journal-day.today .journal-body { min-height: max(240px, 45vh); }
+/* With tasks due listed under it, they stay in sight. */
+.journal-day.today:has(.today-tasks) .journal-body { min-height: 120px; }
 
 .journal-static { cursor: text; min-height: 1.6em; border-radius: var(--radius); }
 .journal-static:hover { background: color-mix(in srgb, var(--ink) 2.5%, transparent); }

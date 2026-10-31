@@ -866,6 +866,28 @@
       "week": "接下来 7 天",
       "later": "以后",
       "undated": "没有日期"
+    },
+    "calendar": "日历",
+    "move": "改日期",
+    "dayEmpty": "这天没有任务",
+    "undatedHint": "把任务拖到日历上的某一天，或用“改日期”给它一个日期。",
+    "undatedHintTouch": "用“改日期”给任务一个日期。",
+    "dueToday": "今天到期",
+    "late_one": "{{count}} 项已过期",
+    "late_other": "{{count}} 项已过期",
+    "count_one": "{{count}} 项任务",
+    "count_other": "{{count}} 项任务",
+    "view": {
+      "week": "周",
+      "month": "月"
+    },
+    "prev": {
+      "week": "上一周",
+      "month": "上个月"
+    },
+    "next": {
+      "week": "下一周",
+      "month": "下个月"
     }
   },
   "table": {

@@ -1,4 +1,5 @@
 import { Menu } from "@base-ui/react/menu";
+import { TodayTasks } from "./TodayTasks";
 import { usePullToSearch } from "../shell/pullSearch";
 import { usePhone } from "../shell/phone";
 import { MoreHorizontal, Search } from "lucide-react";
@@ -230,6 +231,7 @@ export function JournalView() {
                 emptyLabel={t("journal.empty")}
               />
             )}
+            {date === today && <TodayTasks today={today} />}
           </section>
         );
       })}

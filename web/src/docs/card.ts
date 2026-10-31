@@ -431,10 +431,9 @@ export function renameTagIn(doc: LoroDoc, from: string, to: string): number {
  *  open editors show it, and it does not join their undo. */
 export const TASK_ORIGIN = `${APP_EDIT_ORIGIN}task`;
 
-/** Marks the task item `bid` done, or open again (todo), as the editor's
- *  status menu does: `checked`, and no other status. Answers whether it
- *  found it; the caller commits with TASK_ORIGIN. */
-export function setTaskDone(doc: LoroDoc, bid: string, done: boolean): boolean {
+/** Sets attributes of the task item `bid` (its status, dates); null clears
+ *  one. Answers whether it found it; the caller commits with TASK_ORIGIN. */
+export function setTaskAttrs(doc: LoroDoc, bid: string, values: Record<string, string | boolean | null>): boolean {
   const find = (nodes: LoroTreeNode[] | undefined): LoroMap | null => {
     for (const node of nodes ?? []) {
       const attrs = node.data.get("attributes");
@@ -446,10 +445,13 @@ export function setTaskDone(doc: LoroDoc, bid: string, done: boolean): boolean {
   };
   const attrs = find(bodyTree(doc).roots());
   if (!attrs) return false;
-  attrs.set("checked", done);
-  attrs.set("status", null);
+  for (const [k, v] of Object.entries(values)) attrs.set(k, v);
   return true;
 }
+
+/** Marks the task item `bid` done, or open again (todo), as the editor's
+ *  status menu does: `checked`, and no other status. */
+export const setTaskDone = (doc: LoroDoc, bid: string, done: boolean) => setTaskAttrs(doc, bid, { checked: done, status: null });
 
 /** Appends one block per line: paragraphs in a document card, items of the
  *  last top-level list in an outline (journal). `source` marks blocks not

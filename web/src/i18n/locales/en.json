@@ -866,6 +866,28 @@
       "week": "Next 7 days",
       "later": "Later",
       "undated": "No date"
+    },
+    "calendar": "Calendar",
+    "move": "Change date",
+    "dayEmpty": "Nothing due this day",
+    "undatedHint": "Drag a task onto a day of the calendar, or give it a date with “Change date”.",
+    "undatedHintTouch": "Give a task a date with “Change date”.",
+    "dueToday": "Due today",
+    "late_one": "{{count}} overdue",
+    "late_other": "{{count}} overdue",
+    "count_one": "{{count}} task",
+    "count_other": "{{count}} tasks",
+    "view": {
+      "week": "Week",
+      "month": "Month"
+    },
+    "prev": {
+      "week": "Previous week",
+      "month": "Previous month"
+    },
+    "next": {
+      "week": "Next week",
+      "month": "Next month"
     }
   },
   "table": {
