@@ -6,6 +6,7 @@ import { create } from "zustand";
 import i18n from "../i18n";
 import { CARDS_CHANGED, cardsChanged } from "../card/actions";
 import { backend } from "../platform";
+import { layoutRestored } from "../shell/layout";
 import { useShell } from "../shell/tabs";
 
 /** The first web link in a piece of text, and the text around it. Share
@@ -93,6 +94,8 @@ export function receiveShares() {
     try {
       const text = await backend.takeShared();
       if (!text) return;
+      // At a cold start, after the saved tabs are back (or 3 s at most).
+      await Promise.race([layoutRestored(), new Promise((r) => setTimeout(r, 3000))]);
       const shell = useShell.getState();
       shell.open({ kind: "inbox" });
       try {

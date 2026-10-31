@@ -32,6 +32,15 @@ async function live(layout: SavedLayout): Promise<SavedLayout> {
   return { ...layout, panes };
 }
 
+let markRestored: () => void = () => {};
+const restoredOnce = new Promise<void>((resolve) => (markRestored = resolve));
+
+/** Resolves once the startup layout is back, so a page opened at startup
+ * (a share on Android) is not replaced by the restored tabs. */
+export function layoutRestored(): Promise<void> {
+  return restoredOnce;
+}
+
 export function useLayoutPersistence() {
   useEffect(() => {
     let restored = false;
@@ -51,6 +60,7 @@ export function useLayoutPersistence() {
       .catch(() => {})
       .finally(() => {
         restored = true;
+        markRestored();
       });
 
     // Saved after restoring, so the startup layout never overwrites it.
