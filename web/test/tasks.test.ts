@@ -2,13 +2,16 @@
 import { Editor } from "@tiptap/core";
 import { UndoManager } from "loro-crdt";
 import { describe, expect, it } from "vitest";
-import { initCard } from "../src/docs/card";
+import type { TaskRow } from "../src/bindings/commands";
+import { initCard, setTaskDone, TASK_ORIGIN } from "../src/docs/card";
+import { extractIndex } from "../src/docs/index";
 import { isRemoteTx, LoroBinding } from "../src/editor/binding";
 import { baseExtensions } from "../src/editor/extensions";
 import { _slashChoices } from "../src/editor/outliner/suggest";
 import { makeTask, setTaskState, taskState } from "../src/editor/outliner/tasks";
 import { itemAt } from "../src/editor/outliner/tree";
 import { STATUSES } from "../src/editor/outliner/statusIcons";
+import { groupTasks } from "../src/tasks/group";
 import { bind, caret, cursorAfter, cursorBefore, device, outline, press, settle, typeText } from "./helpers";
 
 async function journal(html: string) {
@@ -236,3 +239,61 @@ function makeTaskAt(e: Editor, text: string) {
   cursorAfter(e, text);
   return makeTask(e.state, "todo")!;
 }
+
+describe("the task list", () => {
+  const task = (over: Partial<TaskRow>): TaskRow => ({ cardId: "c", cardTitle: "", cardKind: "note", bid: over.text ?? "", text: "", status: "todo", priority: null, deadline: null, scheduled: null, updatedAt: 0, ...over });
+
+  it("reads tasks as the editor writes them, and finishes one from outside the editor", async () => {
+    const loro = device(1n);
+    initCard(loro, "journal", "", 1);
+    const { editor: e } = await bind(loro);
+    e.commands.setContent("<ul><li><p>a</p></li><li><p>b</p></li><li><p>plain</p></li></ul>");
+    await settle();
+    let tr = e.state.tr;
+    setTaskState(tr, at(e, "a"), "doing");
+    e.view.dispatch(tr);
+    tr = e.state.tr;
+    const b = at(e, "b");
+    setTaskState(tr, b, "todo");
+    e.view.dispatch(tr);
+    tr = e.state.tr;
+    const b2 = at(e, "b");
+    tr.setNodeMarkup(b2.pos, undefined, { ...b2.node.attrs, priority: "high", deadline: "2026-11-01" });
+    e.view.dispatch(tr);
+    await settle();
+    const tasks = extractIndex(loro).blocks.filter((x) => x.task).map((x) => [x.text, x.task]);
+    expect(tasks).toEqual([
+      ["a", { status: "doing", priority: null, deadline: null, scheduled: null }],
+      ["b", { status: "todo", priority: "high", deadline: "2026-11-01", scheduled: null }],
+    ]);
+
+    // Finished from the list: the open editor shows it, struck through.
+    const bid = at(e, "b").node.attrs.bid as string;
+    expect(setTaskDone(loro, bid, true)).toBe(true);
+    loro.commit({ origin: TASK_ORIGIN });
+    await settle();
+    expect(taskState(at(e, "b"))).toBe("done");
+    expect(at(e, "b").node.attrs.priority).toBe("high");
+    expect(setTaskDone(loro, "no-such-block", true)).toBe(false);
+  });
+
+  it("puts open tasks under when they are due, soonest and most urgent first", () => {
+    const today = "2026-10-31";
+    const rows = [
+      task({ text: "someday" }),
+      task({ text: "late", deadline: "2026-10-20" }),
+      task({ text: "now", scheduled: today }),
+      task({ text: "now urgent", scheduled: today, priority: "urgent" }),
+      task({ text: "soon", deadline: "2026-11-07" }),
+      task({ text: "far", deadline: "2026-11-08" }),
+      task({ text: "deadline wins", deadline: "2026-12-01", scheduled: "2026-10-01" }),
+    ];
+    expect(groupTasks(rows, today).map(([g, list]) => [g, list.map((r) => r.text)])).toEqual([
+      ["overdue", ["late"]],
+      ["today", ["now urgent", "now"]],
+      ["week", ["soon"]],
+      ["later", ["far", "deadline wins"]],
+      ["undated", ["someday"]],
+    ]);
+  });
+});

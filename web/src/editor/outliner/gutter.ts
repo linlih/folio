@@ -114,7 +114,7 @@ function gutter(view: EditorView, getPos: () => number | undefined, spec: Gutter
   return el;
 }
 
-const dateLabel = (date: string) => {
+export const dateLabel = (date: string) => {
   const [y, m, d] = date.split("-").map(Number);
   return new Intl.DateTimeFormat(i18n.language, { month: "short", day: "numeric" }).format(new Date(y, m - 1, d));
 };

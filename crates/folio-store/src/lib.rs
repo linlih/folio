@@ -247,6 +247,23 @@ fn like(q: &str) -> String {
     format!("%{}%", q.replace('\\', "\\\\").replace('%', "\\%").replace('_', "\\_"))
 }
 
+/// A task somewhere in the library (the task list, web/src/tasks).
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TaskRow {
+    pub card_id: String,
+    pub card_title: String,
+    pub card_kind: String,
+    pub bid: String,
+    pub text: String,
+    /// todo, doing, done, backlog, review or canceled.
+    pub status: String,
+    pub priority: Option<String>,
+    pub deadline: Option<String>,
+    pub scheduled: Option<String>,
+    pub updated_at: i64,
+}
+
 /// A journal day that has content, for the read-only part of the journal stream.
 #[derive(Clone, Debug, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -810,6 +827,34 @@ impl Store {
         )
     }
 
+    /// Tasks not in the trash: the open ones (todo, doing, backlog, review),
+    /// or with `closed` the done and canceled ones, most recently changed
+    /// cards first, at most `limit`.
+    pub fn tasks(&self, closed: bool, limit: u32) -> Result<Vec<TaskRow>> {
+        let which = if closed { "IN ('done', 'canceled')" } else { "NOT IN ('done', 'canceled')" };
+        let mut stmt = self.conn.prepare_cached(&format!(
+            "SELECT b.card_id, c.title, c.kind, b.bid, b.text, b.task_status, b.priority, b.deadline, b.scheduled, c.updated_at
+             FROM idx.blocks b JOIN idx.cards c ON c.card_id = b.card_id
+             WHERE b.task_status {which} AND c.deleted_at IS NULL
+             ORDER BY c.updated_at DESC, b.card_id, b.ord LIMIT ?1"
+        ))?;
+        let rows = stmt.query_map(params![limit], |r| {
+            Ok(TaskRow {
+                card_id: r.get(0)?,
+                card_title: r.get::<_, Option<String>>(1)?.unwrap_or_default(),
+                card_kind: r.get::<_, Option<String>>(2)?.unwrap_or_default(),
+                bid: r.get(3)?,
+                text: r.get::<_, Option<String>>(4)?.unwrap_or_default(),
+                status: r.get(5)?,
+                priority: r.get(6)?,
+                deadline: r.get(7)?,
+                scheduled: r.get(8)?,
+                updated_at: r.get(9)?,
+            })
+        })?;
+        Ok(rows.collect::<std::result::Result<_, _>>()?)
+    }
+
     /// Journal days between two dates (inclusive, `YYYY-MM-DD`) that have a
     /// document, newest first, with their text for read-only display.
     pub fn journal_days(&self, from: &str, to: &str) -> Result<Vec<JournalDay>> {
@@ -1277,8 +1322,20 @@ impl Store {
         }
         for b in &x.blocks {
             tx.execute(
-                "INSERT OR REPLACE INTO idx.blocks(bid, card_id, parent_bid, ord, text, type) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-                params![b.bid, id.as_str(), b.parent, b.ord, b.text, b.kind],
+                "INSERT OR REPLACE INTO idx.blocks(bid, card_id, parent_bid, ord, text, type, task_status, priority, deadline, scheduled)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+                params![
+                    b.bid,
+                    id.as_str(),
+                    b.parent,
+                    b.ord,
+                    b.text,
+                    b.kind,
+                    b.task.as_ref().map(|t| &t.status),
+                    b.task.as_ref().and_then(|t| t.priority.as_ref()),
+                    b.task.as_ref().and_then(|t| t.deadline.as_ref()),
+                    b.task.as_ref().and_then(|t| t.scheduled.as_ref())
+                ],
             )?;
             if !b.text.is_empty() {
                 tx.execute("INSERT INTO idx.fts(card_id, bid, text) VALUES (?1, ?2, ?3)", params![id.as_str(), b.bid, b.text])?;
@@ -1547,6 +1604,38 @@ mod tests {
         assert_eq!(ids(&s), [a.to_string()]);
         s.pin_card(&a, false, 5).unwrap();
         assert!(ids(&s).is_empty());
+    }
+
+    #[test]
+    fn tasks_are_listed_open_or_closed_without_the_trash() {
+        use folio_core::body::{add_block, push_text};
+        use loro::LoroValue;
+        let dir = tempfile::tempdir().unwrap();
+        let mut s = Store::open(dir.path()).unwrap();
+        let task = |s: &mut Store, title: &str, items: &[(&str, Option<&str>, bool)]| {
+            let id = s.create_card(CardKind::Note, title, 1).unwrap();
+            s.edit(&id, DocKind::Card, 2, |doc| {
+                let list = add_block(doc, None, "taskList", &[])?;
+                for (i, (text, status, checked)) in items.iter().enumerate() {
+                    let mut attrs = vec![("bid", LoroValue::from(format!("{title}-{i}"))), ("checked", LoroValue::from(*checked))];
+                    if let Some(st) = status {
+                        attrs.push(("status", LoroValue::from(*st)));
+                    }
+                    let item = add_block(doc, Some(list), "taskItem", &attrs)?;
+                    push_text(doc, add_block(doc, Some(item), "paragraph", &[])?, text)?;
+                }
+                Ok(())
+            })
+            .unwrap();
+            id
+        };
+        task(&mut s, "a", &[("买书", None, false), ("读完", None, true), ("写读后感", Some("doing"), false)]);
+        let gone = task(&mut s, "b", &[("在回收站里", None, false)]);
+        s.trash_card(&gone, 3).unwrap();
+        let open: Vec<_> = s.tasks(false, 100).unwrap().into_iter().map(|t| (t.text, t.status)).collect();
+        assert_eq!(open, [("买书".to_owned(), "todo".to_owned()), ("写读后感".to_owned(), "doing".to_owned())]);
+        let closed: Vec<_> = s.tasks(true, 100).unwrap().into_iter().map(|t| (t.card_title, t.text)).collect();
+        assert_eq!(closed, [("a".to_owned(), "读完".to_owned())]);
     }
 
     #[test]

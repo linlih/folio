@@ -1,5 +1,5 @@
 import { LoroDoc } from "loro-crdt";
-import type { AssetEvent, BackupInfo, Backlink, CardRow, ChildBlock, JournalDay, SearchHit } from "../bindings/commands";
+import type { AssetEvent, BackupInfo, Backlink, CardRow, ChildBlock, JournalDay, SearchHit, TaskRow } from "../bindings/commands";
 import { appendBlocks, bodyLines, dayLines, initCard, preview, readCardTopics, readMeta, readProps, setClip, setDeleted, setInbox, setPinned } from "../docs/card";
 import { isJournalId, journalDate, localDate, uuidv7 } from "../docs/ids";
 import { extractIndex } from "../docs/index";
@@ -153,6 +153,17 @@ export function memoryBackend(now: () => number = Date.now): Backend {
         .sort(([, a], [, b]) => (readMeta(b.doc).deletedAt ?? 0) - (readMeta(a.doc).deletedAt ?? 0))
         .slice(0, limit)
         .map(([id, e]) => row(id, e)),
+    tasks: async (closed, limit = 500) => {
+      const out: TaskRow[] = [];
+      for (const [cid, e] of [...live()].sort((a, b) => b[1].updatedAt - a[1].updatedAt)) {
+        const m = readMeta(e.doc);
+        for (const b of extractIndex(e.doc).blocks) {
+          if (!b.task || ["done", "canceled"].includes(b.task.status) !== closed) continue;
+          out.push({ cardId: cid, cardTitle: m.title, cardKind: m.kind, bid: b.bid, text: b.text, ...b.task, updatedAt: e.updatedAt });
+        }
+      }
+      return out.slice(0, limit);
+    },
     journalDays: async (from, to) => {
       const days: JournalDay[] = [];
       for (const [id, e] of docs) {

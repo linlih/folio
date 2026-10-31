@@ -2,7 +2,7 @@ import { Channel, convertFileSrc, invoke } from "@tauri-apps/api/core";
 import type { AppInfo, AssetInfo, BackupInfo, Backlink, BlockText, CardRow, JournalDay, McpStatus, SearchHit, SyncDevice, SyncStatus, TagInfo, TopicCount, CardText } from "../bindings/commands";
 import type { Backend, ExportResult } from "./backend";
 import type { LatestRelease, LibraryLocation, PickedFolder } from "../bindings/commands";
-import type { InboxItem, LinkPreview, TagCard } from "../bindings/commands";
+import type { InboxItem, LinkPreview, TagCard, TaskRow } from "../bindings/commands";
 
 const ANDROID = typeof navigator !== "undefined" && /Android/i.test(navigator.userAgent);
 
@@ -25,6 +25,7 @@ export function tauriBackend(): Backend {
     trashCard: (id) => invoke<void>("trash_card", { id }),
     restoreCard: (id) => invoke<void>("restore_card", { id }),
     listTrash: (limit) => invoke<CardRow[]>("list_trash", { limit }),
+    tasks: (closed, limit) => invoke<TaskRow[]>("tasks", { closed, limit }),
     emptyTrash: () => invoke<string[]>("empty_trash"),
     journalDays: (from, to) => invoke<JournalDay[]>("journal_days", { from, to }),
     backlinks: (id) => invoke<Backlink[]>("backlinks", { id }),

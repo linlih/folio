@@ -9,6 +9,7 @@ import { SearchPalette } from "../search/SearchPalette";
 import { ShellDialogs } from "./ShellDialogs";
 import { useMcpApprovals } from "../mcp/McpDialogs";
 import { handleGlobalKey } from "./shortcuts";
+import { TasksView } from "../tasks/TasksView";
 import { TrashView } from "../trash/TrashView";
 import { InboxView } from "../inbox/InboxView";
 import { TagView } from "../tags/TagView";
@@ -38,6 +39,8 @@ function View({ tab, pane, active }: { tab: Tab; pane: string; active: boolean }
       return <TrashView />;
     case "inbox":
       return <InboxView active={active} />;
+    case "tasks":
+      return <TasksView active={active} />;
     case "card":
       return <CardView cardId={tab.target.cardId} pane={pane} active={active} />;
     case "tag":

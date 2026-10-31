@@ -58,7 +58,7 @@ pub fn has_pending_migrations(conn: &Connection) -> rusqlite::Result<bool> {
 }
 
 /// Bump whenever `INDEX_TABLES` changes.
-const INDEX_VERSION: i64 = 10;
+const INDEX_VERSION: i64 = 11;
 
 const INDEX_TABLES: &str = "
   CREATE TABLE idx.cards (
@@ -76,8 +76,11 @@ const INDEX_TABLES: &str = "
   CREATE INDEX idx.cards_by_updated ON cards(updated_at);
   CREATE TABLE idx.blocks (
     bid TEXT, card_id TEXT, parent_bid TEXT, ord INTEGER, text TEXT, type TEXT,
+    -- A task's state (todo, doing, done, …), priority and YYYY-MM-DD dates.
+    task_status TEXT, priority TEXT, deadline TEXT, scheduled TEXT,
     PRIMARY KEY (card_id, bid)
   );
+  CREATE INDEX idx.blocks_by_task ON blocks(task_status) WHERE task_status IS NOT NULL;
   CREATE INDEX idx.blocks_by_bid ON blocks(bid);
   -- [[card]] links: which block of which card links to which card.
   CREATE TABLE idx.links (from_card TEXT, from_bid TEXT, to_card TEXT);

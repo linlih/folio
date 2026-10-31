@@ -19,7 +19,8 @@
     "pin": "置顶",
     "unpin": "取消置顶",
     "topics": "主题",
-    "inbox": "收集箱"
+    "inbox": "收集箱",
+    "tasks": "任务"
   },
   "library": {
     "title": "卡片库",
@@ -558,7 +559,8 @@
     "backupDone": "已备份",
     "newBoard": "新建白板",
     "boards": "打开白板列表",
-    "inbox": "打开收集箱"
+    "inbox": "打开收集箱",
+    "tasks": "打开任务"
   },
   "topics": {
     "add": "添加到主题",
@@ -845,5 +847,22 @@
     "undated": "更早（没有记录时间）",
     "restore": "恢复到这个版本",
     "restored": "已恢复到 {{when}} 的版本（{{undo}} 撤销）"
+  },
+  "tasks": {
+    "title": "任务",
+    "open": "未完成",
+    "closed": "已完成",
+    "finish": "标记完成",
+    "reopen": "重新打开",
+    "none": "没有未完成的任务",
+    "noneHint": "在任何卡片或日记里，用 [ ] 开头或 Mod+Enter 把一行变成待办，它就会出现在这里。",
+    "noneClosed": "还没有完成的任务",
+    "group": {
+      "overdue": "已过期",
+      "today": "今天",
+      "week": "接下来 7 天",
+      "later": "以后",
+      "undated": "没有日期"
+    }
   }
 }

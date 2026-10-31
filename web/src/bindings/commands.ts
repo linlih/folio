@@ -141,6 +141,22 @@ export interface ChildBlock {
   text: string;
 }
 
+/** A task item somewhere in the library (folio-store's `tasks`). */
+export interface TaskRow {
+  cardId: string;
+  cardTitle: string;
+  cardKind: string;
+  bid: string;
+  text: string;
+  /** todo, doing, done, backlog, review or canceled. */
+  status: string;
+  priority: string | null;
+  /** YYYY-MM-DD */
+  deadline: string | null;
+  scheduled: string | null;
+  updatedAt: number;
+}
+
 export interface SearchHit {
   cardId: string;
   cardTitle: string;

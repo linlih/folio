@@ -49,3 +49,22 @@ fn lines_find_the_links_the_editor_wrote() {
     let text: Vec<String> = all.iter().map(|l| format!("{}{}", "\t".repeat(l.depth), l.parts.iter().map(|p| p.text.as_str()).collect::<String>())).collect();
     assert_eq!(text.join("\n"), summarize(&doc).text, "same lines as the text");
 }
+
+/// Tasks as the editor writes them: done is `checked`, other states
+/// `status`, with priority and dates beside them.
+#[test]
+fn tasks_are_read_as_the_editor_wrote_them() {
+    use folio_core::index::{extract, Task};
+    let doc = load(include_bytes!("../../folio-io/tests/fixtures/card-rich.loro"));
+    let tasks: Vec<(String, Task)> = extract(&doc).blocks.into_iter().filter_map(|b| b.task.map(|t| (b.text, t))).collect();
+    let task = |status: &str| Task { status: status.into(), ..Default::default() };
+    assert_eq!(
+        tasks,
+        vec![
+            ("todo".into(), task("todo")),
+            ("doing".into(), Task { priority: Some("high".into()), deadline: Some("2026-11-01".into()), ..task("doing") }),
+            ("done".into(), task("done")),
+            ("canceled".into(), task("canceled")),
+        ]
+    );
+}

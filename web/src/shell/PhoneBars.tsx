@@ -91,6 +91,11 @@ export function PhoneTopBar({ pane }: { pane: Pane }) {
       {/* A whiteboard and a topic show their own names, on the page. */}
       <span className="phone-title">{root || inTopic || tab.target.kind === "board" ? "" : label(tab)}</span>
       {root && (
+        <button className="icon-button" aria-label={t("nav.tasks")} title={t("nav.tasks")} onClick={() => useShell.getState().open({ kind: "tasks" })}>
+          <SquareCheck size={18} />
+        </button>
+      )}
+      {root && (
         <button className="icon-button" aria-label={t("settings.title")} title={t("settings.title")} onClick={() => setDialog({ kind: "settings" })}>
           <Settings size={18} />
         </button>

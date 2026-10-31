@@ -23,6 +23,30 @@ pub struct Block {
     /// Node type: listItem, taskItem, paragraph, heading, codeBlock, …
     pub kind: String,
     pub text: String,
+    /// A task's state, priority and dates (a `taskItem`).
+    pub task: Option<Task>,
+}
+
+/// A task as its item holds it (web/src/editor/outliner/tasks.ts).
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Task {
+    /// todo, doing, done, backlog, review or canceled.
+    pub status: String,
+    /// high, medium or low.
+    pub priority: Option<String>,
+    /// `YYYY-MM-DD`
+    pub deadline: Option<String>,
+    pub scheduled: Option<String>,
+}
+
+fn task_of(node: &LoroValue) -> Option<Task> {
+    if name(node) != "taskItem" {
+        return None;
+    }
+    let LoroValue::Map(m) = node else { return None };
+    let checked = matches!(m.get(ATTRIBUTES), Some(LoroValue::Map(a)) if matches!(a.get("checked"), Some(LoroValue::Bool(true))));
+    let status = if checked { "done".to_owned() } else { attr(node, "status").unwrap_or_else(|| "todo".to_owned()) };
+    Some(Task { status, priority: attr(node, "priority"), deadline: attr(node, "deadline"), scheduled: attr(node, "scheduled") })
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -142,7 +166,7 @@ fn walk(nodes: &[LoroValue], parent: Option<&str>, out: &mut Extract) {
                 }
             }
             if !bid.is_empty() {
-                out.blocks.push(Block { bid: bid.clone(), parent: parent.map(str::to_owned), ord, kind: kind.to_owned(), text });
+                out.blocks.push(Block { bid: bid.clone(), parent: parent.map(str::to_owned), ord, kind: kind.to_owned(), text, task: task_of(node) });
                 ord += 1;
             }
             walk(&nested, if bid.is_empty() { parent } else { Some(&bid) }, out);
@@ -150,7 +174,7 @@ fn walk(nodes: &[LoroValue], parent: Option<&str>, out: &mut Extract) {
             let bid = attr(node, "bid").unwrap_or_default();
             let text = inline_text(node, &bid, out);
             if !bid.is_empty() {
-                out.blocks.push(Block { bid, parent: parent.map(str::to_owned), ord, kind: kind.to_owned(), text });
+                out.blocks.push(Block { bid, parent: parent.map(str::to_owned), ord, kind: kind.to_owned(), text, task: None });
                 ord += 1;
             }
         } else if kind == "blockquote" {

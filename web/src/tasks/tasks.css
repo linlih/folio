@@ -1,0 +1,24 @@
+/* The task list (tasks/TasksView.tsx). */
+.tasks-switch { display: flex; margin-left: auto; align-self: center; padding: 2px; border-radius: 8px; background: var(--hover); }
+.tasks-switch button { padding: 3px 12px; border-radius: 6px; font: 13px/1.5 var(--font-ui); color: var(--secondary); }
+.tasks-switch button[aria-selected="true"] { background: var(--paper); color: var(--text); box-shadow: 0 0 0 1px var(--border); }
+
+.task-group { margin-bottom: 24px; }
+.task-group h2 { display: flex; align-items: baseline; gap: 8px; margin: 0 0 4px; font: 600 13px/1.6 var(--font-ui); color: var(--secondary); }
+.task-group[data-group="overdue"] h2 { color: #b5523f; }
+.task-count { font-weight: 400; color: var(--muted); }
+
+.task-list { list-style: none; margin: 0; padding: 0; }
+.task-row { display: flex; align-items: flex-start; gap: 4px; border-radius: 6px; }
+.task-row:hover { background: var(--hover); }
+.task-status { flex: none; width: 30px; height: 30px; margin-top: 2px; font-size: 16px; }
+.task-status svg { width: 1em; height: 1em; }
+.task-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; padding: 6px 8px 6px 0; text-align: left; }
+.task-text { font: 15px/1.45 var(--font-body); color: var(--text); overflow-wrap: anywhere; }
+.task-row[data-closed] .task-text { color: var(--muted); text-decoration: line-through; }
+.task-priority { display: inline-grid; place-items: center; vertical-align: -0.12em; margin-right: 0.3em; }
+.task-priority svg { width: 1em; height: 1em; }
+.task-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 0; font: 12px/1.6 var(--font-ui); color: var(--muted); }
+.task-card { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+.task-meta .ol-date { font-size: 11px; vertical-align: baseline; }
+.task-meta .ol-date.deadline:not([data-overdue]) { color: var(--secondary); background: var(--hover); }

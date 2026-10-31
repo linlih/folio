@@ -21,6 +21,8 @@ export function useTabLabel() {
         return t("trash.title");
       case "inbox":
         return t("inbox.title");
+      case "tasks":
+        return t("tasks.title");
       case "card":
         return tab.title || t("library.untitled");
       case "tag":

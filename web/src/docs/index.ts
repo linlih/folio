@@ -10,6 +10,16 @@ export interface IndexBlock {
   parent: string | null;
   kind: string;
   text: string;
+  /** Set on task items (folio-core's `task_of`). */
+  task?: IndexTask;
+}
+
+export interface IndexTask {
+  /** "done" when checked, else the status attribute or "todo". */
+  status: string;
+  priority: string | null;
+  deadline: string | null;
+  scheduled: string | null;
 }
 
 export interface IndexExtract {
@@ -51,6 +61,15 @@ function inline(node: Json, block: string, out: IndexExtract): string {
   return s;
 }
 
+function taskOf(n: Json): IndexTask {
+  const str = (name: string) => {
+    const v = typeof n === "string" ? null : n.attributes?.[name];
+    return typeof v === "string" && v ? v : null;
+  };
+  const checked = typeof n !== "string" && n.attributes?.checked === true;
+  return { status: checked ? "done" : (str("status") ?? "todo"), priority: str("priority"), deadline: str("deadline"), scheduled: str("scheduled") };
+}
+
 function walk(nodes: Json[], parent: string | null, out: IndexExtract) {
   for (const n of nodes) {
     if (typeof n === "string") continue;
@@ -68,7 +87,7 @@ function walk(nodes: Json[], parent: string | null, out: IndexExtract) {
           if (t) texts.push(t);
         }
       }
-      if (bid) out.blocks.push({ bid, parent, kind, text: texts.join(" ") });
+      if (bid) out.blocks.push({ bid, parent, kind, text: texts.join(" "), ...(kind === "taskItem" ? { task: taskOf(n) } : {}) });
       walk(nested, bid || parent, out);
     } else if (TEXTBLOCKS.has(kind)) {
       const bid = attr(n, "bid");

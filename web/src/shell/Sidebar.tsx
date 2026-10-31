@@ -1,5 +1,5 @@
 import { Menu } from "@base-ui/react/menu";
-import { CalendarDays, ChevronRight, FileText, Layers, LayoutDashboard, Plus, Hash, LibraryBig, MoreHorizontal, PanelLeftClose, PanelLeftOpen, Search, SquarePen, Trash2, Inbox } from "lucide-react";
+import { CalendarDays, ChevronRight, FileText, Layers, LayoutDashboard, Plus, Hash, LibraryBig, MoreHorizontal, PanelLeftClose, PanelLeftOpen, Search, SquarePen, SquareCheck, Trash2, Inbox } from "lucide-react";
 import { useInboxCount } from "../inbox/clip";
 import { useEffect, useState, type ReactNode } from "react";
 import type { TagInfo } from "../bindings/commands";
@@ -164,6 +164,7 @@ export function Sidebar() {
         <LibraryBig size={15} strokeWidth={1.75} />
         <span>{t("nav.library")}</span>
       </button>
+      {navItem({ kind: "tasks" }, <SquareCheck size={15} strokeWidth={1.75} />, t("nav.tasks"))}
       {navItem({ kind: "boards" }, <LayoutDashboard size={15} strokeWidth={1.75} />, t("nav.boards"))}
 
       <div className="nav-scroll">

@@ -410,6 +410,30 @@ export function renameTagIn(doc: LoroDoc, from: string, to: string): number {
   return changed;
 }
 
+/** A task finished or reopened from outside its editor (the task list):
+ *  open editors show it, and it does not join their undo. */
+export const TASK_ORIGIN = `${APP_EDIT_ORIGIN}task`;
+
+/** Marks the task item `bid` done, or open again (todo), as the editor's
+ *  status menu does: `checked`, and no other status. Answers whether it
+ *  found it; the caller commits with TASK_ORIGIN. */
+export function setTaskDone(doc: LoroDoc, bid: string, done: boolean): boolean {
+  const find = (nodes: LoroTreeNode[] | undefined): LoroMap | null => {
+    for (const node of nodes ?? []) {
+      const attrs = node.data.get("attributes");
+      if (node.data.get("nodeName") === "taskItem" && attrs instanceof LoroMap && attrs.get("bid") === bid) return attrs;
+      const found = find(node.children());
+      if (found) return found;
+    }
+    return null;
+  };
+  const attrs = find(bodyTree(doc).roots());
+  if (!attrs) return false;
+  attrs.set("checked", done);
+  attrs.set("status", null);
+  return true;
+}
+
 /** Appends one block per line: paragraphs in a document card, items of the
  *  last top-level list in an outline (journal). `source` marks blocks not
  *  written by a person (§0.3). Returns nothing; the caller commits. */

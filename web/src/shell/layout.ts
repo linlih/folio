@@ -8,7 +8,7 @@ import { useShell, type Pane } from "./tabs";
 const LAYOUT_SETTING = "shell.layout";
 const SAVE_DELAY_MS = 400;
 /** Tab kinds a saved layout may hold; others (removed since) are dropped. */
-const KNOWN = new Set(["library", "journal", "trash", "card", "tag", "boards", "board"]);
+const KNOWN = new Set(["library", "journal", "trash", "tasks", "card", "tag", "boards", "board"]);
 
 interface SavedLayout {
   panes: Pane[];

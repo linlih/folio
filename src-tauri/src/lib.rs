@@ -13,7 +13,7 @@ use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use folio_core::{CardKind, DocId, DocKind};
-use folio_store::{BackupInfo, Backlink, BlockText, CardRow, JournalDay, Origin, SearchHit, Store, TagInfo};
+use folio_store::{BackupInfo, Backlink, BlockText, CardRow, JournalDay, Origin, SearchHit, Store, TagInfo, TaskRow};
 use serde::Serialize;
 use tauri::Manager;
 use tauri::ipc::{InvokeBody, Request, Response};
@@ -449,6 +449,11 @@ fn pinned_cards(state: tauri::State<AppState>) -> CmdResult<Vec<CardRow>> {
 #[tauri::command]
 fn list_trash(state: tauri::State<AppState>, limit: Option<u32>) -> CmdResult<Vec<CardRow>> {
     Ok(lock(&state)?.list_trash(limit.unwrap_or(200))?)
+}
+
+#[tauri::command]
+fn tasks(state: tauri::State<AppState>, closed: bool, limit: Option<u32>) -> CmdResult<Vec<TaskRow>> {
+    Ok(lock(&state)?.tasks(closed, limit.unwrap_or(500))?)
 }
 
 #[tauri::command]
@@ -1214,6 +1219,7 @@ pub fn run() {
             trash_card,
             restore_card,
             list_trash,
+            tasks,
             empty_trash,
             pin_card,
             open_link,

@@ -19,7 +19,8 @@
     "pin": "Pin",
     "unpin": "Unpin",
     "topics": "Topics",
-    "inbox": "Inbox"
+    "inbox": "Inbox",
+    "tasks": "Tasks"
   },
   "library": {
     "title": "Card library",
@@ -558,7 +559,8 @@
     "backupDone": "Backed up",
     "newBoard": "New whiteboard",
     "boards": "Open whiteboards",
-    "inbox": "Open inbox"
+    "inbox": "Open inbox",
+    "tasks": "Open tasks"
   },
   "topics": {
     "add": "Add to topic",
@@ -845,5 +847,22 @@
     "undated": "Earlier (time not recorded)",
     "restore": "Restore this version",
     "restored": "Restored the version from {{when}} ({{undo}} to undo)"
+  },
+  "tasks": {
+    "title": "Tasks",
+    "open": "Open",
+    "closed": "Done",
+    "finish": "Mark done",
+    "reopen": "Reopen",
+    "none": "No open tasks",
+    "noneHint": "Start a line with [ ] or press Mod+Enter in any card or journal day to make it a to-do; it will show up here.",
+    "noneClosed": "No finished tasks yet",
+    "group": {
+      "overdue": "Overdue",
+      "today": "Today",
+      "week": "Next 7 days",
+      "later": "Later",
+      "undated": "No date"
+    }
   }
 }

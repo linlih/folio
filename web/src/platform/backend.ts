@@ -1,7 +1,7 @@
 import type { AssetEvent, AssetInfo, BackupInfo, McpStatus, SyncDevice, SyncStatus, TagInfo, TopicCount, CardText } from "../bindings/commands";
 import type { LatestRelease, LibraryLocation, PickedFolder } from "../bindings/commands";
 import type { AppInfo, Backlink, BlockText, CardRow, DocKind, JournalDay, SearchHit } from "../bindings/commands";
-import type { ClipInfo, InboxItem, LinkPreview, TagCard } from "../bindings/commands";
+import type { ClipInfo, InboxItem, LinkPreview, TagCard, TaskRow } from "../bindings/commands";
 
 /** Everything the UI may ask of the host. The Tauri app and web mode each
  *  implement it; UI code never imports `@tauri-apps/api` directly. */
@@ -20,6 +20,9 @@ export interface Backend {
   trashCard(id: string): Promise<void>;
   restoreCard(id: string): Promise<void>;
   listTrash(limit?: number): Promise<CardRow[]>;
+  /** Task items in cards not in the trash, most recently changed card
+   *  first: open ones (not done or canceled), or the closed ones. */
+  tasks(closed: boolean, limit?: number): Promise<TaskRow[]>;
   /** Deletes every card in the trash for good, on every device (journal
    *  days stay); returns their ids. */
   emptyTrash(): Promise<string[]>;
