@@ -1,5 +1,5 @@
 import { Menu } from "@base-ui/react/menu";
-import { MoreHorizontal } from "lucide-react";
+import { ArrowDown, ArrowUp, MoreHorizontal } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { CARDS_CHANGED } from "../card/actions";
@@ -107,6 +107,38 @@ const ROW_MIME = "application/x-folio-db-row";
 
 /** Columns by a select field's choices. Cards move by dragging (mouse) or
  *  through each card's menu (touch). */
+/** What the cards are ordered by, and which way: the same order as the
+ *  table's (a column heading sets it there), kept with the tag's view. */
+function SortControl({ tag, db }: { tag: string; db: Database }) {
+  const { t } = useTranslation();
+  const set = (view: { sortBy?: string; sortDesc?: boolean }) => void editDatabase((doc) => setView(doc, tag, view));
+  const keys = [
+    { id: "created", name: t("db.sortCreated") },
+    { id: "updated", name: t("db.sortUpdated") },
+    { id: "title", name: t("db.titleColumn") },
+    ...db.fields.map((f) => ({ id: f.id, name: f.name })),
+  ];
+  const current = keys.some((k) => k.id === db.view.sortBy) ? db.view.sortBy : "created";
+  const desc = db.view.sortDesc;
+  return (
+    <div className="db-sort">
+      <label className="db-bar-select">
+        {t("db.sortBy")}
+        <select value={current} onChange={(e) => set({ sortBy: e.target.value })}>
+          {keys.map((k) => (
+            <option key={k.id} value={k.id}>
+              {k.name}
+            </option>
+          ))}
+        </select>
+      </label>
+      <button className="icon-button db-sort-dir" aria-label={t(desc ? "db.sortDesc" : "db.sortAsc")} title={t(desc ? "db.sortDesc" : "db.sortAsc")} onClick={() => set({ sortDesc: !desc })}>
+        {desc ? <ArrowDown size={14} /> : <ArrowUp size={14} />}
+      </button>
+    </div>
+  );
+}
+
 export function BoardView({ tag, db, rows, change }: { tag: string; db: Database; rows: DbRow[]; change: (id: string, field: string, v: PropValue) => void }) {
   const { t, i18n } = useTranslation();
   const open = useShell((s) => s.open);
@@ -134,8 +166,8 @@ export function BoardView({ tag, db, rows, change }: { tag: string; db: Database
   const move = (id: string, option: string | null) => change(id, field.id, option);
   return (
     <>
-      {selects.length > 1 && (
-        <label className="db-group-by">
+      <div className="db-board-bar">
+        <label className="db-bar-select">
           {t("db.groupBy")}
           <select value={field.id} onChange={(e) => void editDatabase((doc) => setView(doc, tag, { groupBy: e.target.value }))}>
             {selects.map((f) => (
@@ -145,7 +177,9 @@ export function BoardView({ tag, db, rows, change }: { tag: string; db: Database
             ))}
           </select>
         </label>
-      )}
+        <SortControl tag={tag} db={db} />
+      </div>
+      {selects.length === 1 && <p className="db-bar-hint">{t("db.groupByHint")}</p>}
       <div className="db-board">
         {columns.map(({ option, rows: cards }) => {
           const key = option?.id ?? "";
