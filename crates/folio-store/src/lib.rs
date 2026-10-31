@@ -1026,7 +1026,9 @@ impl Store {
         Ok(rows.collect::<std::result::Result<_, _>>()?)
     }
 
-    /// Blocks with a tag (any case), newest cards first.
+    /// Blocks with a tag (any case), newest first: a journal day by its
+    /// date, so going back to add to an old day does not move it up; other
+    /// cards by when they were last edited. Within a card, in document order.
     pub fn tagged(&self, tag: &str, limit: u32) -> Result<Vec<Backlink>> {
         let mut stmt = self.conn.prepare_cached(
             "SELECT b.card_id, c.title, c.kind, b.bid, b.text, 'tag', c.updated_at
@@ -1035,7 +1037,10 @@ impl Store {
                JOIN idx.cards c ON c.card_id = t.card_id
               WHERE t.tag = ?1 AND c.deleted_at IS NULL
               GROUP BY b.card_id, b.bid
-              ORDER BY c.updated_at DESC, b.ord LIMIT ?2",
+              ORDER BY CASE WHEN c.kind = 'journal' THEN substr(c.card_id, 9)
+                            ELSE date(c.updated_at / 1000, 'unixepoch', 'localtime') END DESC,
+                       c.updated_at DESC, b.card_id, b.rowid
+              LIMIT ?2",
         )?;
         let rows = stmt.query_map(params![tag_key(tag), limit], backlink_row)?;
         let mut rows: Vec<Backlink> = rows.collect::<std::result::Result<_, _>>()?;
@@ -1767,6 +1772,19 @@ mod tests {
         assert_eq!(rows[1].props, "{}");
         s.trash_card(&other, 5).unwrap();
         assert_eq!(s.tag_cards("书").unwrap().len(), 1);
+    }
+
+    #[test]
+    fn journal_days_on_a_tag_page_go_by_date() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut s = Store::open(dir.path()).unwrap();
+        let older = DocId::journal(2026, 10, 20).unwrap();
+        let newer = DocId::journal(2026, 10, 30).unwrap();
+        s.apply_update(&newer, DocKind::Card, &journal_with_tag(&s, "想法"), Origin::Local, 3).unwrap();
+        // Going back to an older day later does not move it up.
+        s.apply_update(&older, DocKind::Card, &journal_with_tag(&s, "想法"), Origin::Local, 9).unwrap();
+        let ids: Vec<_> = s.tagged("想法", 10).unwrap().into_iter().map(|r| r.card_id).collect();
+        assert_eq!(ids, vec![newer.to_string(), older.to_string()]);
     }
 
     /// A journal day with one paragraph holding a tag.

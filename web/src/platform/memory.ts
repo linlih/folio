@@ -1,7 +1,7 @@
 import { LoroDoc } from "loro-crdt";
 import type { AssetEvent, BackupInfo, Backlink, CardRow, ChildBlock, JournalDay, SearchHit } from "../bindings/commands";
 import { appendBlocks, bodyLines, initCard, preview, readCardTopics, readMeta, readProps, setClip, setDeleted, setInbox, setPinned } from "../docs/card";
-import { isJournalId, journalDate, uuidv7 } from "../docs/ids";
+import { isJournalId, journalDate, localDate, uuidv7 } from "../docs/ids";
 import { extractIndex } from "../docs/index";
 import { isBoardId } from "../docs/board";
 import { WORKSPACE_ID } from "../docs/workspace";
@@ -253,7 +253,11 @@ export function memoryBackend(now: () => number = Date.now): Backend {
     tagged: async (tag, limit = 500) => {
       const key = tag.trim().toLowerCase();
       const out: Backlink[] = [];
-      for (const [cid, e] of [...live()].sort((a, b) => b[1].updatedAt - a[1].updatedAt)) {
+      // Newest first, as the host: a journal day by its date, other cards
+      // by the day they were last edited, then by when.
+      const day = (id: string, at: number) => (isJournalId(id) ? journalDate(id) : localDate(new Date(at)));
+      const order = [...live()].sort(([ia, a], [ib, b]) => day(ib, b.updatedAt).localeCompare(day(ia, a.updatedAt)) || b.updatedAt - a.updatedAt);
+      for (const [cid, e] of order) {
         const x = extractIndex(e.doc);
         const bids = new Set(x.tags.filter(([, name]) => name.trim().toLowerCase() === key).map(([bid]) => bid));
         const m = readMeta(e.doc);

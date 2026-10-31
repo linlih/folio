@@ -86,4 +86,22 @@ describe("#tags", () => {
       [1, "第二条"],
     ]);
   });
+
+  it("journal days on a tag page go by date, not by last edit", async () => {
+    let clock = 1;
+    const backend = memoryBackend(() => clock);
+    const hub = new DocHub(backend, MEMORY_FRONTEND_PEER);
+    const write = async (id: string) => {
+      const handle = await hub.open(id);
+      const { editor } = await bind(handle.doc, handle.undo);
+      editor.commands.setContent('<p><span data-tag="想法">#想法</span> 一条</p>');
+      await settle();
+      editor.destroy();
+      await handle.persistence.flush();
+    };
+    await write("journal:2026-10-30");
+    clock = 9;
+    await write("journal:2026-10-20");
+    expect((await backend.tagged("想法")).map((r) => r.cardId)).toEqual(["journal:2026-10-30", "journal:2026-10-20"]);
+  });
 });
