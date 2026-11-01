@@ -1425,7 +1425,7 @@ checksum = "77ce24cb58228fbb8aa041425bb1050850ac19177686ea6e0f41a70416f56fdb"
 
 [[package]]
 name = "folio"
-version = "0.1.14"
+version = "0.1.15"
 dependencies = [
  "folio-ai",
  "folio-clip",
@@ -1456,7 +1456,7 @@ dependencies = [
 
 [[package]]
 name = "folio-ai"
-version = "0.1.14"
+version = "0.1.15"
 dependencies = [
  "serde",
  "serde_json",
@@ -1466,7 +1466,7 @@ dependencies = [
 
 [[package]]
 name = "folio-clip"
-version = "0.1.14"
+version = "0.1.15"
 dependencies = [
  "serde",
  "serde_json",
@@ -1475,7 +1475,7 @@ dependencies = [
 
 [[package]]
 name = "folio-core"
-version = "0.1.14"
+version = "0.1.15"
 dependencies = [
  "loro",
  "serde",
@@ -1486,7 +1486,7 @@ dependencies = [
 
 [[package]]
 name = "folio-io"
-version = "0.1.14"
+version = "0.1.15"
 dependencies = [
  "folio-core",
  "loro",
@@ -1496,7 +1496,7 @@ dependencies = [
 
 [[package]]
 name = "folio-mcp"
-version = "0.1.14"
+version = "0.1.15"
 dependencies = [
  "folio-core",
  "folio-io",
@@ -1512,7 +1512,7 @@ dependencies = [
 
 [[package]]
 name = "folio-server"
-version = "0.1.14"
+version = "0.1.15"
 dependencies = [
  "axum",
  "folio-core",
@@ -1529,7 +1529,7 @@ dependencies = [
 
 [[package]]
 name = "folio-store"
-version = "0.1.14"
+version = "0.1.15"
 dependencies = [
  "folio-core",
  "loro",
@@ -1544,7 +1544,7 @@ dependencies = [
 
 [[package]]
 name = "folio-sync"
-version = "0.1.14"
+version = "0.1.15"
 dependencies = [
  "argon2",
  "base64 0.22.1",
@@ -5287,7 +5287,7 @@ dependencies = [
 
 [[package]]
 name = "tauri-plugin-folio-apk"
-version = "0.1.14"
+version = "0.1.15"
 dependencies = [
  "serde",
  "tauri",
