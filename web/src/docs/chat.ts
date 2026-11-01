@@ -88,13 +88,25 @@ export function chatDeleted(ws: LoroDoc, id: string): boolean {
   return m instanceof LoroMap && num(m, "deleted_at") !== null;
 }
 
-/** The messages in order; one that cannot be read is left out. */
+/** Messages taken back by id: an answer asked again, a message edited.
+ *  Kept apart from the messages, which are never changed; versions before
+ *  it still show them. */
+const DROPPED = "dropped";
+
+export function dropMessages(doc: LoroDoc, ids: string[], now = Date.now()) {
+  const dropped = doc.getMap(DROPPED);
+  for (const id of ids) if (id) dropped.set(id, now);
+  doc.commit({ origin: CHAT_ORIGIN });
+}
+
+/** The messages in order; one that cannot be read, or taken back, is left out. */
 export function readMessages(doc: LoroDoc): ChatMessage[] {
   const list = doc.getList(MESSAGES);
+  const dropped = doc.getMap(DROPPED);
   const out: ChatMessage[] = [];
   for (let i = 0; i < list.length; i++) {
     const m = list.get(i);
-    if (!(m instanceof LoroMap)) continue;
+    if (!(m instanceof LoroMap) || dropped.get(str(m, "id")) !== undefined) continue;
     try {
       const message = JSON.parse(str(m, "data")) as AiMessage;
       if (!message || typeof message !== "object" || !("role" in message)) continue;

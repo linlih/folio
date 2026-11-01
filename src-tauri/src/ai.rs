@@ -221,6 +221,8 @@ pub(crate) async fn ai_turn(
     provider: String,
     // The provider's model this device chose; its first one when not given.
     model: Option<String>,
+    // The thinking level the page chose for that model; "" for none.
+    effort: Option<String>,
     system: String,
     messages: Vec<Message>,
     tools: Vec<Tool>,
@@ -237,7 +239,11 @@ pub(crate) async fn ai_turn(
         return Err(CommandError::Other("no-key".into()));
     }
     let model = model.filter(|m| !m.is_empty()).unwrap_or(p.model);
-    let provider = Provider { protocol: p.protocol, base_url: p.base_url, model, key, effort: p.effort };
+    let effort = match effort {
+        Some(e) => Some(e).filter(|e| !e.is_empty()),
+        None => p.effort.filter(|e| !e.is_empty()),
+    };
+    let provider = Provider { protocol: p.protocol, base_url: p.base_url, model, key, effort };
     let id = turn.clone();
     let result = tauri::async_runtime::spawn_blocking(move || {
         folio_ai::run_turn(&provider, &system, &messages, &tools, &mut |e| drop(events.send(e)), &|| cancelled(&id))

@@ -1,14 +1,9 @@
 import { Menu } from "@base-ui/react/menu";
 import { Check, ChevronDown, Settings } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { chooseProvider, saveProvider, useAiSettings, type AiProvider } from "./settings";
+import { effortLevels } from "./effort";
+import { chooseProvider, saveProvider, useAiSettings } from "./settings";
 
-/** How hard the model may think, as each protocol names it: Anthropic's
- *  effort, or OpenAI's reasoning_effort. */
-const EFFORTS: Record<AiProvider["protocol"], string[]> = {
-  anthropic: ["low", "medium", "high", "xhigh", "max"],
-  openai: ["low", "medium", "high"],
-};
 
 /** The model a conversation uses and how hard it thinks, chosen where the
  *  message is written (as in Claude's and ChatGPT's apps); the next turn
@@ -19,8 +14,9 @@ export function ModelPicker({ onManage }: { onManage: () => void }) {
   const provider = providers.find((p) => p.id === current) ?? providers[0];
   if (!provider) return null;
   const chosen = model ?? provider.models[0] ?? "";
-  const effort = provider.effort ?? "";
-  const levels = EFFORTS[provider.protocol];
+  const levels = effortLevels(provider.protocol, chosen);
+  // A level kept for another of the provider's models is not shown or sent.
+  const effort = levels.includes(provider.effort ?? "") ? provider.effort! : "";
   const label = (e: string) => t(e ? `ai.effort.${e}` : "ai.effort.default");
   const hint = (e: string) => (e === "" ? "default" : e === "low" ? "low" : e === levels.at(-1) ? "deepest" : null);
   const setEffort = (e: string) => void saveProvider({ ...provider, effort: e }, null);
@@ -47,9 +43,9 @@ export function ModelPicker({ onManage }: { onManage: () => void }) {
                 ))}
               </Menu.Group>
             ))}
-            <div className="popup-separator" />
-            <div className="popup-label">{t("ai.effort.label")}</div>
-            {["", ...levels].map((e) => (
+            {levels.length > 0 && <div className="popup-separator" />}
+            {levels.length > 0 && <div className="popup-label">{t("ai.effort.label")}</div>}
+            {levels.length > 0 && ["", ...levels].map((e) => (
               <Menu.Item key={e || "default"} className="popup-item chat-model-item" closeOnClick={false} onClick={() => setEffort(e)}>
                 <span>
                   {label(e)}

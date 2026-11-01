@@ -6,12 +6,13 @@
 
 import { create } from "zustand";
 import { docs } from "../app";
-import { appendMessage, createChat, readMessages, touchChat, type ChatMessage } from "../docs/chat";
+import { appendMessage, createChat, dropMessages, readMessages, touchChat, type ChatMessage } from "../docs/chat";
 import type { DocHandle } from "../docs/hub";
 import { localDate, uuidv7 } from "../docs/ids";
 import { workspaceDoc } from "../docs/topics";
 import i18n from "../i18n";
 import { backend } from "../platform";
+import { turnEffort } from "./effort";
 import { currentProvider, useAiSettings } from "./settings";
 import type { AiMessage, AiPart, AiTool, AiToolResult } from "./types";
 import { apply, isWriteTool, propose, WRITE_TOOLS, type Proposal, type WriteRecord } from "./writes";
@@ -30,8 +31,16 @@ export interface ChatContext {
   selection?: string;
 }
 
-/** A user message as kept: what they typed, and what they were looking at. */
-export type UserMessage = { role: "user"; text: string; context?: ChatContext };
+/** A card the user attached with @ (as Notion and Obsidian Copilot let
+ *  notes be mentioned). */
+export interface CardRef {
+  cardId: string;
+  title: string;
+}
+
+/** A user message as kept: what they typed, what they were looking at, and
+ *  the cards they attached. Versions before `cards` keep it and leave it out. */
+export type UserMessage = { role: "user"; text: string; context?: ChatContext; cards?: CardRef[] };
 
 /** A conversation being answered on this device. */
 export interface LiveTurn {
@@ -166,11 +175,17 @@ export function systemPrompt(now = new Date()): string {
  *  before what they typed. */
 function forModel(m: AiMessage | UserMessage): AiMessage {
   if (m.role === "tools") return { role: "tools", results: m.results };
-  if (m.role !== "user" || !("context" in m) || !m.context) return m.role === "user" ? { role: "user", text: m.text } : m;
-  const c = m.context;
-  const lines = [`[The user is looking at the card “${c.title || i18n.t("library.untitled")}” (id ${c.cardId}).]`];
-  if (c.selection) lines.push(`[They selected this text in it:]\n${c.selection}`);
-  return { role: "user", text: `${lines.join("\n")}\n\n${m.text}` };
+  if (m.role !== "user") return m;
+  const u = m as UserMessage;
+  const name = (title: string) => title || i18n.t("library.untitled");
+  const lines: string[] = [];
+  if (u.context) {
+    lines.push(`[The user is looking at the card “${name(u.context.title)}” (id ${u.context.cardId}).]`);
+    if (u.context.selection) lines.push(`[They selected this text in it:]\n${u.context.selection}`);
+  }
+  const cards = Array.isArray(u.cards) ? u.cards.filter((c) => c && typeof c.cardId === "string") : [];
+  if (cards.length) lines.push(`[The user attached these cards to this message; read them with read_card before answering: ${cards.map((c) => `“${name(c.title)}” (id ${c.cardId})`).join(", ")}.]`);
+  return { role: "user", text: lines.length ? `${lines.join("\n")}\n\n${u.text}` : u.text };
 }
 
 let tools: Promise<AiTool[]> | null = null;
@@ -199,7 +214,43 @@ export async function newChat(firstMessage: string, now = Date.now()): Promise<s
 
 /** Sends `text` in the conversation `id` and answers it; resolves once the
  *  answer is done, stopped or failed (the error is in `useChatLive`). */
-export async function send(id: string, text: string, context: ChatContext | null, now: () => number = Date.now): Promise<void> {
+export function send(id: string, text: string, context: ChatContext | null, cards: CardRef[] = [], now: () => number = Date.now): Promise<void> {
+  const user: UserMessage = { role: "user", text, ...(context ? { context } : {}), ...(cards.length ? { cards } : {}) };
+  return run(id, user, () => [], now);
+}
+
+/** The messages after the last one the user sent (its answer), and with
+ *  `withIt` that one too. */
+const lastExchange = (messages: ChatMessage[], withIt: boolean) => {
+  const at = messages.map((m) => m.message.role).lastIndexOf("user");
+  return at < 0 ? [] : messages.slice(withIt ? at : at + 1).map((m) => m.id);
+};
+
+/** Asks again for the answer to the last message, the old answer taken back. */
+export function regenerate(id: string, now: () => number = Date.now): Promise<void> {
+  return run(id, null, (messages) => lastExchange(messages, false), now);
+}
+
+/** Sends `text` in place of the last message the user sent, which is taken
+ *  back with its answer; what it was sent with goes again. */
+export function editLast(id: string, text: string, now: () => number = Date.now): Promise<void> {
+  let user: UserMessage | null = null;
+  return run(
+    id,
+    () => user,
+    (messages) => {
+      const last = [...messages].reverse().find((m) => m.message.role === "user");
+      const was = last?.message as UserMessage | undefined;
+      user = { role: "user", text, ...(was?.context ? { context: was.context } : {}), ...(was?.cards?.length ? { cards: was.cards } : {}) };
+      return lastExchange(messages, true);
+    },
+    now,
+  );
+}
+
+/** One message answered: `drop` names what is taken back first, `user` is
+ *  the message sent (none when an answer is asked again). */
+async function run(id: string, user: UserMessage | null | (() => UserMessage | null), drop: (messages: ChatMessage[]) => string[], now: () => number): Promise<void> {
   const provider = currentProvider();
   const ws = await workspaceDoc();
   setError(id, null);
@@ -207,8 +258,10 @@ export async function send(id: string, text: string, context: ChatContext | null
   const turn = uuidv7();
   setLive(id, { text: "", tools: [], turn, stopping: false });
   try {
-    const user: UserMessage = { role: "user", text, ...(context ? { context } : {}) };
-    appendMessage(handle.doc, user as AiMessage, now());
+    const gone = drop(readMessages(handle.doc));
+    if (gone.length) dropMessages(handle.doc, gone, now());
+    const message = typeof user === "function" ? user() : user;
+    if (message) appendMessage(handle.doc, message as AiMessage, now());
     touchChat(ws.doc, id, now());
     if (!provider) throw new Error("no-provider");
     const toolList = await readTools();
@@ -218,7 +271,7 @@ export async function send(id: string, text: string, context: ChatContext | null
       let streamed = "";
       const calls: { id: string; name: string }[] = [];
       setLive(id, { text: "", tools: [], turn, stopping: useChatLive.getState().live[id]?.stopping ?? false });
-      const reply = await backend.aiTurn({ turn, provider: provider.id, model: provider.model, system: systemPrompt(new Date(now())), messages, tools: toolList }, (e) => {
+      const reply = await backend.aiTurn({ turn, provider: provider.id, model: provider.model, effort: turnEffort(provider.protocol, provider.model, provider.effort), system: systemPrompt(new Date(now())), messages, tools: toolList }, (e) => {
         if (e.type === "text") streamed += e.text;
         else calls.push({ id: e.id, name: e.name });
         const cur = useChatLive.getState().live[id];

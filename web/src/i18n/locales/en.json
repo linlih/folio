@@ -945,14 +945,14 @@
     "history": "Chats",
     "newChat": "New chat",
     "settings": "AI settings",
-    "placeholder": "Ask about your notes…",
+    "placeholder": "Ask about your notes; @ to attach a card…",
     "model": "Model",
     "addModel": "Add a model…",
     "send": "Send",
     "stop": "Stop",
     "contextHint": "Includes the current card",
     "contextRemove": "Leave the card out",
-    "setupHint": "First add a model and its API key in Settings.",
+    "setupHint": "Pick a provider and enter its API key to start.",
     "welcome": "Ask me about your notes, have me summarize or organize them, or help you review. Answers link to where they come from.",
     "ideas": {
       "summarizeCard": "Summarize this card",
@@ -1068,6 +1068,23 @@
         "deepest": "Deepest, slower"
       }
     },
-    "manageModels": "Manage models…"
+    "manageModels": "Manage models…",
+    "mention": "Attach a card",
+    "mentionHint": "Attach a card (@)",
+    "retry": "Retry",
+    "regenerate": "Answer again",
+    "edit": "Edit this message",
+    "editing": "Editing your last message; sending answers it again",
+    "editPlaceholder": "Edit the message…",
+    "searchChats": "Search chats",
+    "noMatch": "No matching chats",
+    "rename": "Rename",
+    "groups": {
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "week": "Previous 7 days",
+      "month": "Previous 30 days",
+      "older": "Older"
+    }
   }
 }

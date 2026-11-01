@@ -6,9 +6,9 @@ import { useShell } from "../shell/tabs";
 import "./ai.css";
 import { loadAiSettings, PRESETS, removeProvider, saveProvider, setWriteMode, useAiSettings, type AiProvider, type Preset } from "./settings";
 
-type Draft = Omit<AiProvider, "id" | "model"> & { id?: string; key: string; keyless?: boolean; custom: boolean };
+export type Draft = Omit<AiProvider, "id" | "model"> & { id?: string; key: string; keyless?: boolean; custom: boolean };
 
-const fromPreset = (p: Preset): Draft => ({
+export const fromPreset = (p: Preset): Draft => ({
   name: p.name,
   protocol: p.protocol,
   baseUrl: p.baseUrl,
@@ -108,7 +108,7 @@ type Probe = { state: "idle" } | { state: "checking" } | { state: "ok"; models: 
 
 /** Adding or changing one provider: its key, a check that the key and
  *  address work (which also lists its models), and the models to use. */
-function ProviderForm({ draft, hasKey, onChange, onDone }: { draft: Draft; hasKey: boolean; onChange: (d: Draft) => void; onDone: () => void }) {
+export function ProviderForm({ draft, hasKey, onChange, onDone }: { draft: Draft; hasKey: boolean; onChange: (d: Draft) => void; onDone: () => void }) {
   const { t } = useTranslation();
   const [check, setCheck] = useState<Probe>({ state: "idle" });
   const [filter, setFilter] = useState("");

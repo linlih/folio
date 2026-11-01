@@ -48,6 +48,8 @@ export interface AiTurnRequest {
   provider: string;
   /** Which of the provider's models; its first when not given. */
   model?: string;
+  /** The thinking level for this turn, "" for none; the provider's when not given. */
+  effort?: string;
   system: string;
   messages: AiMessage[];
   tools: AiTool[];

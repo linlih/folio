@@ -1,20 +1,23 @@
-import { ArrowUp, BookPlus, CalendarPlus, Check, Copy, FileText, History, Pencil, Plus, Settings, Square, Trash2, Undo2, X } from "lucide-react";
+import { ArrowUp, AtSign, BookPlus, CalendarPlus, Check, Copy, FileText, History, Pencil, Plus, RotateCcw, Settings, Square, Trash2, Undo2, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { docs } from "../app";
 import { cardName, openAt } from "../card/reveal";
 import { readMeta } from "../docs/card";
-import { chatDeleted, deleteChat, markUndone, readChats, readMessages, readUndone, type ChatInfo, type ChatMessage } from "../docs/chat";
+import { chatDeleted, deleteChat, markUndone, readChats, renameChat, readMessages, readUndone, type ChatInfo, type ChatMessage } from "../docs/chat";
 import { workspaceDoc } from "../docs/topics";
 import { backend } from "../platform";
+import { filterNames } from "../search/pinyin";
 import { usePhone } from "../shell/phone";
 import { CHAT_COMBO, keyLabel } from "../shell/shortcuts";
 import { focusedPane, toSide, useShell } from "../shell/tabs";
 import { answerTitle, appendToJournal, saveAsCard } from "./actions";
-import { allowAll, decide, messageText, newChat, openChat, send, stop, useChatLive, type ChatContext, type LiveTurn as LiveTurnState, type PendingWrite, type UserMessage } from "./chat";
+import { allowAll, decide, editLast, messageText, newChat, openChat, regenerate, send, stop, useChatLive, type CardRef, type ChatContext, type LiveTurn as LiveTurnState, type PendingWrite, type UserMessage } from "./chat";
 import { parseMarkdown, renderBlocks, type Target } from "./markdown";
+import { useMention } from "./Mention";
 import { ModelPicker } from "./ModelPicker";
-import { loadAiSettings, useAiSettings } from "./settings";
+import { fromPreset, ProviderForm, type Draft } from "./AiSettings";
+import { loadAiSettings, PRESETS, useAiSettings } from "./settings";
 import type { AiPart, AiToolResult } from "./types";
 import { ChangedSince, isWriteTool, undo as undoChange, type WriteRecord } from "./writes";
 
@@ -105,8 +108,15 @@ function Panel() {
   const focused = useFocusedCard();
   const [withCard, setWithCard] = useState(true);
   const [draft, setDraft] = useState("");
+  const [cards, setCards] = useState<CardRef[]>([]);
+  /** Editing the last message sent: the next send takes its place. */
+  const [editing, setEditing] = useState(false);
   const scroller = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLTextAreaElement>(null);
+  const mention = useMention(draft, input, (card, text) => {
+    setDraft(text);
+    setCards((cs) => (cs.some((c) => c.cardId === card.cardId) ? cs : [...cs, card]));
+  });
 
   useEffect(() => {
     if (!settings.loaded) void loadAiSettings();
@@ -131,6 +141,7 @@ function Panel() {
   const choose = (id: string | null) => {
     setChatId(id);
     setListing(false);
+    setEditing(false);
     void backend.setLocalSetting(CURRENT, id);
     if (!phone) setTimeout(() => input.current?.focus());
   };
@@ -139,13 +150,37 @@ function Panel() {
     const body = text.trim();
     if (!body || live) return;
     setDraft("");
+    setCards([]);
+    if (editing && chatId) {
+      setEditing(false);
+      return editLast(chatId, body);
+    }
     const context = withCard && focused ? focused : null;
     const id = chatId ?? (await newChat(body));
     if (id !== chatId) choose(id);
-    await send(id, body, context);
+    await send(id, body, context, cards);
+  };
+
+  const edit = (text: string) => {
+    setEditing(true);
+    setDraft(text);
+    setTimeout(() => {
+      const el = input.current;
+      if (!el) return;
+      el.focus();
+      el.setSelectionRange(text.length, text.length);
+      el.style.height = "auto";
+      el.style.height = `${Math.min(el.scrollHeight, 180)}px`;
+    });
   };
 
   const onKey = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (mention.onKey(e)) return;
+    if (e.key === "Escape" && editing) {
+      setEditing(false);
+      setDraft("");
+      return;
+    }
     if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
       e.preventDefault();
       void submit();
@@ -179,49 +214,99 @@ function Panel() {
         <>
           <div className="chat-scroll" ref={scroller}>
             {messages.length === 0 && !live && (
-              <Welcome noProvider={noProvider} onSettings={openSettings} onPick={(text) => void submit(text)} hasCard={!!focused} />
+              <Welcome noProvider={noProvider} onPick={(text) => void submit(text)} hasCard={!!focused} />
             )}
-            <Messages chatId={chatId} messages={messages} undone={undone} answering={!!live} pending={live?.pending} />
+            <Messages chatId={chatId} messages={messages} undone={undone} answering={!!live} pending={live?.pending} onEdit={edit} />
             {live && chatId && <LiveTurn chatId={chatId} live={live} />}
             {error && (
               <div className="chat-error" role="alert">
                 <p>{error}</p>
-                <button className="chat-link" onClick={openSettings}>
-                  <Settings size={13} /> {t("ai.settings")}
-                </button>
+                <span className="chat-error-actions">
+                  {chatId && messages.length > 0 && (
+                    <button className="chat-link" onClick={() => void regenerate(chatId)}>
+                      <RotateCcw size={13} /> {t("ai.retry")}
+                    </button>
+                  )}
+                  <button className="chat-link" onClick={openSettings}>
+                    <Settings size={13} /> {t("ai.settings")}
+                  </button>
+                </span>
               </div>
             )}
           </div>
           <footer className="chat-compose">
-            {focused && withCard && (
-              <span className="chat-context" title={t("ai.contextHint")}>
-                <FileText size={12} />
-                <span>{focused.title}</span>
-                <button aria-label={t("ai.contextRemove")} onClick={() => setWithCard(false)}>
+            {mention.menu}
+            {editing && (
+              <div className="chat-editing">
+                <Pencil size={12} />
+                <span>{t("ai.editing")}</span>
+                <button aria-label={t("dialog.cancel")} title={t("dialog.cancel")} onClick={() => (setEditing(false), setDraft(""))}>
                   <X size={11} />
                 </button>
-              </span>
+              </div>
+            )}
+            {!editing && ((focused && withCard) || cards.length > 0) && (
+              <div className="chat-contexts">
+                {focused && withCard && !cards.some((c) => c.cardId === focused.cardId) && (
+                  <span className="chat-context" title={t("ai.contextHint")}>
+                    <FileText size={12} />
+                    <span>{focused.title}</span>
+                    <button aria-label={t("ai.contextRemove")} onClick={() => setWithCard(false)}>
+                      <X size={11} />
+                    </button>
+                  </span>
+                )}
+                {cards.map((c) => (
+                  <span key={c.cardId} className="chat-context attached">
+                    <AtSign size={12} />
+                    <span>{c.title}</span>
+                    <button aria-label={t("ai.contextRemove")} onClick={() => setCards((cs) => cs.filter((x) => x.cardId !== c.cardId))}>
+                      <X size={11} />
+                    </button>
+                  </span>
+                ))}
+              </div>
             )}
             <textarea
               ref={input}
               value={draft}
               rows={1}
-              placeholder={t("ai.placeholder")}
+              placeholder={t(editing ? "ai.editPlaceholder" : "ai.placeholder")}
               onChange={(e) => {
                 setDraft(e.target.value);
+                mention.track(e.target);
                 e.target.style.height = "auto";
                 e.target.style.height = `${Math.min(e.target.scrollHeight, 180)}px`;
               }}
+              onSelect={(e) => mention.track(e.currentTarget)}
               onKeyDown={onKey}
             />
             <div className="chat-compose-bar">
-              {settings.providers.length > 0 ? (
-                <ModelPicker onManage={openSettings} />
-              ) : (
-                <button className="chat-link" onClick={openSettings}>
-                  {t("ai.addModel")}
-                </button>
-              )}
+              <span className="chat-compose-tools">
+                {!editing && (
+                  <button
+                    className="chat-tool-button"
+                    title={t("ai.mentionHint")}
+                    aria-label={t("ai.mentionHint")}
+                    onClick={() => {
+                      const next = mention.start();
+                      setDraft(next.text);
+                      mention.setCaret(next.caret);
+                      setTimeout(() => (input.current?.focus(), input.current?.setSelectionRange(next.caret, next.caret)));
+                    }}
+                  >
+                    <AtSign size={14} />
+                  </button>
+                )}
+                {settings.providers.length > 0 ? (
+                  <ModelPicker onManage={openSettings} />
+                ) : (
+                  // The empty conversation shows the setup itself.
+                  messages.length > 0 && <button className="chat-link" onClick={openSettings}>
+                    {t("ai.addModel")}
+                  </button>
+                )}
+              </span>
               {live ? (
                 <button className="chat-send" aria-label={t("ai.stop")} title={t("ai.stop")} onClick={() => chatId && stop(chatId)}>
                   <Square size={12} fill="currentColor" />
@@ -239,17 +324,33 @@ function Panel() {
   );
 }
 
-function Welcome({ noProvider, onSettings, onPick, hasCard }: { noProvider: boolean; onSettings: () => void; onPick: (text: string) => void; hasCard: boolean }) {
+/** Without a model, one is set up here, where the user meant to chat (as
+ *  Zed's agent panel asks for a provider first), not in a settings dialog. */
+function Setup() {
   const { t } = useTranslation();
-  if (noProvider)
-    return (
-      <div className="chat-welcome">
-        <p>{t("ai.setupHint")}</p>
-        <button className="button primary" onClick={onSettings}>
-          {t("ai.addModel")}
-        </button>
-      </div>
-    );
+  const keys = useAiSettings((s) => s.keys);
+  const [draft, setDraft] = useState<Draft | null>(null);
+  return (
+    <div className="chat-welcome chat-setup">
+      <p>{t("ai.setupHint")}</p>
+      {draft ? (
+        <ProviderForm draft={draft} hasKey={!!draft.id && keys.includes(draft.id)} onChange={setDraft} onDone={() => setDraft(null)} />
+      ) : (
+        <div className="chat-ideas">
+          {PRESETS.map((p) => (
+            <button key={p.id} onClick={() => setDraft(fromPreset(p))}>
+              {p.name || t("ai.setup.custom")}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Welcome({ noProvider, onPick, hasCard }: { noProvider: boolean; onPick: (text: string) => void; hasCard: boolean }) {
+  const { t } = useTranslation();
+  if (noProvider) return <Setup />;
   const ideas = [...(hasCard ? ["summarizeCard", "quizCard"] : []), "recent", "openTasks"];
   return (
     <div className="chat-welcome">
@@ -265,29 +366,85 @@ function Welcome({ noProvider, onSettings, onPick, hasCard }: { noProvider: bool
   );
 }
 
+/** Which group of the history a conversation goes under, by its last use. */
+export function chatGroup(at: number, now = Date.now()): "today" | "yesterday" | "week" | "month" | "older" {
+  const day = new Date(now);
+  day.setHours(0, 0, 0, 0);
+  const start = day.getTime();
+  const DAY = 86_400_000;
+  if (at >= start) return "today";
+  if (at >= start - DAY) return "yesterday";
+  if (at >= start - 7 * DAY) return "week";
+  if (at >= start - 30 * DAY) return "month";
+  return "older";
+}
+
+/** The conversations, searchable by title and grouped by when they were
+ *  last used (as in Notion's and ChatGPT's history). */
 function ChatList({ chats, current, onChoose }: { chats: ChatInfo[]; current: string | null; onChoose: (id: string) => void }) {
   const { t, i18n } = useTranslation();
+  const phone = usePhone();
+  const [query, setQuery] = useState("");
+  const [renaming, setRenaming] = useState<string | null>(null);
   const fmt = useMemo(() => new Intl.DateTimeFormat(i18n.language, { month: "short", day: "numeric" }), [i18n.language]);
   if (chats.length === 0) return <p className="chat-empty">{t("ai.noChats")}</p>;
+  const q = query.trim();
+  const shown = q ? filterNames(chats, q, (c) => c.title || t("ai.newChat")) : chats;
+  const groups: [string, ChatInfo[]][] = [];
+  for (const c of shown) {
+    const g = chatGroup(c.updatedAt);
+    if (groups.at(-1)?.[0] === g) groups.at(-1)![1].push(c);
+    else groups.push([g, [c]]);
+  }
+  const rename = (id: string, title: string) => {
+    setRenaming(null);
+    if (title.trim()) void workspaceDoc().then((h) => renameChat(h.doc, id, title));
+  };
   return (
-    <ul className="chat-list">
-      {chats.map((c) => (
-        <li key={c.id} className={c.id === current ? "current" : undefined}>
-          <button className="chat-list-open" onClick={() => onChoose(c.id)}>
-            <span>{c.title || t("ai.newChat")}</span>
-            <time>{fmt.format(c.updatedAt)}</time>
-          </button>
-          <button
-            className="icon-button"
-            aria-label={t("ai.delete")}
-            title={t("ai.delete")}
-            onClick={() => void workspaceDoc().then((h) => (deleteChat(h.doc, c.id), useShell.getState().setNotice(t("ai.deleted"))))}
-          >
-            <Trash2 size={13} />
-          </button>
-        </li>
+    <div className="chat-history">
+      <input className="chat-history-search" value={query} placeholder={t("ai.searchChats")} autoFocus={!phone} onChange={(e) => setQuery(e.target.value)} />
+      {shown.length === 0 && <p className="chat-empty">{t("ai.noMatch")}</p>}
+      {groups.map(([g, list]) => (
+        <section key={g}>
+          <h4 className="chat-history-group">{t(`ai.groups.${g}`)}</h4>
+          <ul className="chat-list">
+            {list.map((c) => (
+              <li key={c.id} className={c.id === current ? "current" : undefined}>
+                {renaming === c.id ? (
+                  <input
+                    className="chat-rename"
+                    defaultValue={c.title}
+                    autoFocus
+                    onFocus={(e) => e.target.select()}
+                    onBlur={(e) => rename(c.id, e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.nativeEvent.isComposing) rename(c.id, e.currentTarget.value);
+                      else if (e.key === "Escape") (e.stopPropagation(), setRenaming(null));
+                    }}
+                  />
+                ) : (
+                  <button className="chat-list-open" onClick={() => onChoose(c.id)} onDoubleClick={() => setRenaming(c.id)}>
+                    <span>{c.title || t("ai.newChat")}</span>
+                    <time>{g === "today" ? new Date(c.updatedAt).toLocaleTimeString(i18n.language, { hour: "2-digit", minute: "2-digit" }) : fmt.format(c.updatedAt)}</time>
+                  </button>
+                )}
+                <button className="icon-button" aria-label={t("ai.rename")} title={t("ai.rename")} onClick={() => setRenaming(c.id)}>
+                  <Pencil size={13} />
+                </button>
+                <button
+                  className="icon-button"
+                  aria-label={t("ai.delete")}
+                  title={t("ai.delete")}
+                  onClick={() => void workspaceDoc().then((h) => (deleteChat(h.doc, c.id), useShell.getState().setNotice(t("ai.deleted"))))}
+                >
+                  <Trash2 size={13} />
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
       ))}
-    </ul>
+    </div>
   );
 }
 
@@ -330,7 +487,9 @@ function ToolLine({ part, result }: { part: { name: string; input?: Record<strin
   );
 }
 
-function Messages({ chatId, messages, undone, answering, pending }: { chatId: string | null; messages: ChatMessage[]; undone: Set<string>; answering: boolean; pending?: PendingWrite[] }) {
+function Messages({ chatId, messages, undone, answering, pending, onEdit }: { chatId: string | null; messages: ChatMessage[]; undone: Set<string>; answering: boolean; pending?: PendingWrite[]; onEdit: (text: string) => void }) {
+  const { t } = useTranslation();
+  const lastUser = messages.map((m) => m.message.role).lastIndexOf("user");
   // Proposed changes show as proposals, under the conversation.
   const proposed = new Set(pending?.map((p) => p.part.id));
   const results = new Map<string, AiToolResult>();
@@ -344,16 +503,32 @@ function Messages({ chatId, messages, undone, answering, pending }: { chatId: st
   messages.forEach((m, i) => {
     const msg = m.message;
     if (msg.role === "user") {
-      const context = (msg as UserMessage).context;
+      const { context, cards } = msg as UserMessage;
       out.push(
         <div key={m.id || i} className="chat-msg user">
-          {context && (
-            <span className="chat-context quiet">
-              <FileText size={11} />
-              {context.title}
+          {(context || cards?.length) && (
+            <span className="chat-sent-contexts">
+              {context && (
+                <span className="chat-context quiet">
+                  <FileText size={11} />
+                  {context.title}
+                </span>
+              )}
+              {Array.isArray(cards) &&
+                cards.map((c) => (
+                  <button key={c.cardId} className="chat-context quiet link" onClick={(e) => void openCard(c.cardId, null, toSide(e))}>
+                    <AtSign size={11} />
+                    {c.title}
+                  </button>
+                ))}
             </span>
           )}
           <div className="chat-bubble">{msg.text}</div>
+          {i === lastUser && !answering && (
+            <button className="chat-edit" title={t("ai.edit")} aria-label={t("ai.edit")} onClick={() => onEdit(msg.text)}>
+              <Pencil size={12} />
+            </button>
+          )}
         </div>,
       );
     } else if (msg.role === "assistant") {
@@ -372,7 +547,7 @@ function Messages({ chatId, messages, undone, answering, pending }: { chatId: st
               <ToolLine key={p.id} part={p} result={results.get(p.id)} />
             ),
           )}
-          {text && lastOfAnswer && <Actions messages={messages} upTo={i} />}
+          {text && lastOfAnswer && <Actions messages={messages} upTo={i} chatId={chatId} last={i > lastUser && !answering} />}
         </div>,
       );
     }
@@ -392,7 +567,7 @@ function answerText(messages: ChatMessage[], upTo: number): string {
   return parts.join("\n\n");
 }
 
-function Actions({ messages, upTo }: { messages: ChatMessage[]; upTo: number }) {
+function Actions({ messages, upTo, chatId, last }: { messages: ChatMessage[]; upTo: number; chatId: string | null; last: boolean }) {
   const { t } = useTranslation();
   const [done, setDone] = useState<string | null>(null);
   const text = answerText(messages, upTo);
@@ -427,6 +602,11 @@ function Actions({ messages, upTo }: { messages: ChatMessage[]; upTo: number }) 
       <button title={t("ai.toJournal")} aria-label={t("ai.toJournal")} onClick={() => void act("journal", async () => (await appendToJournal(text), notice(t("ai.addedJournal"))))}>
         {done === "journal" ? <Check size={13} /> : <CalendarPlus size={13} />}
       </button>
+      {last && chatId && (
+        <button title={t("ai.regenerate")} aria-label={t("ai.regenerate")} onClick={() => void regenerate(chatId)}>
+          <RotateCcw size={13} />
+        </button>
+      )}
     </div>
   );
 }

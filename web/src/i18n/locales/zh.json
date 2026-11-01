@@ -945,14 +945,14 @@
     "history": "对话记录",
     "newChat": "新对话",
     "settings": "AI 设置",
-    "placeholder": "问问你的笔记…",
+    "placeholder": "问问你的笔记，@ 引用卡片…",
     "model": "模型",
     "addModel": "添加模型…",
     "send": "发送",
     "stop": "停止",
     "contextHint": "会带上当前卡片",
     "contextRemove": "不带当前卡片",
-    "setupHint": "先在设置里添加一个模型和它的 API key。",
+    "setupHint": "选一家服务商，填上 API key 就能开始。",
     "welcome": "可以问我笔记里的内容、让我总结和整理，或者帮你复习。回答会附上来源，点一下就能打开。",
     "ideas": {
       "summarizeCard": "总结这张卡片",
@@ -1068,6 +1068,23 @@
         "deepest": "最深入，较慢"
       }
     },
-    "manageModels": "管理模型…"
+    "manageModels": "管理模型…",
+    "mention": "引用卡片",
+    "mentionHint": "引用卡片（@）",
+    "retry": "重试",
+    "regenerate": "重新回答",
+    "edit": "修改这条消息",
+    "editing": "修改上一条消息，发送后会重新回答",
+    "editPlaceholder": "修改消息…",
+    "searchChats": "搜索对话",
+    "noMatch": "没有匹配的对话",
+    "rename": "重命名",
+    "groups": {
+      "today": "今天",
+      "yesterday": "昨天",
+      "week": "7 天内",
+      "month": "30 天内",
+      "older": "更早"
+    }
   }
 }

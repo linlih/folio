@@ -39,7 +39,13 @@ backend.aiTool ─────────────────────�
   - 添加时：选预设 → 填 key → 「测试连接」→ 从服务商的模型列表里勾选。也可以手动输入模型 ID，供不提供列表的服务商使用。预设的地址和协议默认收起。
   - 测试连接就是请求 `GET {base}/models`（`folio_ai::list_models`，宿主命令 `ai_models`）。两种协议和 Ollama 都返回 `{"data": [{"id"}]}`。
   - 输入框的模型菜单按服务商分组。每台设备记住自己选的服务商和模型（镜像里的 `current` 和 `model`），`ai_turn` 带上这个模型。
-- **思考程度：** 在输入框的模型菜单里直接选（像 Claude 和 ChatGPT 的应用），不放在设置里，下一轮就生效。按服务商分别记住。Anthropic 用 `output_config.effort`（低到最高五档）；OpenAI 兼容用 `reasoning_effort`（低、中、高），只在选了的时候才发送，因为不是每家都认这个参数。
+- **对话窗口**（参照 Notion、Obsidian Copilot、ChatGPT）：
+  - 输入 `@` 弹出卡片列表（按标题，支持拼音），选中的卡片作为标签显示在输入框上方，随消息一起发送。存在用户消息的 `cards` 字段里。发给模型时写成「用户附上了这些卡片，先用 read_card 读」。旧版本会忽略这个字段。
+  - 最后一条回答可以「重新回答」，最后一条消息可以修改后重发（会带上原来的卡片和上下文）。被替换的消息记在对话文档的 `dropped` 映射里（消息 id → 时间），读取时跳过；消息列表本身仍然只增不改。旧版本看不懂 `dropped`，会把新旧消息都显示出来。被替换的回答如果已经改过笔记，这些修改不会自动撤销。
+  - 出错时可以直接重试（就是重新回答）。
+  - 没有模型时，在对话面板里直接添加（选服务商 → 填 key → 测试 → 选模型），不用跳到设置。
+  - 对话记录可以搜索标题，按「今天、昨天、7 天内、30 天内、更早」分组，可以重命名。
+- **思考程度：** 在输入框的模型菜单里直接选（像 Claude 和 ChatGPT 的应用），不放在设置里，下一轮就生效。按服务商分别记住。只对已知支持的模型显示和发送（`web/src/ai/effort.ts`）：Claude 5 系列五档全有，Opus 4.5 和 4.6 系列没有「很高」，更早的 Claude 不显示；OpenAI 兼容只对 o 系列、gpt-5、gpt-oss 显示。页面每轮把这个值传给 `ai_turn`，不支持时传空。Anthropic 用 `output_config.effort`（低到最高五档）；OpenAI 兼容用 `reasoning_effort`（低、中、高），只在选了的时候才发送，因为不是每家都认这个参数。
 - **工具（只读）：** search、read_card、read_journal、get_backlinks、list_tags、find_by_tag、list_recent_cards、list_topics、topic_cards、list_tasks。用户当前看的卡片和选中的文字会随消息一起发送（输入框上方的标签可以去掉）。
 - **来源：** 系统提示要求模型用 `[标题](folio:card/<id>)` 和 `[几个字](folio:block/<卡片 id>/<块 id>)` 标出来源。点击后打开卡片并定位到那个块。
 - **Markdown 渲染：** 自己解析成语法树再渲染，不用 innerHTML，模型的输出不会变成页面上的标签或脚本。

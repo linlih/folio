@@ -4,7 +4,10 @@
 import { LoroDoc, LoroMap } from "loro-crdt";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { docs, notes, startDocs } from "../src/app";
-import { decide, openChat, send, stop, useChatLive, newChat } from "../src/ai/chat";
+import { decide, editLast, openChat, regenerate, send, stop, useChatLive, newChat } from "../src/ai/chat";
+import { effortLevels, turnEffort } from "../src/ai/effort";
+import { mentionAt } from "../src/ai/Mention";
+import { chatGroup } from "../src/ai/ChatPanel";
 import { linkTarget, parseMarkdown, toHtml } from "../src/ai/markdown";
 import { saveProvider, setWriteMode, useAiSettings } from "../src/ai/settings";
 import { ChangedSince, undo } from "../src/ai/writes";
@@ -124,6 +127,46 @@ describe("answering a message", () => {
     };
     await send(id, "y", null);
     expect(useChatLive.getState().errors[id]).toMatch(/key/i);
+  });
+
+  it("sends the cards attached with @, asks an answer again, and takes an edited message's place", async () => {
+    const requests: AiTurnRequest[] = [];
+    let n = 0;
+    g.__folioFakeAi = async (request) => {
+      requests.push(structuredClone(request));
+      return { parts: [{ type: "text", text: `答${++n}` }], raw: null, stop: "end", inputTokens: 0, outputTokens: 0 };
+    };
+    const id = await newChat("比较");
+    await send(id, "比较这两张", null, [{ cardId: "a1", title: "甲" }, { cardId: "b2", title: "乙" }]);
+    expect((requests[0].messages[0] as { text: string }).text).toMatch(/read_card[\s\S]*“甲” \(id a1\), “乙” \(id b2\)[\s\S]*比较这两张$/);
+    const h = await openChat(id);
+    const texts = () => readMessages(h.doc).map((m) => (m.message.role === "user" ? m.message.text : m.message.role === "assistant" && m.message.parts[0]?.type === "text" ? m.message.parts[0].text : ""));
+    await regenerate(id);
+    expect(texts()).toEqual(["比较这两张", "答2"]);
+    expect(requests[1].messages).toHaveLength(1);
+    await editLast(id, "只看甲");
+    expect(texts()).toEqual(["只看甲", "答3"]);
+    // What it was sent with goes again.
+    expect((requests[2].messages[0] as { text: string }).text).toMatch(/a1[\s\S]*只看甲$/);
+    // Taken back, not removed: the list only grows.
+    expect(h.doc.getList("messages").length).toBe(5);
+  });
+
+  it("asks the thinking level only of models that take it", async () => {
+    expect(effortLevels("anthropic", "claude-opus-5-5")).toEqual(["low", "medium", "high", "xhigh", "max"]);
+    expect(effortLevels("anthropic", "claude-opus-4-5-20251101")).toContain("max");
+    expect(effortLevels("anthropic", "claude-haiku-4-5")).toEqual([]);
+    expect(effortLevels("anthropic", "claude-3-5-sonnet-latest")).toEqual([]);
+    expect(effortLevels("openai", "gpt-5-mini")).toEqual(["low", "medium", "high"]);
+    expect(effortLevels("openai", "openai/o4-mini")).toHaveLength(3);
+    expect(effortLevels("openai", "deepseek-chat")).toEqual([]);
+    expect(turnEffort("openai", "deepseek-chat", "high")).toBe("");
+    const requests: AiTurnRequest[] = [];
+    g.__folioFakeAi = async (request) => (requests.push(request), { parts: [{ type: "text", text: "好" }], raw: null, stop: "end", inputTokens: 0, outputTokens: 0 });
+    await saveProvider({ name: "Test", protocol: "anthropic", baseUrl: "https://example.test/v1", models: ["test-model"], effort: "high" }, "k");
+    const id = await newChat("x");
+    await send(id, "x", null);
+    expect(requests[0]).toMatchObject({ model: "test-model", effort: "" });
   });
 
   it("stops between turns when asked", async () => {
@@ -269,5 +312,23 @@ describe("changing notes", () => {
     await send(id, "x", null);
     const result = seen[1].messages.at(-1)!;
     expect(result.role === "tools" && result.results[0]).toMatchObject({ isError: true, content: expect.stringMatching(/No card/) });
+  });
+});
+
+describe("writing a message", () => {
+  it("finds the @ being typed", () => {
+    expect(mentionAt("看看 @Ru", 7)).toEqual({ start: 3, query: "Ru" });
+    expect(mentionAt("@", 1)).toEqual({ start: 0, query: "" });
+    expect(mentionAt("a@b.com", 7)).toBeNull();
+    expect(mentionAt("@x\ny", 4)).toBeNull();
+  });
+
+  it("groups the history by when each conversation was last used", () => {
+    const now = new Date(2026, 10, 2, 15).getTime();
+    expect(chatGroup(new Date(2026, 10, 2, 1).getTime(), now)).toBe("today");
+    expect(chatGroup(new Date(2026, 10, 1, 23).getTime(), now)).toBe("yesterday");
+    expect(chatGroup(new Date(2026, 9, 28).getTime(), now)).toBe("week");
+    expect(chatGroup(new Date(2026, 9, 10).getTime(), now)).toBe("month");
+    expect(chatGroup(new Date(2025, 0, 1).getTime(), now)).toBe("older");
   });
 });
