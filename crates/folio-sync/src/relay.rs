@@ -198,6 +198,13 @@ impl Relay {
             }
         }
         conn.execute_batch("CREATE INDEX IF NOT EXISTS updates_by_doc ON updates(workspace, doc, seq);")?;
+        // When each document was written, reported or deleted is not kept
+        // (design/ARCHITECTURE.md §5.6 item 8): nothing needs it, and it
+        // would show when someone writes what. The columns stay, as 0, for
+        // older servers; times kept by them are cleared.
+        conn.execute_batch(
+            "UPDATE updates SET at = 0 WHERE at <> 0; UPDATE acks SET at = 0 WHERE at <> 0; UPDATE purged SET at = 0 WHERE at <> 0;",
+        )?;
         Ok(Relay { conn: Mutex::new(conn), snapshot_at: (SNAPSHOT_MIN_UPDATES, SNAPSHOT_MIN_BYTES), blob_dir, temporary, max_file: MAX_FILE_BYTES, quota: None, unused_grace: Some(UNUSED_GRACE_MS) })
     }
 
@@ -315,8 +322,7 @@ impl Relay {
         let mut conn = self.conn();
         self.require(&conn, workspace)?;
         let tx = conn.transaction()?;
-        let at = now_ms();
-        Self::touch(&tx, workspace, device, at)?;
+        Self::touch(&tx, workspace, device, now_ms())?;
         for item in items {
             let blob = crate::crypto::unb64(&item.blob)?;
             // From a device that has not heard of the deletion yet.
@@ -324,8 +330,8 @@ impl Relay {
                 continue;
             }
             tx.execute(
-                "INSERT INTO updates(workspace, doc, device, blob, at) VALUES (?1, ?2, ?3, ?4, ?5)",
-                params![workspace, item.doc, device, blob, at],
+                "INSERT INTO updates(workspace, doc, device, blob, at) VALUES (?1, ?2, ?3, ?4, 0)",
+                params![workspace, item.doc, device, blob],
             )?;
         }
         tx.commit()?;
@@ -418,8 +424,7 @@ impl Relay {
         let mut conn = self.conn();
         self.require(&conn, workspace)?;
         let tx = conn.transaction()?;
-        let at = now_ms();
-        Self::touch(&tx, workspace, device, at)?;
+        Self::touch(&tx, workspace, device, now_ms())?;
         let (previous, started): (Option<i64>, Option<i64>) = tx.query_row(
             "SELECT acked_round, acked_started FROM devices WHERE workspace = ?1 AND device = ?2",
             params![workspace, device],
@@ -428,8 +433,8 @@ impl Relay {
         for item in items {
             let blob = crate::crypto::unb64(&item.blob)?;
             tx.execute(
-                "INSERT OR REPLACE INTO acks(workspace, device, doc, blob, at) VALUES (?1, ?2, ?3, ?4, ?5)",
-                params![workspace, device, item.doc, blob, at],
+                "INSERT OR REPLACE INTO acks(workspace, device, doc, blob, at) VALUES (?1, ?2, ?3, ?4, 0)",
+                params![workspace, device, item.doc, blob],
             )?;
         }
         let accepted = round.is_none_or(|round| {
@@ -483,8 +488,7 @@ impl Relay {
         let mut conn = self.conn();
         self.require(&conn, workspace)?;
         let tx = conn.transaction()?;
-        let at = now_ms();
-        Self::touch(&tx, workspace, device, at)?;
+        Self::touch(&tx, workspace, device, now_ms())?;
         // The device pulled further than the server now has (it was put
         // back to an older copy): the device starts over at its next sync.
         if covers > Self::head_of(&tx, workspace)? {
@@ -495,8 +499,8 @@ impl Relay {
         }
         let blob = crate::crypto::unb64(&item.blob)?;
         tx.execute(
-            "INSERT INTO updates(workspace, doc, device, blob, at, kind) VALUES (?1, ?2, ?3, ?4, ?5, 'snapshot')",
-            params![workspace, item.doc, device, blob, at],
+            "INSERT INTO updates(workspace, doc, device, blob, at, kind) VALUES (?1, ?2, ?3, ?4, 0, 'snapshot')",
+            params![workspace, item.doc, device, blob],
         )?;
         let seq = tx.last_insert_rowid();
         tx.execute("DELETE FROM updates WHERE workspace = ?1 AND doc = ?2 AND seq <= ?3", params![workspace, item.doc, covers])?;
@@ -514,10 +518,9 @@ impl Relay {
         let mut conn = self.conn();
         self.require(&conn, workspace)?;
         let tx = conn.transaction()?;
-        let at = now_ms();
-        Self::touch(&tx, workspace, device, at)?;
+        Self::touch(&tx, workspace, device, now_ms())?;
         for doc in docs {
-            tx.execute("INSERT OR IGNORE INTO purged(workspace, doc, at) VALUES (?1, ?2, ?3)", params![workspace, doc, at])?;
+            tx.execute("INSERT OR IGNORE INTO purged(workspace, doc, at) VALUES (?1, ?2, 0)", params![workspace, doc])?;
             tx.execute("DELETE FROM updates WHERE workspace = ?1 AND doc = ?2", params![workspace, doc])?;
         }
         tx.commit()?;
@@ -909,5 +912,32 @@ mod tests {
         // Opening again changes nothing.
         drop(relay);
         assert_eq!(Relay::open(&path).unwrap().log_stats("ws").unwrap(), (0, 1));
+    }
+
+    #[test]
+    fn when_documents_are_written_is_not_kept() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("relay.db");
+        let times = |relay: &Relay| -> Vec<i64> {
+            let conn = relay.conn();
+            ["updates", "acks", "purged"]
+                .iter()
+                .map(|t| conn.query_row(&format!("SELECT COALESCE(MAX(at), 0) FROM {t}"), [], |r| r.get(0)).unwrap())
+                .collect()
+        };
+        let relay = Relay::open(&path).unwrap();
+        relay.create_workspace("ws", &crate::crypto::wrap(&crate::crypto::WorkspaceKey::generate(), "p", (1024, 1, 1)).unwrap()).unwrap();
+        let item = |doc: &str| PushItem { doc: doc.into(), blob: crate::crypto::b64(b"sealed") };
+        relay.push("ws", "a", &[item("one"), item("two")]).unwrap();
+        relay.push_acks("ws", "a", &[item("one")], None).unwrap();
+        relay.purge("ws", "a", &["two".into()]).unwrap();
+        assert_eq!(times(&relay), vec![0, 0, 0]);
+        // The device list still says when each device was last seen.
+        assert!(relay.devices("ws", "a").unwrap()[0].last_seen > 0);
+
+        // Times an older server kept are cleared when this one opens it.
+        relay.conn().execute_batch("UPDATE updates SET at = 5; UPDATE acks SET at = 5; UPDATE purged SET at = 5;").unwrap();
+        drop(relay);
+        assert_eq!(times(&Relay::open(&path).unwrap()), vec![0, 0, 0]);
     }
 }
