@@ -50,6 +50,8 @@ interface ShellState {
   /** Cards opened most recently first, for the sidebar. */
   recent: { cardId: string; title: string | null }[];
   notice: string | null;
+  /** The notice offers to undo what it reports (appUndo's last step). */
+  noticeUndo: boolean;
   /** The sidebar is shown (it can be hidden for more room, like Claude's). */
   sidebarOpen: boolean;
   setSidebarOpen(open: boolean): void;
@@ -95,7 +97,7 @@ interface ShellState {
   renameTag(from: string, to: string): void;
   /** Restores a saved layout (startup). */
   restore(layout: { panes: Pane[]; focused: string; split: number }): void;
-  setNotice(text: string | null): void;
+  setNotice(text: string | null, options?: { undo?: boolean }): void;
 }
 
 export type TabDrop = { pane: string; index?: number } | { newPane: true };
@@ -159,6 +161,7 @@ export const useShell = create<ShellState>((set) => {
     split: DEFAULT_SPLIT,
     recent: [],
     notice: null,
+    noticeUndo: false,
     sidebarOpen: true,
     setSidebarOpen: (sidebarOpen) => set({ sidebarOpen }),
     panelOpen: false,
@@ -316,7 +319,7 @@ export const useShell = create<ShellState>((set) => {
         return { ...t, split: Math.min(0.8, Math.max(0.2, layout.split || DEFAULT_SPLIT)) };
       }),
 
-    setNotice: (notice) => set({ notice }),
+    setNotice: (notice, options) => set({ notice, noticeUndo: Boolean(options?.undo) }),
   };
 });
 

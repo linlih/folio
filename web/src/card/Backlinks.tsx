@@ -5,7 +5,7 @@ import type { Backlink } from "../bindings/commands";
 import { backend } from "../platform";
 import { appUndo, docs } from "../app";
 import { linkMention, unlinkMention } from "../editor/linkMention";
-import { CARDS_CHANGED, cardsChanged, undoKey } from "./actions";
+import { CARDS_CHANGED, cardsChanged } from "./actions";
 import { toSide, useShell } from "../shell/tabs";
 import { cardName, openAt } from "./reveal";
 
@@ -140,7 +140,7 @@ export function Backlinks({ cardId, active }: { cardId: string; active: boolean 
           cardsChanged();
         },
       });
-      shell.setNotice(t("backlinks.linkedDone", { count: done.length, undo: undoKey() }));
+      shell.setNotice(t("backlinks.linkedDone", { count: done.length }), { undo: true });
       cardsChanged();
     } catch (e) {
       shell.setNotice(t("error.generic", { message: String(e) }));

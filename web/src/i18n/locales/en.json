@@ -1,4 +1,5 @@
 {
+  "noticeUndo": "Undo",
   "app": {
     "name": "Folio"
   },
@@ -142,9 +143,9 @@
     "title": "Trash",
     "empty": "The trash is empty",
     "restore": "Restore",
-    "moved": "Moved “{{title}}” to the trash. Press {{undo}} to undo.",
+    "moved": "Moved “{{title}}” to the trash",
     "restored": "Restored “{{title}}”.",
-    "movedMany": "Moved {{count}} cards to the trash. Press {{undo}} to undo.",
+    "movedMany": "Moved {{count}} cards to the trash",
     "restoredMany": "Restored {{count}} cards.",
     "emptyHint": "Cards you move to the trash show up here, and can be restored for 30 days.",
     "emptyTrash": "Empty trash",
@@ -233,7 +234,7 @@
     "link": "Link",
     "linkHint": "Turn this mention into a card link",
     "linkAll": "Link all ({{count}})",
-    "linkedDone": "Linked {{count}} mentions. {{undo}} undoes it."
+    "linkedDone": "Linked {{count}} mentions"
   },
   "search": {
     "placeholder": "Search cards, journal and blocks",
@@ -776,7 +777,7 @@
     "emptyHint": "When you find something worth keeping, tap Share in another app and pick Folio (Android), or copy the link and paste it above. Only the title, summary and link are kept; once read, tap ✓ to mark it dealt with and it stays in the card library.",
     "openSource": "Open the original",
     "markDone": "Dealt with",
-    "done": "“{{title}}” dealt with; it stays in the card library ({{undo}} to undo)",
+    "done": "“{{title}}” dealt with; it stays in the card library",
     "inInbox": "In the inbox"
   },
   "db": {
@@ -806,7 +807,7 @@
     "sortDesc": "Sort descending",
     "renameField": "Rename",
     "deleteField": "Delete field",
-    "fieldDeleted": "Deleted the field “{{name}}”; the values stay on the cards ({{undo}} to undo)",
+    "fieldDeleted": "Deleted the field “{{name}}”; the values stay on the cards",
     "choose": "Choose…",
     "optionPlaceholder": "Search or add an option",
     "newOption": "Add “{{name}}”",
@@ -849,7 +850,7 @@
     "elsewhere": "Another device",
     "undated": "Earlier (time not recorded)",
     "restore": "Restore this version",
-    "restored": "Restored the version from {{when}} ({{undo}} to undo)"
+    "restored": "Restored the version from {{when}}"
   },
   "tasks": {
     "title": "Tasks",

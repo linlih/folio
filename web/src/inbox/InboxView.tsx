@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { appUndo, docs } from "../app";
 import type { InboxItem } from "../bindings/commands";
-import { CARDS_CHANGED, moveToTrash, undoKey } from "../card/actions";
+import { CARDS_CHANGED, moveToTrash } from "../card/actions";
 import { backend } from "../platform";
 import { EmptyState } from "../shell/EmptyState";
 import { toSide, useShell } from "../shell/tabs";
@@ -74,7 +74,7 @@ export function InboxView({ active = true }: { active?: boolean }) {
       return;
     }
     appUndo.push({ label: "inbox", undo: () => markDealtWith(item.id, false), redo: () => markDealtWith(item.id, true) });
-    setNotice(t("inbox.done", { title: item.title || t("library.untitled"), undo: undoKey() }));
+    setNotice(t("inbox.done", { title: item.title || t("library.untitled") }), { undo: true });
   }
 
   const date = new Intl.DateTimeFormat(i18n.language, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });

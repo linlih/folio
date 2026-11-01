@@ -1,4 +1,5 @@
 {
+  "noticeUndo": "撤销",
   "app": {
     "name": "页"
   },
@@ -142,9 +143,9 @@
     "title": "回收站",
     "empty": "回收站是空的",
     "restore": "恢复",
-    "moved": "已把“{{title}}”移到回收站，按 {{undo}} 撤销。",
+    "moved": "已把“{{title}}”移到回收站",
     "restored": "已恢复“{{title}}”。",
-    "movedMany": "已把 {{count}} 张卡片移到回收站，按 {{undo}} 撤销。",
+    "movedMany": "已把 {{count}} 张卡片移到回收站",
     "restoredMany": "已恢复 {{count}} 张卡片。",
     "emptyHint": "移到回收站的卡片会出现在这里，30 天内可以随时恢复。",
     "emptyTrash": "清空回收站",
@@ -233,7 +234,7 @@
     "link": "链接",
     "linkHint": "把这处提到改成卡片链接",
     "linkAll": "全部链接（{{count}}）",
-    "linkedDone": "已链接 {{count}} 处，按 {{undo}} 撤销"
+    "linkedDone": "已链接 {{count}} 处"
   },
   "search": {
     "placeholder": "搜索卡片、日记和块",
@@ -776,7 +777,7 @@
     "emptyHint": "看到值得留下的内容，在其他 App 里点「分享」选 Folio（Android），或复制链接粘贴到上面。这里只保存标题、摘要和链接；读完后点 ✓ 标为已整理，它会留在卡片库里。",
     "openSource": "打开原文",
     "markDone": "已整理",
-    "done": "「{{title}}」已整理，仍在卡片库里（{{undo}} 撤销）",
+    "done": "「{{title}}」已整理，仍在卡片库里",
     "inInbox": "在收集箱中"
   },
   "db": {
@@ -806,7 +807,7 @@
     "sortDesc": "降序排列",
     "renameField": "重命名",
     "deleteField": "删除属性",
-    "fieldDeleted": "已删除属性「{{name}}」，卡片上的值还在（{{undo}} 撤销）",
+    "fieldDeleted": "已删除属性「{{name}}」，卡片上的值还在",
     "choose": "选择…",
     "optionPlaceholder": "搜索或新建选项",
     "newOption": "新建「{{name}}」",
@@ -849,7 +850,7 @@
     "elsewhere": "其他设备",
     "undated": "更早（没有记录时间）",
     "restore": "恢复到这个版本",
-    "restored": "已恢复到 {{when}} 的版本（{{undo}} 撤销）"
+    "restored": "已恢复到 {{when}} 的版本"
   },
   "tasks": {
     "title": "任务",

@@ -4,7 +4,6 @@ import { ArrowDown, ArrowUp, Calendar, CheckSquare, Hash as NumberIcon, Link, Li
 import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { appUndo } from "../app";
-import { undoKey } from "../card/actions";
 import { addField, deleteField, FIELD_TYPES, renameField, restoreField, setView, type DbView, type Field, type FieldType } from "../docs/database";
 import { useShell } from "../shell/tabs";
 import { editDatabase } from "./database";
@@ -80,7 +79,7 @@ export async function removeField(tag: string, field: Field, t: (k: string, o?: 
     undo: () => editDatabase((doc) => restoreField(doc, tag, field.id)),
     redo: () => editDatabase((doc) => deleteField(doc, tag, field.id)),
   });
-  useShell.getState().setNotice(t("db.fieldDeleted", { name: field.name, undo: undoKey() }));
+  useShell.getState().setNotice(t("db.fieldDeleted", { name: field.name }), { undo: true });
 }
 
 /** A column's heading: its name, and a menu to sort by it, rename it or

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { appUndo } from "../app";
+import { undoKey } from "../card/actions";
 import { CardView } from "../card/CardView";
 import { JournalView } from "../journal/JournalView";
 import { CardLibrary } from "../library/CardLibrary";
@@ -133,7 +134,7 @@ const inTextField = (e: KeyboardEvent) =>
 
 export function AppShell() {
   const { t } = useTranslation();
-  const { panes, focused, split, notice, setNotice, sidebarOpen } = useShell();
+  const { panes, focused, split, notice, noticeUndo, setNotice, sidebarOpen } = useShell();
   const main = useRef<HTMLElement>(null);
   const [narrow, setNarrow] = useState(false);
   const phone = usePhone();
@@ -211,6 +212,13 @@ export function AppShell() {
       {notice && (
         <div className="notice" role="status" onClick={() => setNotice(null)}>
           {notice}
+          {/* A button, not "press ⌘Z": a phone has no keys to press. */}
+          {noticeUndo && (
+            <button className="notice-undo" onClick={() => void appUndo.undo()}>
+              {t("noticeUndo")}
+              {!touch && <kbd>{undoKey()}</kbd>}
+            </button>
+          )}
         </div>
       )}
     </div>

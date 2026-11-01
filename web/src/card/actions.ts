@@ -31,7 +31,7 @@ export async function moveToTrash(cardId: string, title: string) {
       cardsChanged();
     },
   });
-  shell.setNotice(i18n.t("trash.moved", { title: shown, undo: undoKey() }));
+  shell.setNotice(i18n.t("trash.moved", { title: shown }), { undo: true });
   cardsChanged();
 }
 
@@ -68,6 +68,6 @@ export async function moveManyToTrash(cards: { id: string; title: string }[]) {
       cardsChanged();
     },
   });
-  shell.setNotice(i18n.t("trash.movedMany", { count: cards.length, undo: undoKey() }));
+  shell.setNotice(i18n.t("trash.movedMany", { count: cards.length }), { undo: true });
   cardsChanged();
 }

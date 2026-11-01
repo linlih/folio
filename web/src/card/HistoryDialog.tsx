@@ -11,7 +11,6 @@ import { baseExtensions } from "../editor/extensions";
 import { backend } from "../platform";
 import { DialogFrame } from "../shell/Dialog";
 import { useShell } from "../shell/tabs";
-import { undoKey } from "./actions";
 import "./history.css";
 
 /** A card's earlier versions (docs/history.ts): pick one to read it as it
@@ -45,7 +44,7 @@ export function HistoryDialog({ cardId }: { cardId: string }) {
     if (!handle || !version) return;
     restoreTo(handle, version.frontiers);
     useShell.getState().setDialog(null);
-    useShell.getState().setNotice(t("history.restored", { when: label(version), undo: undoKey() }));
+    useShell.getState().setNotice(t("history.restored", { when: label(version) }), { undo: true });
   };
 
   return (

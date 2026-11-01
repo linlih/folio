@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { notes } from "../app";
 import { localDate } from "../docs/ids";
+import { isTouch } from "../shell/phone";
 import { useShell } from "../shell/tabs";
 import "./capture.css";
 
@@ -81,7 +82,8 @@ export function QuickCapture() {
           rows={4}
         />
         <div className="capture-foot">
-          <span>{t("capture.hint")}</span>
+          {/* Keys a touch screen does not have. */}
+          <span>{isTouch() ? "" : t("capture.hint")}</span>
           <button className="button primary" onClick={() => void save()}>
             {t("capture.save")}
           </button>
