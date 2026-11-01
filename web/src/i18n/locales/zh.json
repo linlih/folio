@@ -36,7 +36,10 @@
     "search": "搜索卡片标题和内容",
     "edited": "编辑于",
     "origin": "来源",
-    "origins": { "all": "全部来源", "inbox": "来自收集箱" },
+    "origins": {
+      "all": "全部来源",
+      "inbox": "来自收集箱"
+    },
     "within": {
       "all": "不限",
       "today": "今天",
@@ -172,7 +175,8 @@
       "date": "任务日期",
       "priority": "优先级",
       "time": "时间与日期",
-      "list": "列表类型"
+      "list": "列表类型",
+      "template": "模板"
     },
     "ref": "卡片引用",
     "embedBlock": "嵌入块",
@@ -197,7 +201,8 @@
     "datePicker": "选择日期",
     "numbered": "编号列表",
     "numberedChildren": "子项编号",
-    "table": "表格"
+    "table": "表格",
+    "template": "模板"
   },
   "suggest": {
     "none": "没有匹配",
@@ -233,7 +238,11 @@
     "noneFound": "没有符合的反向链接。",
     "fold": "收起",
     "unfold": "展开",
-    "sorts": {"recent": "最近编辑", "oldest": "最早编辑", "title": "卡片名"},
+    "sorts": {
+      "recent": "最近编辑",
+      "oldest": "最早编辑",
+      "title": "卡片名"
+    },
     "none": "还没有其他卡片链接到这里。",
     "unlinked": "未链接的引用",
     "unlinkedCount": "未链接的引用（{{count}}）",
@@ -917,5 +926,13 @@
     "deleteTable": "删除表格",
     "addRow": "添加一行",
     "addCol": "添加一列"
+  },
+  "templates": {
+    "mark": "设为模板",
+    "unmark": "不再作为模板",
+    "marked": "已设为模板。在任意位置输入 / 就能插入它的内容",
+    "unmarked": "已不再作为模板",
+    "none": "还没有模板：在一张卡片的 ⋯ 菜单里选「设为模板」",
+    "empty": "这个模板还没有内容"
   }
 }

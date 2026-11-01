@@ -2,6 +2,8 @@
 // commands follow Logseq's `commands-map` group by group; the spec's table
 // says what is covered and what waits for later milestones.
 
+import { insertTemplate, useTemplates } from "../../card/templates";
+import { useShell } from "../../shell/tabs";
 import { insertNewTable } from "../table";
 import { computePosition, flip, offset, shift } from "@floating-ui/dom";
 import { Extension, type Editor, type Range } from "@tiptap/core";
@@ -247,6 +249,7 @@ const ICON = {
   text: svg(`<path d="M5 5h10M10 5v10"/>`),
   heading: (n: number) => svg(`<path d="M3.5 5v10M9.5 5v10M3.5 10h6"/><text x="12" y="15.5" font-size="8" fill="currentColor" stroke="none">${n}</text>`),
   calendar: svg(`<rect x="3.5" y="4.5" width="13" height="12" rx="2"/><path d="M3.5 8.5h13M7 3v3M13 3v3"/>`),
+  template: svg(`<rect x="4" y="3" width="12" height="14" rx="2"/><path d="M7 7h6M7 10h6M7 13h3" stroke-dasharray="2 1.5"/>`),
   embed: svg(`<rect x="3" y="4" width="14" height="12" rx="2"/><path d="M6.5 8h7M6.5 11h5"/><path d="M3 4v12" stroke-width="2.4"/>`),
   clock: svg(`<circle cx="10" cy="10" r="7"/><path d="M10 6v4l2.5 2"/>`),
   numbered: svg(`<path d="M9 5.5h7M9 10h7M9 14.5h7M4 4.5l1-.5v3"/>`),
@@ -390,10 +393,34 @@ function slashChoices(): Choice[] {
         if (date) journalLink(editor, date);
       },
     },
+    // templates: one entry each; how to make one while there are none
+    ...templateChoices(g("template")),
     // list type
     { id: "numbered", group: g("list"), label: t("slash.numbered"), hint: "1.", icon: ICON.numbered, keywords: "number ordered list", run: (e, r) => toggleNumbered(e, r, false) },
     { id: "numbered-children", group: g("list"), label: t("slash.numberedChildren"), icon: ICON.numbered, keywords: "number children ordered", run: (e, r) => toggleNumbered(e, r, true) },
   ];
+}
+
+function templateChoices(group: string): Choice[] {
+  const { cards } = useTemplates.getState();
+  if (cards.length === 0) {
+    return [
+      {
+        id: "template", group, label: t("slash.template"), icon: ICON.template, keywords: "template moban muban",
+        run: (editor, range) => {
+          editor.view.dispatch(clear(editor, range));
+          useShell.getState().setNotice(t("templates.none"));
+        },
+      },
+    ];
+  }
+  return cards.map((c) => ({
+    id: `template:${c.id}`, group, label: c.title, icon: ICON.template, keywords: `template moban muban ${c.title}`,
+    run: (editor: Editor, range: Range) => {
+      editor.view.dispatch(clear(editor, range));
+      void insertTemplate(editor, c.id);
+    },
+  }));
 }
 
 const matches = (choice: Choice, query: string) => {

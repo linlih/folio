@@ -1,6 +1,7 @@
 import { Menu } from "@base-ui/react/menu";
 import { MoreHorizontal } from "lucide-react";
 import { isPinned, setPin, usePins } from "./pins";
+import { isTemplate, markTemplate, useTemplates } from "./templates";
 import { TopicRow } from "./TopicRow";
 import { ClipSource } from "./ClipSource";
 import { CardFields } from "./CardFields";
@@ -57,6 +58,7 @@ function titleEdge(toTitle: () => void) {
 function CardMenu({ cardId, title }: { cardId: string; title: string }) {
   const { t } = useTranslation();
   const pinned = usePins((s) => isPinned(s.cards, cardId));
+  const template = useTemplates((s) => isTemplate(s.ids, cardId));
   // Phones download files when they are looked at; this takes a card's
   // all along before going offline (design/attachments.md §5.4).
   const phone = usePhone() && backend.kind === "tauri";
@@ -75,6 +77,9 @@ function CardMenu({ cardId, title }: { cardId: string; title: string }) {
           <Menu.Popup className="popup">
             <Menu.Item className="popup-item" onClick={() => void setPin(cardId, !pinned)}>
               {t(pinned ? "nav.unpin" : "nav.pin")}
+            </Menu.Item>
+            <Menu.Item className="popup-item" onClick={() => void markTemplate(cardId, !template)}>
+              {t(template ? "templates.unmark" : "templates.mark")}
             </Menu.Item>
             <Menu.Item className="popup-item" onClick={() => useShell.getState().setDialog({ kind: "history", cardId })}>
               {t("history.menu")}

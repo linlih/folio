@@ -1,6 +1,6 @@
 // The workspace document (`ws`, design/ARCHITECTURE.md §4.1): what belongs
-// to the whole library rather than one card: the topics (§4.7) and the list
-// of whiteboards (§4.3).
+// to the whole library rather than one card: the topics (§4.7), the list
+// of whiteboards (§4.3) and which cards are templates (design/outliner.md).
 //
 // `topics` is a root map, so every device's copy is the same container; each
 // topic is a map under its own new id, made by one device only, so its
@@ -146,4 +146,29 @@ export function deleteTopic(doc: LoroDoc, id: string, now = Date.now()) {
   }
   m.set("deleted_at", now);
   doc.commit({ origin: TOPIC_ORIGIN });
+}
+
+const TEMPLATES = "templates";
+/** Origin of template edits: not part of a card's undo history. */
+export const TEMPLATE_ORIGIN = "meta:template";
+
+/** The cards used as templates, in the order they were made templates.
+ *  `templates` maps a card id to when; a device that unmarks it deletes
+ *  the key (the last change wins). */
+export function readTemplates(doc: LoroDoc): string[] {
+  const all = doc.getMap(TEMPLATES);
+  return all
+    .keys()
+    .map((id) => [id, typeof all.get(id) === "number" ? (all.get(id) as number) : 0] as const)
+    .sort((a, b) => a[1] - b[1] || (a[0] < b[0] ? -1 : 1))
+    .map(([id]) => id);
+}
+
+/** Makes a card a template, or an ordinary card again. */
+export function setTemplate(doc: LoroDoc, cardId: string, on: boolean, now: number) {
+  const all = doc.getMap(TEMPLATES);
+  if (on === (all.get(cardId) !== undefined)) return;
+  if (on) all.set(cardId, now);
+  else all.delete(cardId);
+  doc.commit({ origin: TEMPLATE_ORIGIN });
 }

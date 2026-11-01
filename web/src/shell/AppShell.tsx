@@ -28,6 +28,7 @@ import { TabDragLayer } from "./tabDrag";
 import { DetailsPanel } from "./DetailsPanel";
 import { useLayoutPersistence } from "./layout";
 import { useShell, type Pane, type Tab } from "./tabs";
+import { useTemplatesLoader } from "../card/templates";
 import "./shell.css";
 
 function View({ tab, pane, active }: { tab: Tab; pane: string; active: boolean }) {
@@ -145,6 +146,8 @@ export function AppShell() {
   // A new version from GitHub Releases, checked quietly once a day.
   useEffect(() => startUpdateChecks(), []);
   useMcpApprovals();
+  // Which cards are templates, for the / menu.
+  useTemplatesLoader();
 
   useEffect(() => {
     const el = main.current;

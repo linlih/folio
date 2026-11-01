@@ -36,7 +36,10 @@
     "search": "Search titles and text",
     "edited": "Edited",
     "origin": "From",
-    "origins": { "all": "Any source", "inbox": "From the inbox" },
+    "origins": {
+      "all": "Any source",
+      "inbox": "From the inbox"
+    },
     "within": {
       "all": "Any time",
       "today": "Today",
@@ -172,7 +175,8 @@
       "date": "Task date",
       "priority": "Priority",
       "time": "Time & date",
-      "list": "List type"
+      "list": "List type",
+      "template": "Templates"
     },
     "ref": "Card reference",
     "embedBlock": "Embed a block",
@@ -197,7 +201,8 @@
     "datePicker": "Date picker",
     "numbered": "Numbered list",
     "numberedChildren": "Number children",
-    "table": "Table"
+    "table": "Table",
+    "template": "Template"
   },
   "suggest": {
     "none": "No matches",
@@ -233,7 +238,11 @@
     "noneFound": "No backlinks match.",
     "fold": "Fold",
     "unfold": "Unfold",
-    "sorts": {"recent": "Recently edited", "oldest": "Least recently edited", "title": "Card name"},
+    "sorts": {
+      "recent": "Recently edited",
+      "oldest": "Least recently edited",
+      "title": "Card name"
+    },
     "none": "No other card links here yet.",
     "unlinked": "Unlinked references",
     "unlinkedCount": "Unlinked references ({{count}})",
@@ -917,5 +926,13 @@
     "deleteTable": "Delete table",
     "addRow": "Add a row",
     "addCol": "Add a column"
+  },
+  "templates": {
+    "mark": "Use as template",
+    "unmark": "Stop using as template",
+    "marked": "Now a template. Type / anywhere to insert its content",
+    "unmarked": "No longer a template",
+    "none": "No templates yet: choose “Use as template” in a card’s ⋯ menu",
+    "empty": "This template is empty"
   }
 }
