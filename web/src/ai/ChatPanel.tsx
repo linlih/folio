@@ -472,11 +472,32 @@ function Markdown({ text }: { text: string }) {
   return <div className="chat-md">{renderBlocks(blocks, onLink)}</div>;
 }
 
+/** A card's title for a tool line, which names cards by id. */
+function useCardTitle(id: string | null): string | null {
+  const [title, setTitle] = useState<string | null>(null);
+  useEffect(() => {
+    setTitle(null);
+    if (!id) return;
+    let gone = false;
+    backend.titles([id]).then(
+      (rows) => !gone && setTitle(cardName(id, rows.find(([cid]) => cid === id)?.[1] ?? "")),
+      () => {},
+    );
+    return () => {
+      gone = true;
+    };
+  }, [id]);
+  return title;
+}
+
 /** What a tool call did, in a few words. */
 function ToolLine({ part, result }: { part: { name: string; input?: Record<string, unknown> }; result?: AiToolResult | "running" }) {
   const { t } = useTranslation();
   const input = part.input ?? {};
-  const what = ["query", "title", "tag", "topic", "date", "id"].map((k) => input[k]).find((v) => typeof v === "string" && v) as string | undefined;
+  const named = ["query", "title", "tag", "topic", "date"].map((k) => input[k]).find((v) => typeof v === "string" && v) as string | undefined;
+  // A card named by id shows by its title (a journal day by its date).
+  const title = useCardTitle(!named && typeof input.id === "string" && input.id ? input.id : null);
+  const what = named ?? title ?? undefined;
   const label = t(`ai.tools.${part.name}`, { defaultValue: part.name });
   return (
     <div className={`chat-tool${result && result !== "running" && result.isError ? " failed" : ""}`}>
