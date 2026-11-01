@@ -52,6 +52,14 @@ export const togglePanel = () => {
   s.setPanelOpen(!s.panelOpen);
 };
 
+/** The assistant: ⌘J. */
+export const CHAT_COMBO = "Mod+J";
+
+export const toggleChat = () => {
+  const s = useShell.getState();
+  s.setChatOpen(!s.chatOpen);
+};
+
 export async function newCard() {
   const id = await backend.createCard("");
   cardsChanged();
@@ -89,6 +97,7 @@ export const GLOBAL_SHORTCUTS: Global[] = [
     match: (e) => e.code === "KeyI" && !e.shiftKey && (isMac ? e.metaKey && e.ctrlKey && !e.altKey : e.ctrlKey && e.altKey && !e.metaKey),
     run: togglePanel,
   },
+  { combo: CHAT_COMBO, label: "chat", match: (e, m) => m && plain(e) && !e.shiftKey && e.code === "KeyJ", run: toggleChat },
   { combo: "Mod+/", label: "help", match: (e, m) => m && plain(e) && (e.key === "/" || e.code === "Slash"), run: () => useShell.getState().setDialog({ kind: "shortcuts" }) },
 ];
 
@@ -115,6 +124,7 @@ export const SHORTCUT_GROUPS: { title: string; items: [string, string][] }[] = [
       ["Mod+Shift+L", "library"],
       [SIDEBAR_COMBO, "sidebar"],
       [PANEL_COMBO, "panel"],
+      [CHAT_COMBO, "chat"],
       ["Mod+/", "help"],
     ],
   },

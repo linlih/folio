@@ -7,6 +7,7 @@ import { isJournalId } from "./ids";
 import { Persistence } from "./persistence";
 import { WORKSPACE_ID } from "./workspace";
 import { isBoardId } from "./board";
+import { hasMessages } from "./chat";
 
 /** Typing within this window is undone as one step. */
 export const UNDO_MERGE_MS = 500;
@@ -47,10 +48,11 @@ export class DocHub {
     trackComposition();
   }
 
-  open(id: string): Promise<DocHandle> {
+  /** `as`: what a bare id holds when it may not exist yet (a new chat). */
+  open(id: string, as?: "chat"): Promise<DocHandle> {
     let entry = this.entries.get(id);
     if (!entry) {
-      entry = { handle: this.load(id), refs: 0 };
+      entry = { handle: this.load(id, as), refs: 0 };
       this.entries.set(id, entry);
       // A failed load must not stay cached.
       entry.handle.catch(() => this.entries.delete(id));
@@ -107,7 +109,7 @@ export class DocHub {
     return this.entries.has(id);
   }
 
-  private async load(id: string): Promise<DocHandle> {
+  private async load(id: string, as?: "chat"): Promise<DocHandle> {
     const doc = new LoroDoc();
     doc.setPeerId(BigInt(this.peer));
     // Dated edits, for the card's history (docs/history.ts).
@@ -115,10 +117,11 @@ export class DocHub {
     const snapshot = await this.backend.docSnapshot(id);
     const workspace = id === WORKSPACE_ID;
     const board = isBoardId(id);
+    const chat = as === "chat";
     let born = true;
     if (snapshot) {
       doc.import(snapshot);
-    } else if (workspace || board) {
+    } else if (workspace || board || chat) {
       // Made on first use; written once it holds something.
       born = false;
     } else if (isJournalId(id)) {
@@ -136,8 +139,11 @@ export class DocHub {
     const persistence = new Persistence(id, doc, this.backend, {
       born,
       onError: this.onError,
-      ...(workspace ? { kind: "workspace" as const, hasContent: (d: LoroDoc) => d.getMap("topics").size > 0 } : {}),
+      // Written once it lists anything: a topic, a whiteboard, a template, a chat.
+      ...(workspace ? { kind: "workspace" as const, hasContent: (d: LoroDoc) => ["topics", "boards", "templates", "chats"].some((k) => d.getMap(k).size > 0) } : {}),
       ...(board ? { kind: "board" as const, hasContent: (d: LoroDoc) => d.getMap("items").size > 0 } : {}),
+      // A chat is stored as a whiteboard (docs/chat.ts).
+      ...(chat ? { kind: "board" as const, hasContent: hasMessages } : {}),
     });
     return { id, doc, persistence, undo };
   }

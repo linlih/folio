@@ -110,7 +110,7 @@
       "general": "General",
       "sync": "Sync",
       "backup": "Backup & export",
-      "ai": "AI access",
+      "ai": "AI",
       "about": "About"
     },
     "appearance": "Appearance",
@@ -298,7 +298,8 @@
   "dialog": {
     "done": "Done",
     "close": "Close",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "save": "Save"
   },
   "shortcuts": {
     "title": "Keyboard shortcuts",
@@ -341,7 +342,8 @@
     "undo": "Undo",
     "redo": "Redo",
     "sidebar": "Show / hide sidebar",
-    "panel": "Show / hide details"
+    "panel": "Show / hide details",
+    "chat": "AI assistant"
   },
   "mcp": {
     "title": "AI access (MCP)",
@@ -584,7 +586,8 @@
     "newBoard": "New whiteboard",
     "boards": "Open whiteboards",
     "inbox": "Open inbox",
-    "tasks": "Open tasks"
+    "tasks": "Open tasks",
+    "chat": "Toggle AI assistant"
   },
   "topics": {
     "add": "Add to topic",
@@ -934,5 +937,91 @@
     "unmarked": "No longer a template",
     "none": "No templates yet: choose “Use as template” in a card’s ⋯ menu",
     "empty": "This template is empty"
+  },
+  "ai": {
+    "title": "AI assistant",
+    "open": "AI assistant",
+    "close": "Close",
+    "history": "Chats",
+    "newChat": "New chat",
+    "settings": "AI settings",
+    "placeholder": "Ask about your notes…",
+    "model": "Model",
+    "addModel": "Add a model…",
+    "send": "Send",
+    "stop": "Stop",
+    "contextHint": "Includes the current card",
+    "contextRemove": "Leave the card out",
+    "setupHint": "First add a model and its API key in Settings.",
+    "welcome": "Ask me about your notes, have me summarize or organize them, or help you review. Answers link to where they come from.",
+    "ideas": {
+      "summarizeCard": "Summarize this card",
+      "quizCard": "Quiz me on this card",
+      "recent": "What have I been writing about lately?",
+      "openTasks": "Which tasks are still open?"
+    },
+    "noChats": "No chats yet",
+    "delete": "Delete chat",
+    "deleted": "Chat deleted",
+    "copy": "Copy",
+    "saveCard": "Save as card",
+    "savedCard": "Saved as a card",
+    "toJournal": "Add to today's journal",
+    "addedJournal": "Added to today's journal",
+    "answer": "AI answer",
+    "tools": {
+      "search": "Searching notes",
+      "read_card": "Reading card",
+      "read_journal": "Reading journal",
+      "get_backlinks": "Backlinks",
+      "list_tags": "Tags",
+      "find_by_tag": "Finding by tag",
+      "list_recent_cards": "Recent cards",
+      "list_topics": "Topics",
+      "topic_cards": "Cards in topic",
+      "list_tasks": "Tasks"
+    },
+    "errors": {
+      "no-provider": "No model is set up yet.",
+      "no-key": "This model has no API key yet.",
+      "unavailable": "The assistant isn't available on the web; use the desktop or phone app.",
+      "refusal": "The model declined to answer this.",
+      "max-tokens": "The answer was too long and was cut off.",
+      "too-many-turns": "Too many steps; stopped. Try a more specific question.",
+      "other": "Something went wrong: {{message}}"
+    },
+    "setup": {
+      "models": "Models",
+      "none": "No models yet. Pick a provider below and enter its API key.",
+      "add": "Add:",
+      "custom": "Custom",
+      "edit": "Edit",
+      "remove": "Remove",
+      "keySaved": "Key saved",
+      "noKey": "No key",
+      "name": "Name",
+      "protocol": "API",
+      "openaiCompatible": "OpenAI-compatible",
+      "baseUrl": "Base URL",
+      "model": "Model",
+      "modelHint": "e.g. gpt-5, qwen-max",
+      "key": "API key",
+      "keyKeep": "Saved; leave empty to keep",
+      "keyOptional": "Optional for a local server",
+      "keyWhere": "The key stays in this device's keychain. It isn't synced and is sent only to this provider.",
+      "effort": "Effort",
+      "effortDefault": "Default",
+      "incomplete": "Enter the base URL and the model.",
+      "writes": "Changing notes",
+      "writeModes": {
+        "ask": "Ask me first",
+        "auto": "Change directly"
+      },
+      "writeHints": {
+        "ask": "When the AI wants to change or add notes, it shows you the change and writes only once you agree.",
+        "auto": "The AI writes directly; you can undo. (Coming soon: the AI changing notes.)"
+      },
+      "mcp": "External AI tools (MCP)"
+    }
   }
 }

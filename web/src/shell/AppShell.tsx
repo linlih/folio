@@ -27,6 +27,7 @@ import { startUpdateChecks } from "../update/updates";
 import { loadPinyin } from "../search/pinyin";
 import { TabDragLayer } from "./tabDrag";
 import { DetailsPanel } from "./DetailsPanel";
+import { ChatPanel } from "../ai/ChatPanel";
 import { useLayoutPersistence } from "./layout";
 import { useShell, type Pane, type Tab } from "./tabs";
 import { useTemplatesLoader } from "../card/templates";
@@ -212,6 +213,7 @@ export function AppShell() {
         {backend.kind === "memory" && <div className="web-mode">{t("settings.webMode")}</div>}
       </main>
       {phone ? <PhoneNav /> : <DetailsPanel />}
+      <ChatPanel />
       {touch && <KeyboardBar />}
       <TabDragLayer />
       <SearchPalette />

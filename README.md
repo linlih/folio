@@ -51,6 +51,7 @@ crates/
   folio-store/    SQLite: the only writer, change log, derived indexes, device settings
   folio-sync/     Sync client
   folio-io/       Import and export
+  folio-ai/       AI assistant: model providers (Anthropic, OpenAI-compatible)
   folio-mcp/      MCP server (AI access to notes)
   folio-server/   Sync relay server
 src-tauri/      Tauri 2 shell: IPC commands, windows, logging and diagnostics

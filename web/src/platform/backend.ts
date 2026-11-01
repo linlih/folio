@@ -2,6 +2,7 @@ import type { AssetEvent, AssetInfo, BackupInfo, McpStatus, SyncDevice, SyncStat
 import type { LatestRelease, LibraryLocation, PickedFolder } from "../bindings/commands";
 import type { AppInfo, Backlink, BlockText, CardRow, DocKind, JournalDay, SearchHit } from "../bindings/commands";
 import type { ClipInfo, InboxItem, LinkPreview, TagCard, TaskRow } from "../bindings/commands";
+import type { AiEvent, AiReply, AiTool, AiTurnRequest } from "../ai/types";
 
 /** Everything the UI may ask of the host. The Tauri app and web mode each
  *  implement it; UI code never imports `@tauri-apps/api` directly. */
@@ -113,6 +114,18 @@ export interface Backend {
   openReleaseDownload(url: string): Promise<void>;
   /** The theme of the phone's system bars and keyboard: "system", "light" or "dark". */
   setAppearance(theme: string): Promise<void>;
+  /** The assistant (design/ai.md). The providers with an API key on this
+   *  device, and keeping one (an empty key removes it); keys never come
+   *  back to the page. */
+  aiKeys(): Promise<string[]>;
+  aiSetKey(provider: string, key: string): Promise<void>;
+  /** The read-only tools, and running one. */
+  aiTools(): Promise<AiTool[]>;
+  aiTool(name: string, input: unknown): Promise<{ content: string; isError: boolean }>;
+  /** The model's next message, its text streamed to `onEvent`. Fails with
+   *  "no-key" or "no-provider", or the provider's error. */
+  aiTurn(request: AiTurnRequest, onEvent: (e: AiEvent) => void): Promise<AiReply>;
+  aiCancel(turn: string): Promise<void>;
   /** The read-only MCP server for AI tools (§0.3); desktop only. */
   mcpStatus(): Promise<McpStatus | null>;
   setMcpEnabled(enabled: boolean): Promise<McpStatus>;

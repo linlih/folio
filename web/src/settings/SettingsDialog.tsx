@@ -23,6 +23,7 @@ import {
   type Theme,
 } from "../design/theme";
 import { changeLanguage, isLanguage, LANGUAGE_SETTING, LANGUAGES } from "../i18n";
+import { AiSettingsPanel } from "../ai/AiSettings";
 import { McpPanel } from "../mcp/McpDialogs";
 import { backend } from "../platform";
 import { usePhone } from "../shell/phone";
@@ -48,7 +49,7 @@ const DESCRIPTION: Record<SettingsSection, string | null> = {
   general: null,
   sync: "sync.description",
   backup: "backup.description",
-  ai: "mcp.description",
+  ai: null,
   about: null,
 };
 
@@ -149,6 +150,7 @@ function PhoneSettings({ section }: { section: SettingsSection | null }) {
 }
 
 function SectionContent({ section }: { section: SettingsSection }) {
+  const { t } = useTranslation();
   return (
     <>
       {section === "general" && <GeneralPanel />}
@@ -160,7 +162,14 @@ function SectionContent({ section }: { section: SettingsSection }) {
           <BackupsPanel />
         </>
       )}
-      {section === "ai" && <McpPanel />}
+      {section === "ai" && (
+        <>
+          <AiSettingsPanel />
+          <h3 className="ai-settings-title">{t("ai.setup.mcp")}</h3>
+          <p className="ai-settings-hint">{t("mcp.description")}</p>
+          <McpPanel />
+        </>
+      )}
       {section === "about" && <AboutPanel />}
     </>
   );

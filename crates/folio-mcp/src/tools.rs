@@ -15,7 +15,7 @@ pub fn list() -> Value {
         {
             "name": "search",
             "title": "Search notes",
-            "description": "Search card titles and the text of every card and journal day. Returns matching cards and blocks with their card ids.",
+            "description": "Search card titles and the text of every card and journal day. Returns matching cards and blocks with their card and block ids.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -116,6 +116,19 @@ pub fn list() -> Value {
                 "required": ["topic"]
             },
             "annotations": { "readOnlyHint": true }
+        },
+        {
+            "name": "list_tasks",
+            "title": "Tasks",
+            "description": "Task blocks in cards and journal days, with their status, priority and dates; open ones (todo, doing, backlog, review) by default, or the done and canceled ones. Cards edited most recently come first.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "closed": { "type": "boolean", "default": false, "description": "List done and canceled tasks instead of open ones." },
+                    "limit": { "type": "integer", "minimum": 1, "maximum": 500, "default": 100 }
+                }
+            },
+            "annotations": { "readOnlyHint": true }
         }
     ])
 }
@@ -202,7 +215,7 @@ pub fn call(store: &mut Store, name: &str, args: &Value) -> Result<String, Strin
                 .iter()
                 .map(|h| match &h.bid {
                     None => format!("- card “{}” (id {})", title_or(&h.card_title, &h.card_id), h.card_id),
-                    Some(_) => format!("- in “{}” (id {}): {}", title_or(&h.card_title, &h.card_id), h.card_id, h.text),
+                    Some(bid) => format!("- in “{}” (id {}, block {bid}): {}", title_or(&h.card_title, &h.card_id), h.card_id, h.text),
                 })
                 .collect::<Vec<_>>()
                 .join("\n"))
@@ -239,7 +252,7 @@ pub fn call(store: &mut Store, name: &str, args: &Value) -> Result<String, Strin
                 .iter()
                 .map(|b| {
                     let via = if b.via == "ref" { "references a block" } else { "links" };
-                    format!("- “{}” (id {}) {via}: {}", title_or(&b.card_title, &b.card_id), b.card_id, b.text)
+                    format!("- “{}” (id {}, block {}) {via}: {}", title_or(&b.card_title, &b.card_id), b.card_id, b.bid, b.text)
                 })
                 .collect::<Vec<_>>()
                 .join("\n"))
@@ -262,7 +275,7 @@ pub fn call(store: &mut Store, name: &str, args: &Value) -> Result<String, Strin
                 .map(|r| {
                     // The lines under it, indented: often the note itself,
                     // with the tag alone on the line above.
-                    let mut out = format!("- in “{}” (id {}): {}", title_or(&r.card_title, &r.card_id), r.card_id, r.text);
+                    let mut out = format!("- in “{}” (id {}, block {}): {}", title_or(&r.card_title, &r.card_id), r.card_id, r.bid, r.text);
                     for c in &r.children {
                         out.push_str(&format!("\n{}- {}", "  ".repeat(c.depth as usize), c.text));
                     }
@@ -279,6 +292,31 @@ pub fn call(store: &mut Store, name: &str, args: &Value) -> Result<String, Strin
             Ok(cards
                 .iter()
                 .map(|c| format!("- “{}” (id {}){}", title_or(&c.title, &c.id), c.id, if c.preview.is_empty() { String::new() } else { format!(": {}", c.preview) }))
+                .collect::<Vec<_>>()
+                .join("\n"))
+        }
+        "list_tasks" => {
+            let closed = args.get("closed").and_then(Value::as_bool).unwrap_or(false);
+            let tasks = store.tasks(closed, arg_limit(args, 100, 500)).map_err(|e| e.to_string())?;
+            if tasks.is_empty() {
+                return Ok(if closed { "No done or canceled tasks." } else { "No open tasks." }.into());
+            }
+            Ok(tasks
+                .iter()
+                .map(|t| {
+                    let mut extra = Vec::new();
+                    if let Some(p) = &t.priority {
+                        extra.push(format!("priority {p}"));
+                    }
+                    if let Some(d) = &t.deadline {
+                        extra.push(format!("deadline {d}"));
+                    }
+                    if let Some(d) = &t.scheduled {
+                        extra.push(format!("scheduled {d}"));
+                    }
+                    let extra = if extra.is_empty() { String::new() } else { format!(", {}", extra.join(", ")) };
+                    format!("- [{}] {} — in “{}” (id {}, block {}{extra})", t.status, t.text, title_or(&t.card_title, &t.card_id), t.card_id, t.bid)
+                })
                 .collect::<Vec<_>>()
                 .join("\n"))
         }

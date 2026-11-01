@@ -59,6 +59,10 @@ interface ShellState {
    *  and facts. */
   panelOpen: boolean;
   setPanelOpen(open: boolean): void;
+  /** The assistant's panel (design/ai.md), in the details panel's place;
+   *  full screen on a phone. */
+  chatOpen: boolean;
+  setChatOpen(open: boolean): void;
   /** The topic the card library shows (§4.7); null for all cards. */
   libraryTopic: string | null;
   setLibraryTopic(topic: string | null): void;
@@ -165,7 +169,9 @@ export const useShell = create<ShellState>((set) => {
     sidebarOpen: true,
     setSidebarOpen: (sidebarOpen) => set({ sidebarOpen }),
     panelOpen: false,
-    setPanelOpen: (panelOpen) => set({ panelOpen }),
+    setPanelOpen: (panelOpen) => set(panelOpen ? { panelOpen, chatOpen: false } : { panelOpen }),
+    chatOpen: false,
+    setChatOpen: (chatOpen) => set(chatOpen ? { chatOpen, panelOpen: false } : { chatOpen }),
     libraryTopic: null,
     setLibraryTopic: (libraryTopic) => set({ libraryTopic }),
     openTopic: (topic, side = false) => {

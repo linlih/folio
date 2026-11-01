@@ -64,7 +64,7 @@ fn an_approved_client_gets_a_session_and_reads_notes() {
     };
     let (list, _) = handle(&*host, &json!({ "jsonrpc": "2.0", "id": 3, "method": "tools/list" }), Some("s1"), &mut never);
     let Reply::Json(list) = list else { panic!() };
-    assert_eq!(list["result"]["tools"].as_array().unwrap().len(), 9);
+    assert_eq!(list["result"]["tools"].as_array().unwrap().len(), 10);
 
     let found = text(handle(&*host, &call("search", json!({ "query": "借用" })), Some("s1"), &mut never).0);
     assert!(found.contains(&id), "{found}");
@@ -165,4 +165,27 @@ fn topics_list_with_their_sub_topics_and_cards() {
     let sub = tools::call(&mut store, "topic_cards", &json!({ "topic": "AI学习 / 课程B" })).unwrap();
     assert!(sub.starts_with("Cards in “AI学习 › 课程B”"), "{sub}");
     assert!(tools::call(&mut store, "topic_cards", &json!({ "topic": "投资" })).is_err());
+}
+
+#[test]
+fn tasks_are_listed_with_where_they_are() {
+    use folio_core::body::{add_block, push_text};
+    use loro::LoroValue;
+    let dir = tempfile::tempdir().unwrap();
+    let mut store = Store::open(dir.path()).unwrap();
+    let id = store.create_card(CardKind::Note, "读书", 1).unwrap();
+    let doc = LoroDoc::new();
+    doc.import(&store.doc_snapshot(&id).unwrap()).unwrap();
+    let v = doc.oplog_vv();
+    let list = add_block(&doc, None, "taskList", &[]).unwrap();
+    for (bid, text, checked) in [("t1", "买书", false), ("t2", "读完", true)] {
+        let item = add_block(&doc, Some(list), "taskItem", &[("bid", LoroValue::from(bid)), ("checked", LoroValue::from(checked))]).unwrap();
+        push_text(&doc, add_block(&doc, Some(item), "paragraph", &[]).unwrap(), text).unwrap();
+    }
+    doc.commit();
+    store.apply_update(&id, DocKind::Card, &doc.export(ExportMode::updates(&v)).unwrap(), Origin::Local, 2).unwrap();
+    let open = tools::call(&mut store, "list_tasks", &json!({})).unwrap();
+    assert_eq!(open, format!("- [todo] 买书 — in “读书” (id {id}, block t1)"));
+    let closed = tools::call(&mut store, "list_tasks", &json!({ "closed": true })).unwrap();
+    assert!(closed.contains("[done] 读完"), "{closed}");
 }

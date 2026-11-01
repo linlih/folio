@@ -1,6 +1,7 @@
 //! Tauri shell. Commands are thin wrappers over `folio-store`; all rules live in
 //! the crates (design/ARCHITECTURE.md §3.1, tine ADR 0003).
 
+mod ai;
 mod assets;
 mod diagnostics;
 mod library;
@@ -557,9 +558,10 @@ fn titles(state: tauri::State<AppState>, ids: Vec<String>) -> CmdResult<Vec<(Str
 
 /// Settings the page may not read or write through the commands below:
 /// the sync settings hold the server token (and, on devices without a
-/// keychain, the key), and only the host's sync commands change them.
+/// keychain, the key), and only the host's sync commands change them; the
+/// AI keys are only ever read by the host.
 fn page_may_use(key: &str) -> CmdResult<()> {
-    if key == "sync" || key.starts_with("sync.") {
+    if key == "sync" || key.starts_with("sync.") || key == ai::KEYS {
         return Err(CommandError::Other(format!("the setting {key} is not the page's")));
     }
     Ok(())
@@ -1243,6 +1245,12 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             app_info,
+            ai::ai_set_key,
+            ai::ai_keys,
+            ai::ai_tools,
+            ai::ai_tool,
+            ai::ai_turn,
+            ai::ai_cancel,
             latest_release,
             download_update,
             install_update,

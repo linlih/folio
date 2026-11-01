@@ -110,7 +110,7 @@
       "general": "通用",
       "sync": "同步",
       "backup": "备份与导出",
-      "ai": "AI 接入",
+      "ai": "AI",
       "about": "关于"
     },
     "appearance": "外观",
@@ -298,7 +298,8 @@
   "dialog": {
     "done": "完成",
     "close": "关闭",
-    "cancel": "取消"
+    "cancel": "取消",
+    "save": "保存"
   },
   "shortcuts": {
     "title": "键盘快捷键",
@@ -341,7 +342,8 @@
     "undo": "撤销",
     "redo": "重做",
     "sidebar": "显示 / 隐藏侧栏",
-    "panel": "显示 / 隐藏详情面板"
+    "panel": "显示 / 隐藏详情面板",
+    "chat": "AI 助手"
   },
   "mcp": {
     "title": "AI 接入（MCP）",
@@ -584,7 +586,8 @@
     "newBoard": "新建白板",
     "boards": "打开白板列表",
     "inbox": "打开收集箱",
-    "tasks": "打开任务"
+    "tasks": "打开任务",
+    "chat": "打开 / 关闭 AI 助手"
   },
   "topics": {
     "add": "添加到主题",
@@ -934,5 +937,91 @@
     "unmarked": "已不再作为模板",
     "none": "还没有模板：在一张卡片的 ⋯ 菜单里选「设为模板」",
     "empty": "这个模板还没有内容"
+  },
+  "ai": {
+    "title": "AI 助手",
+    "open": "AI 助手",
+    "close": "关闭",
+    "history": "对话记录",
+    "newChat": "新对话",
+    "settings": "AI 设置",
+    "placeholder": "问问你的笔记…",
+    "model": "模型",
+    "addModel": "添加模型…",
+    "send": "发送",
+    "stop": "停止",
+    "contextHint": "会带上当前卡片",
+    "contextRemove": "不带当前卡片",
+    "setupHint": "先在设置里添加一个模型和它的 API key。",
+    "welcome": "可以问我笔记里的内容、让我总结和整理，或者帮你复习。回答会附上来源，点一下就能打开。",
+    "ideas": {
+      "summarizeCard": "总结这张卡片",
+      "quizCard": "根据这张卡片出几道题考考我",
+      "recent": "我最近在记些什么？",
+      "openTasks": "我还有哪些没做完的任务？"
+    },
+    "noChats": "还没有对话",
+    "delete": "删除对话",
+    "deleted": "对话已删除",
+    "copy": "复制",
+    "saveCard": "存成卡片",
+    "savedCard": "已存成卡片",
+    "toJournal": "加到今天的日记",
+    "addedJournal": "已加到今天的日记",
+    "answer": "AI 回答",
+    "tools": {
+      "search": "搜索笔记",
+      "read_card": "读取卡片",
+      "read_journal": "读取日记",
+      "get_backlinks": "查看反链",
+      "list_tags": "查看标签",
+      "find_by_tag": "按标签查找",
+      "list_recent_cards": "查看最近的卡片",
+      "list_topics": "查看主题",
+      "topic_cards": "查看主题下的卡片",
+      "list_tasks": "查看任务"
+    },
+    "errors": {
+      "no-provider": "还没有设置模型。",
+      "no-key": "这个模型还没有 API key。",
+      "unavailable": "网页版暂不支持 AI 助手，请使用桌面或手机应用。",
+      "refusal": "模型拒绝回答这个问题。",
+      "max-tokens": "回答太长，被截断了。",
+      "too-many-turns": "查找步骤太多，已停止。可以把问题问得具体一些。",
+      "other": "出错了：{{message}}"
+    },
+    "setup": {
+      "models": "模型",
+      "none": "还没有模型。从下面选一家服务商，填上 API key。",
+      "add": "添加：",
+      "custom": "自定义",
+      "edit": "编辑",
+      "remove": "移除",
+      "keySaved": "已保存 key",
+      "noKey": "没有 key",
+      "name": "名称",
+      "protocol": "接口",
+      "openaiCompatible": "OpenAI 兼容",
+      "baseUrl": "接口地址",
+      "model": "模型",
+      "modelHint": "如 gpt-5、qwen-max",
+      "key": "API key",
+      "keyKeep": "已保存，留空不改",
+      "keyOptional": "本机服务可以不填",
+      "keyWhere": "key 只保存在这台设备的系统钥匙串里，不会同步，也不会发给除这家服务商以外的任何地方。",
+      "effort": "思考力度",
+      "effortDefault": "默认",
+      "incomplete": "请填写接口地址和模型。",
+      "writes": "修改笔记",
+      "writeModes": {
+        "ask": "每次先问我",
+        "auto": "直接修改"
+      },
+      "writeHints": {
+        "ask": "AI 想修改或新建笔记时，先给你看改动，你同意后才写入。",
+        "auto": "AI 直接写入，可以撤销。（AI 修改笔记的功能即将推出）"
+      },
+      "mcp": "外部 AI 工具（MCP）"
+    }
   }
 }

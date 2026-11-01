@@ -1,10 +1,10 @@
-import { ArrowLeftRight, Columns2, PanelRightOpen, RectangleHorizontal, X } from "lucide-react";
+import { ArrowLeftRight, Columns2, PanelRightOpen, RectangleHorizontal, Sparkles, X } from "lucide-react";
 import { ContextMenu } from "@base-ui/react/context-menu";
 import { useTranslation } from "react-i18next";
 import { copyMarkdown, exportCardMarkdown } from "../card/markdown";
 import { useBoards } from "../docs/topics";
 import { ShowSidebarButton } from "./Sidebar";
-import { keyLabel, PANEL_COMBO, togglePanel } from "./shortcuts";
+import { CHAT_COMBO, keyLabel, PANEL_COMBO, toggleChat, togglePanel } from "./shortcuts";
 import { consumeClick, startTabDrag } from "./tabDrag";
 import { SINGLE, useShell, type Pane, type Tab } from "./tabs";
 
@@ -113,6 +113,7 @@ export function TabBar({ pane, last, narrow, leading }: { pane: Pane; last: bool
   // the traffic lights and the button that brings the sidebar back.
   const sidebarHidden = useShell((s) => !s.sidebarOpen) && leading;
   const panelOpen = useShell((s) => s.panelOpen);
+  const chatOpen = useShell((s) => s.chatOpen);
   const other = panes.find((p) => p.id !== pane.id);
 
   return (
@@ -136,6 +137,11 @@ export function TabBar({ pane, last, narrow, leading }: { pane: Pane; last: bool
             onClick={toggleSplit}
           >
             {split ? <RectangleHorizontal size={15} strokeWidth={1.75} /> : <Columns2 size={15} strokeWidth={1.75} />}
+          </button>
+        )}
+        {last && !chatOpen && (
+          <button className="icon-button" title={`${t("ai.open")} (${keyLabel(CHAT_COMBO)})`} aria-label={t("ai.open")} onClick={toggleChat}>
+            <Sparkles size={15} strokeWidth={1.75} />
           </button>
         )}
         {last && !panelOpen && (

@@ -17,10 +17,14 @@ export const MEMORY_API_PEER = "3";
  *  the same behaviour as folio-store (single write path, trash, journal days).
  *  Everything is gone on reload. */
 export function memoryBackend(now: () => number = Date.now): Backend {
+
   const docs = new Map<string, { doc: LoroDoc; updatedAt: number }>();
   /** Deleted for good: later updates are dropped, as the host does. */
   const purged = new Set<string>();
   const settings = new Map<string, unknown>();
+  /** Documents written as whiteboards, chats among them (bare ids, not cards). */
+  const boards = new Set<string>();
+  const aiKeys = new Set<string>();
   const backups: { info: BackupInfo; docs: Map<string, Uint8Array> }[] = [];
   /** Added files: hash → object URL. */
   const assets = new Map<string, string>();
@@ -42,7 +46,7 @@ export function memoryBackend(now: () => number = Date.now): Backend {
   const cardPreview = (doc: LoroDoc) => preview(bodyLines(doc)) || preview([readMeta(doc).clip?.excerpt ?? ""]);
 
   /** Card documents: not the workspace document or whiteboards. */
-  const cards = () => [...docs].filter(([id]) => id !== WORKSPACE_ID && !isBoardId(id));
+  const cards = () => [...docs].filter(([id]) => id !== WORKSPACE_ID && !isBoardId(id) && !boards.has(id));
 
   const rows = (keep: (meta: ReturnType<typeof readMeta>) => boolean) =>
     cards().filter(([, e]) => keep(readMeta(e.doc))).map(([id, e]) => row(id, e));
@@ -57,7 +61,7 @@ export function memoryBackend(now: () => number = Date.now): Backend {
     e.updatedAt = now();
   };
 
-  return {
+  const backend: Backend = {
     kind: "memory",
     appInfo: async () => ({ version: "web", dataDir: "(memory)", frontendPeer: MEMORY_FRONTEND_PEER, apiPeer: MEMORY_API_PEER, storePeer: String(HOST_PEER), platform: "web" }),
     listCards: async (limit = 200) =>
@@ -72,8 +76,9 @@ export function memoryBackend(now: () => number = Date.now): Backend {
       return id;
     },
     docSnapshot: async (id) => docs.get(id)?.doc.export({ mode: "snapshot" }) ?? null,
-    applyUpdate: async (id, _kind, bytes) => {
+    applyUpdate: async (id, kind, bytes) => {
       if (purged.has(id)) return;
+      if (kind === "board") boards.add(id);
       const e = docs.get(id) ?? { doc: hostDoc(), updatedAt: 0 };
       e.doc.import(bytes);
       e.updatedAt = now();
@@ -260,7 +265,7 @@ export function memoryBackend(now: () => number = Date.now): Backend {
     cardTexts: async (ids) =>
       ids.flatMap((id) => {
         const e = docs.get(id);
-        if (!e || isBoardId(id) || id === WORKSPACE_ID) return [];
+        if (!e || isBoardId(id) || boards.has(id) || id === WORKSPACE_ID) return [];
         const m = readMeta(e.doc);
         return [{ id, title: m.title, text: bodyLines(e.doc).join("\n"), deleted: m.deletedAt !== null }];
       }),
@@ -331,6 +336,22 @@ export function memoryBackend(now: () => number = Date.now): Backend {
     openReleaseDownload: async () => {},
     setAppearance: async () => {},
     // No server in the browser.
+    // No model here: a test may stand one in (globalThis.__folioFakeAi).
+    aiKeys: async () => [...aiKeys],
+    aiSetKey: async (provider, key) => void (key.trim() ? aiKeys.add(provider) : aiKeys.delete(provider)),
+    aiTools: async () => [{ name: "search", description: "Search notes", schema: { type: "object", properties: { query: { type: "string" } }, required: ["query"] } }],
+    aiTool: async (name, input) => {
+      if (name !== "search") return { content: `unknown tool ${name}`, isError: true };
+      const hits = await backend.search(String((input as { query?: string }).query ?? ""), 20);
+      const lines = hits.map((h) => (h.bid ? `- in “${h.cardTitle}” (id ${h.cardId}, block ${h.bid}): ${h.text}` : `- card “${h.cardTitle}” (id ${h.cardId})`));
+      return { content: lines.join("\n") || "Nothing found.", isError: false };
+    },
+    aiTurn: async (request, onEvent) => {
+      const fake = (globalThis as { __folioFakeAi?: Backend["aiTurn"] }).__folioFakeAi;
+      if (!fake) throw new Error("unavailable");
+      return fake(request, onEvent);
+    },
+    aiCancel: async () => {},
     mcpStatus: async () => null,
     setMcpEnabled: async () => {
       throw new Error("not available in the browser");
@@ -396,4 +417,5 @@ export function memoryBackend(now: () => number = Date.now): Backend {
       return () => assetListeners.delete(listener);
     },
   };
+  return backend;
 }

@@ -222,7 +222,7 @@ fn is_set_up(app: &tauri::AppHandle) -> bool {
 
 /// Names this device's key among others in the keychain.
 fn account(s: &SyncSettings) -> String {
-    format!("{}/{}", s.workspace, s.device)
+    format!("sync key {}/{}", s.workspace, s.device)
 }
 
 /// Keeps the key outside the library if this device can; false where it

@@ -6,7 +6,7 @@ import { applyTheme, THEME_SETTING, type Theme } from "../design/theme";
 import i18n from "../i18n";
 import { backend } from "../platform";
 import { filterNames } from "../search/pinyin";
-import { newCard, PANEL_COMBO, SIDEBAR_COMBO, togglePanel, toggleSidebar } from "./shortcuts";
+import { CHAT_COMBO, newCard, PANEL_COMBO, SIDEBAR_COMBO, toggleChat, togglePanel, toggleSidebar } from "./shortcuts";
 import { useShell, type SettingsSection } from "./tabs";
 import { newBoard } from "../docs/topics";
 
@@ -44,6 +44,7 @@ export const COMMANDS: Command[] = [
   { id: "newBoard", label: "newBoard", run: async () => shell().open({ kind: "board", boardId: await newBoard(i18n.t("board.untitled")) }) },
   { id: "sidebar", label: "sidebar", combo: SIDEBAR_COMBO, run: toggleSidebar },
   { id: "panel", label: "panel", combo: PANEL_COMBO, run: togglePanel },
+  { id: "chat", label: "chat", combo: CHAT_COMBO, run: toggleChat },
   { id: "split", label: "split", combo: "Mod+\\", run: () => shell().toggleSplit() },
   { id: "settings", label: "settings", run: settings("general") },
   { id: "sync", label: "syncSettings", run: settings("sync") },

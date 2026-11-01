@@ -1,5 +1,5 @@
 import type { Editor } from "@tiptap/core";
-import { ArrowDown, ArrowUp, CalendarDays, ChevronLeft, ChevronsDownUp, Hash, ImagePlus, IndentDecrease, IndentIncrease, Keyboard, LayoutDashboard, LibraryBig, Redo2, Search, Settings, Slash, SquareCheck, SquarePen, Undo2, Inbox } from "lucide-react";
+import { ArrowDown, ArrowUp, CalendarDays, ChevronLeft, ChevronsDownUp, Hash, ImagePlus, IndentDecrease, IndentIncrease, Keyboard, LayoutDashboard, LibraryBig, Redo2, Search, Settings, Slash, Sparkles, SquareCheck, SquarePen, Undo2, Inbox } from "lucide-react";
 import { useInboxCount } from "../inbox/clip";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -90,6 +90,11 @@ export function PhoneTopBar({ pane }: { pane: Pane }) {
       )}
       {/* A whiteboard and a topic show their own names, on the page. */}
       <span className="phone-title">{root || inTopic || tab.target.kind === "board" ? "" : label(tab)}</span>
+      {root && (
+        <button className="icon-button" aria-label={t("ai.open")} title={t("ai.open")} onClick={() => useShell.getState().setChatOpen(true)}>
+          <Sparkles size={18} />
+        </button>
+      )}
       {root && (
         <button className="icon-button" aria-label={t("phone.search")} title={t("phone.search")} onClick={() => useShell.getState().setSearchOpen(true)}>
           <Search size={18} />
