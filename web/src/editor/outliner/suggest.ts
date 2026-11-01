@@ -180,6 +180,30 @@ const ask = (editor: Editor, range: Range, opts: Parameters<typeof askText>[1]) 
   return askText(anchor, opts).finally(() => editor.view.focus());
 };
 
+/** Where "embed a block / card" left `(())` or `[[]]`: the search that opens
+ *  there inserts an embed instead of a reference or link. */
+let embedAt: { editor: Editor; pos: number } | null = null;
+
+function startEmbed(editor: Editor, range: Range, brackets: string) {
+  const tr = editor.state.tr.insertText(brackets, range.from, range.to);
+  editor.view.dispatch(tr.setSelection(TextSelection.create(tr.doc, range.from + 2)));
+  embedAt = { editor, pos: range.from };
+}
+
+/** True once, if the search at `range` was started to embed. */
+function takeEmbed(editor: Editor, range: Range): boolean {
+  const yes = embedAt?.editor === editor && embedAt.pos === range.from;
+  embedAt = null;
+  return yes;
+}
+
+/** Replaces the search text (and its closing brackets) with an embed. */
+function insertEmbed(editor: Editor, range: Range, close: string, attrs: { bid: string | null; cardId: string | null }) {
+  const { doc } = editor.state;
+  const to = doc.textBetween(range.to, Math.min(doc.content.size, range.to + 2), "", "\ufffc") === close ? range.to + 2 : range.to;
+  editor.chain().insertContentAt({ from: range.from, to }, { type: "blockEmbed", attrs }).run();
+}
+
 const here = (editor: Editor): Range => ({ from: editor.state.selection.from, to: editor.state.selection.from });
 
 /** A link to a journal day (Logseq links the journal page). */
@@ -223,6 +247,7 @@ const ICON = {
   text: svg(`<path d="M5 5h10M10 5v10"/>`),
   heading: (n: number) => svg(`<path d="M3.5 5v10M9.5 5v10M3.5 10h6"/><text x="12" y="15.5" font-size="8" fill="currentColor" stroke="none">${n}</text>`),
   calendar: svg(`<rect x="3.5" y="4.5" width="13" height="12" rx="2"/><path d="M3.5 8.5h13M7 3v3M13 3v3"/>`),
+  embed: svg(`<rect x="3" y="4" width="14" height="12" rx="2"/><path d="M6.5 8h7M6.5 11h5"/><path d="M3 4v12" stroke-width="2.4"/>`),
   clock: svg(`<circle cx="10" cy="10" r="7"/><path d="M10 6v4l2.5 2"/>`),
   numbered: svg(`<path d="M9 5.5h7M9 10h7M9 14.5h7M4 4.5l1-.5v3"/>`),
 };
@@ -237,6 +262,14 @@ function slashChoices(): Choice[] {
         const tr = editor.state.tr.insertText("[[]]", range.from, range.to);
         editor.view.dispatch(tr.setSelection(TextSelection.create(tr.doc, range.from + 2)));
       },
+    },
+    {
+      id: "embedBlock", group: g("basic"), label: t("slash.embedBlock"), hint: "((", icon: ICON.embed, keywords: "embed block transclude qianru",
+      run: (editor, range) => startEmbed(editor, range, "(())"),
+    },
+    {
+      id: "embedCard", group: g("basic"), label: t("slash.embedCard"), hint: "[[", icon: ICON.embed, keywords: "embed card page transclude qianru",
+      run: (editor, range) => startEmbed(editor, range, "[[]]"),
     },
     // format
     {
@@ -387,16 +420,19 @@ async function cardChoices(query: string): Promise<Choice[]> {
     group: "",
     label: r.title || i18n.t("library.untitled"),
     icon: ICON.ref,
-    run: (editor, range) => linkCard(editor, range, r.id, r.title),
+    run: (editor, range) => (takeEmbed(editor, range) ? insertEmbed(editor, range, "]]", { bid: null, cardId: r.id }) : linkCard(editor, range, r.id, r.title)),
   }));
   if (q && !rows.some((r) => r.title === q)) {
-    out.unshift({
+    // Linking, a new card comes first; embedding one, an existing card is far likelier.
+    out[embedAt ? "push" : "unshift"]({
       id: "new",
       group: "",
       label: i18n.t("suggest.newCard", { title: q }),
       run: async (editor, range) => {
+        const embed = takeEmbed(editor, range);
         const id = await backend.createCard(q);
-        linkCard(editor, range, id, q);
+        if (embed) insertEmbed(editor, range, "]]", { bid: null, cardId: id });
+        else linkCard(editor, range, id, q);
         window.dispatchEvent(new Event("folio:cards-changed"));
       },
     });
@@ -417,6 +453,7 @@ async function blockChoices(query: string): Promise<Choice[]> {
     hint: cardName(h.cardId, h.cardTitle),
     icon: ICON.ref,
     run: (editor: Editor, range: Range) => {
+      if (takeEmbed(editor, range)) return insertEmbed(editor, range, "))", { bid: h.bid!, cardId: h.cardId });
       const { doc } = editor.state;
       const to = doc.textBetween(range.to, Math.min(doc.content.size, range.to + 2), "", "\ufffc") === "))" ? range.to + 2 : range.to;
       editor.chain().insertContentAt({ from: range.from, to }, { type: "blockRef", attrs: { bid: h.bid, cardId: h.cardId } }).run();

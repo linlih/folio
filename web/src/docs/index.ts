@@ -49,6 +49,10 @@ function inline(node: Json, block: string, out: IndexExtract): string {
       s += attr(c, "title");
     } else if (c.nodeName === "blockRef") {
       if (attr(c, "bid")) out.refs.push([block, attr(c, "bid")]);
+    } else if (c.nodeName === "blockEmbed") {
+      // An embedded block is referenced; an embedded card, linked.
+      if (attr(c, "bid")) out.refs.push([block, attr(c, "bid")]);
+      else if (attr(c, "cardId")) out.links.push([block, attr(c, "cardId")]);
     } else if (c.nodeName === "tag") {
       if (attr(c, "name")) {
         out.tags.push([block, attr(c, "name")]);

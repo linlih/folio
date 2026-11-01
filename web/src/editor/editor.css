@@ -475,3 +475,45 @@ li.dragging { opacity: 0.4; }
   .table-add-row { height: 26px; }
   .table-add-col { width: 26px; }
 }
+
+/* {{embeds}} (embed.ts): another block or card, shown in place. */
+.block-embed {
+  /* On the line it is in (an outline item's bullet stays beside it), as
+     wide as the line. */
+  display: inline-block;
+  box-sizing: border-box;
+  width: 100%;
+  vertical-align: top;
+  margin: 2px 0;
+  padding: 6px 12px 8px;
+  border-left: 3px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--accent) 4%, transparent);
+  cursor: pointer;
+  white-space: normal;
+}
+.block-embed:hover { background: color-mix(in srgb, var(--accent) 8%, transparent); }
+.block-embed.ProseMirror-selectednode { outline: 2px solid var(--accent); }
+.block-embed.missing { color: var(--muted); }
+.block-embed-source { display: block; margin-bottom: 2px; color: var(--muted); font: 12px/1.6 var(--font-ui); }
+.block-embed-source:empty { display: none; }
+.block-embed-body { display: block; }
+.block-embed-body > :first-child { margin-top: 0; }
+.block-embed-body > :last-child { margin-bottom: 0; }
+.block-embed-body input { pointer-events: none; }
+/* Lists drawn by the browser: the outline's own bullets and fold arrows
+   belong to an editor (as on the whiteboard, board.css). */
+.block-embed-body ul, .block-embed-body ol { padding-left: 1.3em; margin: 0; }
+.block-embed-body li > p { margin: 0; }
+.block-embed-body ul:not([data-type="taskList"]) > li { list-style: disc; }
+.block-embed-body ul ul:not([data-type="taskList"]) > li { list-style: circle; }
+.block-embed-body ol > li { list-style: decimal; }
+.block-embed-body li:has(> p:only-child:empty) { display: none; }
+.block-embed-body li[data-checked] { display: flex; align-items: baseline; gap: 6px; list-style: none; margin-left: -1.2em; }
+.block-embed-body li[data-checked] > label { display: inline-flex; flex: none; }
+.block-embed-body li[data-checked] > label input { margin: 0; accent-color: var(--accent); }
+.block-embed-body li[data-checked="true"] > div { color: var(--muted); text-decoration: line-through; }
+.block-embed-body img { max-width: 100%; border-radius: 6px; }
+/* No empty line after an embed that ends its line. */
+:is(p, h1, h2, h3, h4, h5, h6):has(> .block-embed:last-of-type) > :is(.ProseMirror-separator, .ProseMirror-trailingBreak) { display: none; }
+.block-embed-line { color: var(--muted); }

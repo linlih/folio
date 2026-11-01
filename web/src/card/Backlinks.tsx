@@ -36,7 +36,7 @@ export function Group({ group, onLink }: { group: ReturnType<typeof byCard>[numb
             ) : (
               <button className="backlink-block" onClick={(e) => openAt(r.cardId, group.title, r.bid, toSide(e))}>
                 {r.via === "ref" && <span className="backlink-via">{t("backlinks.ref")}</span>}
-                {r.text || t("backlinks.emptyBlock")}
+                {r.text || t(r.via === "link" || r.via === "ref" ? "backlinks.onlyRef" : "backlinks.emptyBlock")}
               </button>
             )}
             {onLink && (

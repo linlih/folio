@@ -423,7 +423,7 @@ fn inline_text(node: &loro::LoroMapValue, name: &str) -> Option<String> {
     };
     match name {
         "cardLink" => Some(attr("title")),
-        "blockRef" => Some(String::new()),
+        "blockRef" | "blockEmbed" => Some(String::new()),
         "tag" => Some(format!("#{}", attr("name"))),
         "hardBreak" => Some(" ".into()),
         "inlineMath" => Some(attr("latex")),

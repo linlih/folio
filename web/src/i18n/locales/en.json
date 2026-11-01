@@ -175,6 +175,8 @@
       "list": "List type"
     },
     "ref": "Card reference",
+    "embedBlock": "Embed a block",
+    "embedCard": "Embed a card",
     "link": "Link",
     "linkAsk": "Link address",
     "image": "Image",
@@ -231,6 +233,7 @@
     "noneUnlinked": "No other card mentions this card's title.",
     "ref": "block ref",
     "emptyBlock": "(empty block)",
+    "onlyRef": "(An embed or reference)",
     "showAll": "Show all {{count}}",
     "showLess": "Show less",
     "link": "Link",
@@ -252,7 +255,8 @@
   },
   "refs": {
     "copied": "Block reference copied; paste it anywhere to reference this block",
-    "missing": "(referenced block not found)"
+    "missing": "(referenced block not found)",
+    "emptyEmbed": "(Nothing here yet)"
   },
   "capture": {
     "title": "Quick capture to today's journal",

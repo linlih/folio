@@ -175,6 +175,8 @@
       "list": "列表类型"
     },
     "ref": "卡片引用",
+    "embedBlock": "嵌入块",
+    "embedCard": "嵌入卡片",
     "link": "链接",
     "linkAsk": "链接地址",
     "image": "图片",
@@ -231,6 +233,7 @@
     "noneUnlinked": "没有其他卡片提到这张卡片的标题。",
     "ref": "块引用",
     "emptyBlock": "（空块）",
+    "onlyRef": "（嵌入或引用）",
     "showAll": "显示全部 {{count}} 条",
     "showLess": "收起",
     "link": "链接",
@@ -252,7 +255,8 @@
   },
   "refs": {
     "copied": "已复制块引用，粘贴到任意位置即可引用这个块",
-    "missing": "（找不到被引用的块）"
+    "missing": "（找不到被引用的块）",
+    "emptyEmbed": "（还没有内容）"
   },
   "capture": {
     "title": "快速记录到今天的日记",

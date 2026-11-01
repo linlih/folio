@@ -188,7 +188,13 @@ fn inline_markdown(node: &LoroMap, links: &Links) -> String {
                     let title = (links.card_title)(&id).or_else(|| attr_str(&n, "title")).unwrap_or(id);
                     out.push_str(&format!("[[{title}]]"));
                 }
-                "blockRef" => {
+                // Obsidian embeds a note with ![[…]]; a block reads as a reference.
+                "blockEmbed" if attr_str(&n, "bid").is_none() => {
+                    let id = attr_str(&n, "cardId").unwrap_or_default();
+                    let title = (links.card_title)(&id).unwrap_or(id);
+                    out.push_str(&format!("![[{title}]]"));
+                }
+                "blockRef" | "blockEmbed" => {
                     let bid = attr_str(&n, "bid").unwrap_or_default();
                     match (links.block_text)(&bid) {
                         Some(text) => out.push_str(&format!("“{}”", escape(&text))),

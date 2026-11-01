@@ -7,6 +7,7 @@ import { BlockId, type RemoteTxPredicate } from "./blockId";
 import { CardLink } from "./cardLink";
 import { CodeBlock, CodeBlockKeys } from "./codeBlock";
 import { BlockRef } from "./refs";
+import { BlockEmbed } from "./embed";
 import { Tag } from "./tag";
 import { RevealBlock } from "./reveal";
 import { MathEditing } from "./mathEditing";
@@ -90,6 +91,7 @@ export function baseExtensions(isRemote: RemoteTxPredicate, placeholder = "", mo
     DragHandle,
     CardLink,
     BlockRef,
+    BlockEmbed,
     Tag,
     RevealBlock,
     BlockId(isRemote),

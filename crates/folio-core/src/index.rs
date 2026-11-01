@@ -118,6 +118,14 @@ fn inline_text(node: &LoroValue, block: &str, out: &mut Extract) -> String {
                         out.refs.push((block.to_owned(), bid));
                     }
                 }
+                // An embedded block is referenced; an embedded card, linked.
+                "blockEmbed" => {
+                    if let Some(bid) = attr(&child, "bid") {
+                        out.refs.push((block.to_owned(), bid));
+                    } else if let Some(id) = attr(&child, "cardId") {
+                        out.links.push((block.to_owned(), id));
+                    }
+                }
                 "tag" => {
                     if let Some(name) = attr(&child, "name") {
                         s.push('#');
@@ -235,6 +243,25 @@ mod tests {
     use super::*;
     use crate::body::{add_block, push_inline, push_text};
     use crate::card::{init_card, CardKind};
+
+    #[test]
+    fn embeds_count_as_references_and_links() {
+        let doc = LoroDoc::new();
+        init_card(&doc, CardKind::Journal, "", 1).unwrap();
+        let list = add_block(&doc, None, "bulletList", &[]).unwrap();
+        let item = add_block(&doc, Some(list), "listItem", &[("bid", LoroValue::from("i1"))]).unwrap();
+        let line = add_block(&doc, Some(item), "paragraph", &[("bid", LoroValue::from("i1p"))]).unwrap();
+        push_inline(&doc, line, "blockEmbed", &[("bid", "b9"), ("cardId", "c1")]).unwrap();
+        let item = add_block(&doc, Some(list), "listItem", &[("bid", LoroValue::from("i2"))]).unwrap();
+        let line = add_block(&doc, Some(item), "paragraph", &[("bid", LoroValue::from("i2p"))]).unwrap();
+        push_inline(&doc, line, "blockEmbed", &[("cardId", "c2")]).unwrap();
+        doc.commit();
+
+        let x = extract(&doc);
+        assert_eq!(x.refs, vec![("i1".to_owned(), "b9".to_owned())]);
+        assert_eq!(x.links, vec![("i2".to_owned(), "c2".to_owned())]);
+        assert!(x.blocks.iter().all(|b| b.text.is_empty()));
+    }
 
     #[test]
     fn blocks_links_and_refs() {

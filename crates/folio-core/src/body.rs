@@ -182,6 +182,8 @@ fn inline_parts(inline: &LoroMovableList) -> Vec<Part> {
                 match name.as_str() {
                     "cardLink" => push(Part { text: attr("title"), card: Some(attr("cardId")), ..Default::default() }),
                     "blockRef" => push(Part { block: Some(attr("bid")), ..Default::default() }),
+                    "blockEmbed" if !attr("bid").is_empty() => push(Part { block: Some(attr("bid")), ..Default::default() }),
+                    "blockEmbed" => push(Part { card: Some(attr("cardId")), ..Default::default() }),
                     "tag" => {
                         let tag = attr("name");
                         push(Part { text: format!("#{tag}"), tag: Some(tag), ..Default::default() })

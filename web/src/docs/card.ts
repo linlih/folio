@@ -178,6 +178,7 @@ function inlineText(n: Exclude<Json, string>): string | null {
     case "cardLink":
       return a("title");
     case "blockRef":
+    case "blockEmbed":
       return "";
     case "tag":
       return `#${a("name")}`;
@@ -287,6 +288,10 @@ function inlineParts(inline: LoroMovableList): DayPart[] {
           break;
         case "blockRef":
           push({ block: a("bid") });
+          break;
+        case "blockEmbed":
+          if (a("bid")) push({ block: a("bid") });
+          else push({ text: "", card: a("cardId") });
           break;
         case "tag":
           push({ text: `#${a("name")}`, tag: a("name") });
