@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import { addCardTopic, readCardTopics, removeCardTopic } from "../docs/card";
 import type { DocHandle } from "../docs/hub";
 import { newTopic, topicPath, useTopics } from "../docs/topics";
+import { matches } from "../search/pinyin";
 import { isTouch } from "../shell/phone";
 import { toSide, useShell } from "../shell/tabs";
 
@@ -69,7 +70,7 @@ export function TopicPicker({ taken, onPick, className, title, children }: { tak
     // Sub-topics show with their parent ("AI › Course A") and are found by it.
     const found = topics
       .map((topic) => ({ id: topic.id, name: topicPath(topics, topic.id) ?? topic.name, count: counts[topic.id] ?? 0 }))
-      .filter((o) => !taken.includes(o.id) && (!q || o.name.toLowerCase().includes(q)))
+      .filter((o) => !taken.includes(o.id) && matches(o.name, q))
       .slice(0, 8);
     const exact = topics.some((topic) => topic.name.toLowerCase() === q);
     return q && !exact ? [...found, { id: null, name: query.trim(), count: 0 }] : found;

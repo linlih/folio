@@ -2,6 +2,7 @@
 // design/ARCHITECTURE.md §8.4). Pure functions so they can be tested.
 
 import type { CardRow } from "../bindings/commands";
+import { queryMatch } from "../search/pinyin";
 
 export type SortKey = "updated" | "created" | "title";
 /** Last edited within: today, the last 7 days, the last 30 days, or any time. */
@@ -50,13 +51,12 @@ function startOf(edited: EditedWithin, now: Date): number {
 }
 
 export function applyQuery(rows: CardRow[], q: LibraryQuery, locale: string, now = new Date()): CardRow[] {
-  const words = q.text.trim().toLowerCase().split(/\s+/).filter(Boolean);
   const since = startOf(q.edited, now);
   const out = rows.filter((c) => {
     if (c.updatedAt < since) return false;
     if (q.origin === "inbox" && c.fromInbox == null) return false;
-    const hay = `${c.title}\n${c.preview}`.toLowerCase();
-    return words.every((w) => hay.includes(w));
+    // The title by pinyin too, the preview as written.
+    return queryMatch(c.title, q.text) !== null || queryMatch(`${c.title}\n${c.preview}`, q.text) === "text";
   });
   const collator = new Intl.Collator(locale, { numeric: true, sensitivity: "base" });
   const byTitle = (a: CardRow, b: CardRow) => {

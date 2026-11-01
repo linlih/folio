@@ -1,7 +1,7 @@
 import { CalendarDays, ChevronRight, FileText, Hash, Layers, Plus, Search, TextQuote } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { SearchHit, TagInfo } from "../bindings/commands";
+import type { CardRow, SearchHit, TagInfo } from "../bindings/commands";
 import { openTag } from "../editor/tag";
 import { cardsChanged } from "../card/actions";
 import { cardName, openAt } from "../card/reveal";
@@ -11,6 +11,7 @@ import { backend } from "../platform";
 import { findCommands, type Command } from "../shell/commands";
 import { keyLabel } from "../shell/shortcuts";
 import { toSide, useShell } from "../shell/tabs";
+import { filterNames, matches, usePinyin, withPinyinTitles } from "./pinyin";
 import "./search.css";
 
 /** A piece of text around the first match, with the match marked. */
@@ -47,6 +48,9 @@ export function SearchPalette() {
   const [query, setQuery] = useState("");
   const [hits, setHits] = useState<SearchHit[]>([]);
   const [tags, setTags] = useState<TagInfo[]>([]);
+  // Every card's title, to find by pinyin (the index matches as written).
+  const [cards, setCards] = useState<CardRow[]>([]);
+  const pinyin = usePinyin();
   const topics = useTopics((s) => s.topics);
   const [index, setIndex] = useState(0);
   const input = useRef<HTMLInputElement>(null);
@@ -58,6 +62,7 @@ export function SearchPalette() {
     setHits([]);
     setIndex(0);
     backend.tags(500).then(setTags, () => setTags([]));
+    backend.listCards(100_000).then(setCards, () => setCards([]));
     setTimeout(() => input.current?.focus());
   }, [searchOpen]);
 
@@ -79,18 +84,18 @@ export function SearchPalette() {
     if (commandMode)
       return findCommands(query.replace(COMMAND_PREFIX, "")).map((c) => ({ key: `cmd:${c.id}`, icon: "command", title: t(`commands.${c.label}`), command: c }));
     // Tags whose name has the query (with or without its #), first.
-    const tq = query.trim().replace(/^#/, "").toLowerCase();
-    const tagRows: Row[] = tq ? tags.filter((tag) => tag.key.includes(tq)).slice(0, 5).map((tag) => ({ key: `tag:${tag.key}`, icon: "tag", title: tag.name })) : [];
+    const tq = query.trim().replace(/^#/, "");
+    const tagRows: Row[] = tq ? filterNames(tags, tq, (tag) => tag.name).slice(0, 5).map((tag) => ({ key: `tag:${tag.key}`, icon: "tag", title: tag.name })) : [];
     // Topics whose name or path ("AI › Course A") has the query, first.
-    const q0 = query.trim().toLowerCase();
+    const q0 = query.trim();
     const topicRows: Row[] = q0
       ? topics
           .map((x) => ({ id: x.id, path: topicPath(topics, x.id) ?? x.name }))
-          .filter((x) => x.path.toLowerCase().includes(q0))
+          .filter((x) => matches(x.path, q0))
           .slice(0, 5)
           .map((x) => ({ key: `topic:${x.id}`, icon: "topic", title: x.path, topicId: x.id }))
       : [];
-    const out: Row[] = [...topicRows, ...tagRows, ...hits.map((h): Row => ({
+    const out: Row[] = [...topicRows, ...tagRows, ...withPinyinTitles(hits, cards, query).map((h): Row => ({
       key: `${h.cardId}:${h.bid ?? ""}`,
       icon: h.bid ? "block" : isJournalId(h.cardId) ? "journal" : "card",
       title: cardName(h.cardId, h.cardTitle),
@@ -99,7 +104,7 @@ export function SearchPalette() {
     const q = query.trim();
     if (q && !hits.some((h) => !h.bid && h.cardTitle === q)) out.push({ key: "new", icon: "new", title: t("search.newCard", { title: q }) });
     return out;
-  }, [hits, tags, topics, query, t, commandMode]);
+  }, [hits, cards, tags, topics, query, t, commandMode, pinyin]);
 
   const close = () => setSearchOpen(false);
 

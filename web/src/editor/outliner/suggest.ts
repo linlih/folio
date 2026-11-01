@@ -14,6 +14,7 @@ import { addDays, journalId, localDate } from "../../docs/ids";
 import i18n from "../../i18n";
 import { cardName } from "../../card/reveal";
 import { backend } from "../../platform";
+import { filterNames, loadPinyin, matches as nameMatches, queryMatch } from "../../search/pinyin";
 import { addFiles, pickFiles } from "../assets";
 import { askText, caretAnchor } from "./popover";
 import { PRIORITIES, PRIORITY_ICON, STATUSES, STATUS_ICON, type Priority } from "./statusIcons";
@@ -423,10 +424,10 @@ function templateChoices(group: string): Choice[] {
   }));
 }
 
+// A command is found by its name, id or keywords, or the name's pinyin.
 const matches = (choice: Choice, query: string) => {
-  const q = query.trim().toLowerCase();
-  if (!q) return true;
-  return [choice.label, choice.id, choice.hint ?? "", choice.keywords ?? ""].some((s) => s.toLowerCase().includes(q));
+  if (!query.trim()) return true;
+  return [choice.label, choice.id, choice.hint ?? "", choice.keywords ?? ""].some((s) => nameMatches(s, query.trim()));
 };
 
 // ---- `[[` card search ----
@@ -440,8 +441,8 @@ function linkCard(editor: Editor, range: Range, cardId: string, title: string) {
 
 async function cardChoices(query: string): Promise<Choice[]> {
   const q = query.trim();
-  const rows = await backend.listCards(500);
-  const hits = rows.filter((r) => !q || r.title.toLowerCase().includes(q.toLowerCase())).slice(0, 8);
+  const [rows] = await Promise.all([backend.listCards(500), loadPinyin()]);
+  const hits = filterNames(rows, q, (r) => r.title).slice(0, 8);
   const out: Choice[] = hits.map((r) => ({
     id: r.id,
     group: "",
@@ -450,8 +451,10 @@ async function cardChoices(query: string): Promise<Choice[]> {
     run: (editor, range) => (takeEmbed(editor, range) ? insertEmbed(editor, range, "]]", { bid: null, cardId: r.id }) : linkCard(editor, range, r.id, r.title)),
   }));
   if (q && !rows.some((r) => r.title === q)) {
-    // Linking, a new card comes first; embedding one, an existing card is far likelier.
-    out[embedAt ? "push" : "unshift"]({
+    // Linking, a new card comes first; embedding one, or typing the pinyin
+    // of a card's title, an existing card is far likelier.
+    const existing = embedAt || hits.some((r) => queryMatch(r.title, q) === "pinyin");
+    out[existing ? "push" : "unshift"]({
       id: "new",
       group: "",
       label: i18n.t("suggest.newCard", { title: q }),
@@ -497,8 +500,8 @@ function insertTag(editor: Editor, range: Range, name: string) {
 
 async function tagChoices(query: string): Promise<Choice[]> {
   const q = query.trim();
-  const tags = await backend.tags(500);
-  const hits = tags.filter((t) => !q || t.key.includes(q.toLowerCase())).slice(0, 8);
+  const [tags] = await Promise.all([backend.tags(500), loadPinyin()]);
+  const hits = filterNames(tags, q, (t) => t.name).slice(0, 8);
   const out: Choice[] = hits.map((t) => ({
     id: `tag:${t.key}`,
     group: "",

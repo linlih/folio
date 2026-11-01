@@ -56,6 +56,7 @@ import { createContext, useCallback, useContext, useEffect, useLayoutEffect, use
 import { useTranslation } from "react-i18next";
 import { docs } from "../app";
 import type { CardText } from "../bindings/commands";
+import { searchCards } from "../search/pinyin";
 import { CARDS_CHANGED, cardsChanged } from "../card/actions";
 import { CARDS_MIME } from "../card/drag";
 import {
@@ -506,7 +507,7 @@ function AddCard({ placed, onPick }: { placed: Set<string>; onPick: (cardId: str
     const timer = setTimeout(async () => {
       const q = query.trim();
       const found = q
-        ? (await backend.search(q, 40)).map((h) => ({ id: h.cardId, title: h.cardTitle, preview: h.bid ? h.text : "" }))
+        ? (await searchCards(q)).map((h) => ({ id: h.cardId, title: h.cardTitle, preview: h.bid ? h.text : "" }))
         : (await backend.listCards(30)).map((c) => ({ id: c.id, title: c.title, preview: c.preview }));
       const seen = new Set<string>();
       if (!stale) setRows(found.filter((r) => !seen.has(r.id) && seen.add(r.id) && !r.id.startsWith("journal:")));

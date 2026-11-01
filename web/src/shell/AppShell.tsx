@@ -24,6 +24,7 @@ import { KeyboardBar, PhoneNav, PhoneTopBar } from "./PhoneBars";
 import { usePhone, useTouch } from "./phone";
 import { UpdatePrompt } from "../update/UpdatePrompt";
 import { startUpdateChecks } from "../update/updates";
+import { loadPinyin } from "../search/pinyin";
 import { TabDragLayer } from "./tabDrag";
 import { DetailsPanel } from "./DetailsPanel";
 import { useLayoutPersistence } from "./layout";
@@ -145,6 +146,11 @@ export function AppShell() {
   useEffect(() => (touch ? installLongPress() : undefined), [touch]);
   // A new version from GitHub Releases, checked quietly once a day.
   useEffect(() => startUpdateChecks(), []);
+  // The pinyin dictionary, once the app has drawn (search/pinyin.ts).
+  useEffect(() => {
+    const timer = setTimeout(() => void loadPinyin(), 1500);
+    return () => clearTimeout(timer);
+  }, []);
   useMcpApprovals();
   // Which cards are templates, for the / menu.
   useTemplatesLoader();

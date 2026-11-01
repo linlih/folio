@@ -5,6 +5,7 @@ import { docs } from "../app";
 import { applyTheme, THEME_SETTING, type Theme } from "../design/theme";
 import i18n from "../i18n";
 import { backend } from "../platform";
+import { filterNames } from "../search/pinyin";
 import { newCard, PANEL_COMBO, SIDEBAR_COMBO, togglePanel, toggleSidebar } from "./shortcuts";
 import { useShell, type SettingsSection } from "./tabs";
 import { newBoard } from "../docs/topics";
@@ -66,9 +67,5 @@ export const COMMANDS: Command[] = [
 /** Commands whose name (in the current language, or the English id)
  *  contains every word of the query. */
 export function findCommands(query: string): Command[] {
-  const words = query.toLowerCase().split(/\s+/).filter(Boolean);
-  return COMMANDS.filter((c) => {
-    const text = `${i18n.t(`commands.${c.label}`)} ${c.id}`.toLowerCase();
-    return words.every((w) => text.includes(w));
-  });
+  return filterNames(COMMANDS, query, (c) => `${i18n.t(`commands.${c.label}`)} ${c.id}`);
 }
