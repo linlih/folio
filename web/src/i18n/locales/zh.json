@@ -227,6 +227,13 @@
   },
   "backlinks": {
     "linked": "{{count}} 条反向链接",
+    "found": "找到 {{count}} 条（共 {{total}} 条反向链接）",
+    "search": "搜索反向链接",
+    "sort": "排序",
+    "noneFound": "没有符合的反向链接。",
+    "fold": "收起",
+    "unfold": "展开",
+    "sorts": {"recent": "最近编辑", "oldest": "最早编辑", "title": "卡片名"},
     "none": "还没有其他卡片链接到这里。",
     "unlinked": "未链接的引用",
     "unlinkedCount": "未链接的引用（{{count}}）",

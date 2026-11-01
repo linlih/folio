@@ -95,3 +95,20 @@
 .topic-picker .popup-item > span:first-of-type { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; }
 .topic-count { color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
 .topic-picker-empty { margin: 6px 8px; color: var(--muted); font-size: 12.5px; }
+
+/* Searching, sorting and folding backlinks (Backlinks.tsx). */
+.backlinks-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 10px; }
+.backlinks-bar h2 { flex: 1; margin: 0; }
+.backlinks-search { display: flex; align-items: center; gap: 4px; width: 180px; padding: 0 8px; border: 1px solid var(--border); border-radius: 6px; color: var(--muted); }
+.backlinks-search:focus-within { border-color: var(--accent); }
+.backlinks-search input { flex: 1; min-width: 0; height: 26px; border: 0; outline: 0; background: transparent; color: var(--text); font: 12.5px var(--font-ui); }
+.backlinks-sort { height: 28px; padding: 0 6px; border: 1px solid var(--border); border-radius: 6px; background: var(--paper); color: var(--secondary); font: 12.5px var(--font-ui); }
+.backlink-head { display: flex; align-items: center; gap: 2px; }
+/* The fold arrow in the margin, so card names line up with the text. */
+.backlink-head:has(> .backlink-fold) { margin-left: -20px; }
+.backlink-fold { display: grid; place-items: center; width: 18px; height: 18px; border-radius: 4px; color: var(--muted); opacity: 0; }
+.backlink-group:hover .backlink-fold, .backlink-fold:focus-visible, .backlink-fold[aria-expanded="false"] { opacity: 1; }
+.backlink-fold:hover { color: var(--text); background: var(--hover); }
+.backlink-fold svg { transition: transform 0.12s; }
+.backlink-fold svg.open { transform: rotate(90deg); }
+.backlink-count { margin-left: 6px; color: var(--muted); font: 12px var(--font-ui); }

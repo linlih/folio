@@ -1,4 +1,4 @@
-import { ChevronRight, Link2 } from "lucide-react";
+import { ChevronRight, Link2, Search } from "lucide-react";
 import { type CSSProperties, useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { Backlink } from "../bindings/commands";
@@ -20,15 +20,57 @@ export function byCard(rows: Backlink[]) {
   return [...groups.values()];
 }
 
-/** `onLink`: unlinked mentions get a button that turns them into links. */
-export function Group({ group, onLink }: { group: ReturnType<typeof byCard>[number]; onLink?: (rows: Backlink[]) => void }) {
+type Groups = ReturnType<typeof byCard>;
+
+/** How backlinks are ordered: by when the linking card was last edited
+ *  (newest first, as they come), the other way round, or by card name. */
+export type BacklinkSort = "recent" | "oldest" | "title";
+const SORT_SETTING = "backlinks.sort";
+
+/** The groups, keeping the rows whose text, card name or nested blocks
+ *  contain `query` (any case), in `sort` order. */
+export function sieve(groups: Groups, query: string, sort: BacklinkSort): Groups {
+  const q = query.trim().toLowerCase();
+  const has = (s: string) => s.toLowerCase().includes(q);
+  const kept = !q
+    ? groups
+    : groups.flatMap((g) => {
+        const rows = has(g.title) ? g.rows : g.rows.filter((r) => has(r.text) || r.children?.some((c) => has(c.text)));
+        return rows.length ? [{ ...g, rows }] : [];
+      });
+  if (sort === "oldest") return [...kept].reverse();
+  if (sort === "title") return [...kept].sort((a, b) => a.title.localeCompare(b.title));
+  return kept;
+}
+
+/** `onLink`: unlinked mentions get a button that turns them into links.
+ *  `folded` / `onFold`: the group shows only its card's name. */
+export function Group({
+  group,
+  onLink,
+  folded = false,
+  onFold,
+}: {
+  group: Groups[number];
+  onLink?: (rows: Backlink[]) => void;
+  folded?: boolean;
+  onFold?: () => void;
+}) {
   const { t } = useTranslation();
   return (
     <li className="backlink-group">
-      <button className="backlink-card" onClick={(e) => openAt(group.cardId, group.title, null, toSide(e))}>
-        {group.title}
-      </button>
-      <ul>
+      <div className="backlink-head">
+        {onFold && (
+          <button className="backlink-fold" aria-expanded={!folded} aria-label={t(folded ? "backlinks.unfold" : "backlinks.fold")} onClick={onFold}>
+            <ChevronRight size={13} className={folded ? "" : "open"} />
+          </button>
+        )}
+        <button className="backlink-card" onClick={(e) => openAt(group.cardId, group.title, null, toSide(e))}>
+          {group.title}
+        </button>
+        {folded && <span className="backlink-count">{group.rows.length}</span>}
+      </div>
+      {!folded && <ul>
         {group.rows.map((r) => (
           <li key={`${r.via}:${r.bid}`} className={onLink ? "backlink-mention" : undefined}>
             {r.children?.length ? (
@@ -47,7 +89,7 @@ export function Group({ group, onLink }: { group: ReturnType<typeof byCard>[numb
             )}
           </li>
         ))}
-      </ul>
+      </ul>}
     </li>
   );
 }
@@ -94,6 +136,26 @@ export function Backlinks({ cardId, active }: { cardId: string; active: boolean 
   const [linked, setLinked] = useState<Backlink[]>([]);
   const [unlinked, setUnlinked] = useState<Backlink[] | null>(null);
   const [showUnlinked, setShowUnlinked] = useState(false);
+  const [query, setQuery] = useState("");
+  const [sort, setSort] = useState<BacklinkSort>("recent");
+  const [folded, setFolded] = useState<ReadonlySet<string>>(new Set());
+
+  useEffect(() => {
+    void backend
+      .getLocalSetting<BacklinkSort>(SORT_SETTING)
+      .then((s) => s && setSort(s))
+      .catch(() => {});
+  }, []);
+  const changeSort = (s: BacklinkSort) => {
+    setSort(s);
+    void backend.setLocalSetting(SORT_SETTING, s).catch(() => {});
+  };
+  const fold = (id: string) =>
+    setFolded((old) => {
+      const next = new Set(old);
+      if (!next.delete(id)) next.add(id);
+      return next;
+    });
 
   const load = useCallback(async () => {
     try {
@@ -147,15 +209,45 @@ export function Backlinks({ cardId, active }: { cardId: string; active: boolean 
     }
   };
 
-  const groups = byCard(linked);
+  const all = byCard(linked);
+  const total = all.reduce((n, g) => n + g.rows.length, 0);
+  const groups = sieve(all, query, sort);
   const count = groups.reduce((n, g) => n + g.rows.length, 0);
+  const unlinkedGroups = unlinked ? sieve(byCard(unlinked), query, sort) : [];
+  const searching = query.trim() !== "";
   return (
     <section className="backlinks">
-      <h2>
-        <Link2 size={14} strokeWidth={1.75} />
-        {t("backlinks.linked", { count })}
-      </h2>
-      {groups.length === 0 ? <p className="backlinks-empty">{t("backlinks.none")}</p> : <ul>{groups.map((g) => <Group key={g.cardId} group={g} />)}</ul>}
+      <div className="backlinks-bar">
+        <h2>
+          <Link2 size={14} strokeWidth={1.75} />
+          {searching ? t("backlinks.found", { count, total }) : t("backlinks.linked", { count: total })}
+        </h2>
+        {/* Worth it once there is more than a handful. */}
+        {(total > 3 || searching) && (
+          <>
+            <label className="backlinks-search">
+              <Search size={13} />
+              <input type="search" value={query} placeholder={t("backlinks.search")} aria-label={t("backlinks.search")} onChange={(e) => setQuery(e.target.value)} />
+            </label>
+            <select className="backlinks-sort" value={sort} aria-label={t("backlinks.sort")} onChange={(e) => changeSort(e.target.value as BacklinkSort)}>
+              {(["recent", "oldest", "title"] as const).map((s) => (
+                <option key={s} value={s}>
+                  {t(`backlinks.sorts.${s}`)}
+                </option>
+              ))}
+            </select>
+          </>
+        )}
+      </div>
+      {groups.length === 0 ? (
+        <p className="backlinks-empty">{t(searching && total ? "backlinks.noneFound" : "backlinks.none")}</p>
+      ) : (
+        <ul>
+          {groups.map((g) => (
+            <Group key={g.cardId} group={g} folded={folded.has(g.cardId)} onFold={() => fold(g.cardId)} />
+          ))}
+        </ul>
+      )}
       <button className="backlinks-toggle" aria-expanded={showUnlinked} onClick={() => setShowUnlinked((v) => !v)}>
         <ChevronRight size={14} className={showUnlinked ? "open" : ""} />
         {unlinked && showUnlinked ? t("backlinks.unlinkedCount", { count: unlinked.length }) : t("backlinks.unlinked")}
@@ -172,7 +264,7 @@ export function Backlinks({ cardId, active }: { cardId: string; active: boolean 
           <p className="backlinks-empty">{t("backlinks.noneUnlinked")}</p>
         ) : (
           <ul>
-            {byCard(unlinked).map((g) => (
+            {unlinkedGroups.map((g) => (
               <Group key={g.cardId} group={g} onLink={(rows) => void linkRows(rows)} />
             ))}
           </ul>

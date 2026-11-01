@@ -177,7 +177,8 @@ export function memoryBackend(now: () => number = Date.now): Backend {
     backlinks: async (id) => {
       const own = new Set(docs.has(id) ? extractIndex(docs.get(id)!.doc).blocks.map((b) => b.bid) : []);
       const out: Backlink[] = [];
-      for (const [cid, e] of live()) {
+      // As the Rust store: the card edited last first.
+      for (const [cid, e] of [...live()].sort((a, b) => b[1].updatedAt - a[1].updatedAt)) {
         if (cid === id) continue;
         const m = readMeta(e.doc);
         const x = extractIndex(e.doc);

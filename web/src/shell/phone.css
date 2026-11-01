@@ -136,7 +136,7 @@ body.phone-typing:has(.keyboard-bar) .shell { padding-bottom: 44px; }
 
   /* What a mouse finds by hovering is simply there. */
   :root .card-menu, :root .journal-day-menu, :root .ol-chevron, :root .library-check, :root .backlink-link, :root .topic-chip-remove, :root .topic-add,
-  :root .board-tile-menu, :root .nav-row-menu, :root .card-trash, :root .code-language, :root .board-card-open, :root .board-fold { opacity: 1; }
+  :root .board-tile-menu, :root .nav-row-menu, :root .card-trash, :root .code-language, :root .board-card-open, :root .board-fold, :root .backlink-fold { opacity: 1; }
   :root .card-menu, :root .journal-day-menu { width: 36px; height: 36px; }
   :root .board-tile-menu, :root .nav-row-menu { width: 32px; height: 32px; }
 

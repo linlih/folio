@@ -227,6 +227,13 @@
   },
   "backlinks": {
     "linked": "{{count}} linked references",
+    "found": "{{count}} of {{total}} backlinks",
+    "search": "Search backlinks",
+    "sort": "Sort",
+    "noneFound": "No backlinks match.",
+    "fold": "Fold",
+    "unfold": "Unfold",
+    "sorts": {"recent": "Recently edited", "oldest": "Least recently edited", "title": "Card name"},
     "none": "No other card links here yet.",
     "unlinked": "Unlinked references",
     "unlinkedCount": "Unlinked references ({{count}})",
