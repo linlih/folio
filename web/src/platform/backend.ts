@@ -2,7 +2,7 @@ import type { AssetEvent, AssetInfo, BackupInfo, McpStatus, SyncDevice, SyncStat
 import type { LatestRelease, LibraryLocation, PickedFolder } from "../bindings/commands";
 import type { AppInfo, Backlink, BlockText, CardRow, DocKind, JournalDay, SearchHit } from "../bindings/commands";
 import type { ClipInfo, InboxItem, LinkPreview, TagCard, TaskRow } from "../bindings/commands";
-import type { AiEvent, AiReply, AiTool, AiTurnRequest } from "../ai/types";
+import type { AiEvent, AiProtocol, AiReply, AiTool, AiTurnRequest } from "../ai/types";
 
 /** A provider with a key on this device, and the synced copy it matches. */
 export interface AiKeyInfo {
@@ -132,6 +132,10 @@ export interface Backend {
   aiOpenKey(provider: string, sealed: string): Promise<void>;
   /** Keeps a provider's key under another provider instead. */
   aiMoveKey(from: string, to: string): Promise<void>;
+  /** The models a provider offers, which checks its address and key too:
+   *  `key` as typed, or else the one kept for `provider`. Fails with the
+   *  provider's error. */
+  aiModels(request: { protocol: AiProtocol; baseUrl: string; key?: string; provider?: string }): Promise<string[]>;
   /** The read-only tools, and running one. */
   aiTools(): Promise<AiTool[]>;
   aiTool(name: string, input: unknown): Promise<{ content: string; isError: boolean }>;

@@ -1004,12 +1004,10 @@
       "openaiCompatible": "OpenAI 兼容",
       "baseUrl": "接口地址",
       "model": "模型",
-      "modelHint": "如 gpt-5、qwen-max",
       "key": "API key",
       "keyKeep": "已保存，留空不改",
       "keyOptional": "本机服务可以不填",
       "keyWhere": "key 保存在这台设备的系统钥匙串里。开启了同步时，它会加密后同步到你的其他设备（端到端加密，同步服务器看不到）；没开同步就只在这台设备上。",
-      "incomplete": "请填写接口地址和模型。",
       "writes": "修改笔记",
       "writeModes": {
         "ask": "每次先问我",
@@ -1019,7 +1017,20 @@
         "ask": "AI 想修改或新建笔记时，先给你看改动，你允许后才写入。",
         "auto": "AI 直接写入，每处修改都可以在对话里撤销。"
       },
-      "mcp": "外部 AI 工具（MCP）"
+      "mcp": "外部 AI 工具（MCP）",
+      "noModels": "没有模型",
+      "confirmRemove": "确认移除",
+      "advanced": "接口地址和协议",
+      "test": "测试连接",
+      "testing": "连接中…",
+      "testOk": "连接成功，有 {{count}} 个模型可选",
+      "needBaseUrl": "请填写接口地址。",
+      "needModel": "至少选择一个模型。",
+      "pickModels": "从下面的列表勾选要用的模型。",
+      "testFirst": "填好 key 后点「测试连接」，从服务商的模型列表里选；也可以直接输入模型 ID。",
+      "filterModels": "筛选模型",
+      "typeModel": "输入模型 ID，回车添加",
+      "removeModel": "移除 {{model}}"
     },
     "writes": {
       "create_card": "新建卡片",

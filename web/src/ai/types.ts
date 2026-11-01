@@ -46,6 +46,8 @@ export interface AiTurnRequest {
   /** Names the turn, to stop it. */
   turn: string;
   provider: string;
+  /** Which of the provider's models; its first when not given. */
+  model?: string;
   system: string;
   messages: AiMessage[];
   tools: AiTool[];

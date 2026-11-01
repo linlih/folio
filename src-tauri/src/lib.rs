@@ -1250,6 +1250,7 @@ pub fn run() {
             ai::ai_seal_key,
             ai::ai_open_key,
             ai::ai_move_key,
+            ai::ai_models,
             ai::ai_tools,
             ai::ai_tool,
             ai::ai_turn,

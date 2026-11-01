@@ -16,7 +16,10 @@ export interface SharedProvider {
   name: string;
   protocol: AiProtocol;
   baseUrl: string;
+  /** The first of `models`, which versions before them read. */
   model: string;
+  /** The provider's models the user picked, in their order. */
+  models: string[];
   effort?: string;
 }
 
@@ -50,7 +53,11 @@ export function readAiConfig(ws: LoroDoc): SharedAiConfig {
       if (typeof m.get("deleted_at") === "number") continue;
       const protocol = str(m, "protocol") === "anthropic" ? "anthropic" : "openai";
       const effort = str(m, "effort");
-      providers.push({ id, name: str(m, "name"), protocol, baseUrl: str(m, "base_url"), model: str(m, "model"), ...(effort ? { effort } : {}), at: Number(m.get("created_at")) || 0 });
+      const model = str(m, "model");
+      // One per line; a provider from before has only `model`.
+      const listed = str(m, "models").split("\n").filter(Boolean);
+      const models = listed.length ? listed : model ? [model] : [];
+      providers.push({ id, name: str(m, "name"), protocol, baseUrl: str(m, "base_url"), model: models[0] ?? "", models, ...(effort ? { effort } : {}), at: Number(m.get("created_at")) || 0 });
     }
   }
   providers.sort((a, b) => a.at - b.at || (a.id < b.id ? -1 : 1));
@@ -66,7 +73,8 @@ export function writeProvider(ws: LoroDoc, p: SharedProvider, now = Date.now()) 
   const all = providersMap(ws);
   const m = all.ensureMergeableMap(p.id);
   if (m.get("created_at") === undefined) m.set("created_at", now);
-  const fields: [string, string][] = [["name", p.name], ["protocol", p.protocol], ["base_url", p.baseUrl], ["model", p.model], ["effort", p.effort ?? ""]];
+  const models = p.models.length ? p.models : p.model ? [p.model] : [];
+  const fields: [string, string][] = [["name", p.name], ["protocol", p.protocol], ["base_url", p.baseUrl], ["model", models[0] ?? ""], ["models", models.join("\n")], ["effort", p.effort ?? ""]];
   for (const [k, v] of fields) if (m.get(k) !== v) m.set(k, v);
   ws.commit({ origin: AI_ORIGIN });
 }

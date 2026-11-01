@@ -82,7 +82,7 @@ describe("the memory backend", () => {
 describe("answering a message", () => {
   beforeAll(async () => {
     await startDocs();
-    await saveProvider({ name: "Test", protocol: "anthropic", baseUrl: "https://example.test/v1", model: "test-model" }, "k");
+    await saveProvider({ name: "Test", protocol: "anthropic", baseUrl: "https://example.test/v1", models: ["test-model"] }, "k");
   });
   afterEach(() => {
     delete g.__folioFakeAi;
@@ -143,7 +143,7 @@ describe("answering a message", () => {
 describe("changing notes", () => {
   beforeAll(async () => {
     await startDocs();
-    if (!useAiSettings.getState().current) await saveProvider({ name: "Test", protocol: "anthropic", baseUrl: "https://example.test/v1", model: "test-model" }, "k");
+    if (!useAiSettings.getState().current) await saveProvider({ name: "Test", protocol: "anthropic", baseUrl: "https://example.test/v1", models: ["test-model"] }, "k");
   });
   afterEach(() => {
     delete g.__folioFakeAi;

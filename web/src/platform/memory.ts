@@ -358,6 +358,14 @@ export function memoryBackend(now: () => number = Date.now): Backend {
       aiKeys.set(to, { key: k.key, synced: null });
       aiKeys.delete(from);
     },
+    // The browser cannot reach providers; a test may stand a list in
+    // (globalThis.__folioFakeModels: the models, or why not).
+    aiModels: async () => {
+      const fake = (globalThis as { __folioFakeModels?: string[] | string }).__folioFakeModels;
+      if (fake === undefined) throw new Error("unavailable");
+      if (typeof fake === "string") throw new Error(fake);
+      return fake;
+    },
     aiTools: async () => [{ name: "search", description: "Search notes", schema: { type: "object", properties: { query: { type: "string" } }, required: ["query"] } }],
     aiTool: async (name, input) => {
       if (name !== "search") return { content: `unknown tool ${name}`, isError: true };

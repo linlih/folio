@@ -72,6 +72,7 @@ export function tauriBackend(): Backend {
     aiSealKey: (provider) => invoke<string | null>("ai_seal_key", { provider }),
     aiOpenKey: (provider, sealed) => invoke<void>("ai_open_key", { provider, sealed }),
     aiMoveKey: (from, to) => invoke<void>("ai_move_key", { from, to }),
+    aiModels: (request) => invoke<string[]>("ai_models", request),
     aiTools: () => invoke<AiTool[]>("ai_tools"),
     aiTool: (name, input) => invoke<{ content: string; isError: boolean }>("ai_tool", { name, input }),
     aiTurn: (request, onEvent) => {

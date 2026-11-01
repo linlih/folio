@@ -1004,12 +1004,10 @@
       "openaiCompatible": "OpenAI-compatible",
       "baseUrl": "Base URL",
       "model": "Model",
-      "modelHint": "e.g. gpt-5, qwen-max",
       "key": "API key",
       "keyKeep": "Saved; leave empty to keep",
       "keyOptional": "Optional for a local server",
       "keyWhere": "The key is kept in this device's keychain. With sync on, it goes to your other devices encrypted end to end (the sync server can't read it); without sync it stays on this device.",
-      "incomplete": "Enter the base URL and the model.",
       "writes": "Changing notes",
       "writeModes": {
         "ask": "Ask me first",
@@ -1019,7 +1017,20 @@
         "ask": "When the AI wants to change or add notes, it shows you the change and writes only once you allow it.",
         "auto": "The AI writes directly; each change can be undone from the chat."
       },
-      "mcp": "External AI tools (MCP)"
+      "mcp": "External AI tools (MCP)",
+      "noModels": "No models",
+      "confirmRemove": "Remove",
+      "advanced": "Base URL and API",
+      "test": "Test",
+      "testing": "Testing…",
+      "testOk": "Connected; {{count}} models available",
+      "needBaseUrl": "Enter the base URL.",
+      "needModel": "Pick at least one model.",
+      "pickModels": "Tick the models to use in the list below.",
+      "testFirst": "Enter the key and press Test to pick from the provider's models, or type a model ID.",
+      "filterModels": "Filter models",
+      "typeModel": "Type a model ID and press Enter",
+      "removeModel": "Remove {{model}}"
     },
     "writes": {
       "create_card": "New card",

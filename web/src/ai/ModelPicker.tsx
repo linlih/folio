@@ -15,9 +15,10 @@ const EFFORTS: Record<AiProvider["protocol"], string[]> = {
  *  uses it. */
 export function ModelPicker({ onManage }: { onManage: () => void }) {
   const { t } = useTranslation();
-  const { providers, current } = useAiSettings();
+  const { providers, current, model } = useAiSettings();
   const provider = providers.find((p) => p.id === current) ?? providers[0];
   if (!provider) return null;
+  const chosen = model ?? provider.models[0] ?? "";
   const effort = provider.effort ?? "";
   const levels = EFFORTS[provider.protocol];
   const label = (e: string) => t(e ? `ai.effort.${e}` : "ai.effort.default");
@@ -27,22 +28,24 @@ export function ModelPicker({ onManage }: { onManage: () => void }) {
   return (
     <Menu.Root>
       <Menu.Trigger className="chat-model" aria-label={t("ai.model")}>
-        <span className="chat-model-name">{provider.name}</span>
+        <span className="chat-model-name">{chosen || provider.name}</span>
         {effort && <span className="chat-model-effort">{label(effort)}</span>}
         <ChevronDown size={12} />
       </Menu.Trigger>
       <Menu.Portal>
         <Menu.Positioner className="chat-model-positioner" side="top" align="start" sideOffset={6}>
           <Menu.Popup className="popup chat-model-menu">
-            <div className="popup-label">{t("ai.model")}</div>
+            {/* By provider, as Raycast's and Cherry Studio's pickers group them. */}
             {providers.map((p) => (
-              <Menu.Item key={p.id} className="popup-item chat-model-item" onClick={() => void chooseProvider(p.id)}>
-                <span>
-                  {p.name}
-                  {p.model && p.model !== p.name && <small>{p.model}</small>}
-                </span>
-                {p.id === provider.id && <Check size={13} className="check" />}
-              </Menu.Item>
+              <Menu.Group key={p.id}>
+                <Menu.GroupLabel className="popup-label">{p.name}</Menu.GroupLabel>
+                {p.models.map((m) => (
+                  <Menu.Item key={m} className="popup-item chat-model-item" onClick={() => void chooseProvider(p.id, m)}>
+                    <span className="chat-model-id">{m}</span>
+                    {p.id === provider.id && m === chosen && <Check size={13} className="check" />}
+                  </Menu.Item>
+                ))}
+              </Menu.Group>
             ))}
             <div className="popup-separator" />
             <div className="popup-label">{t("ai.effort.label")}</div>

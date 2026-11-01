@@ -31,8 +31,8 @@ fn serve(status: u16, body: String) -> (String, mpsc::Receiver<(String, Value)>)
         }
         let mut buf = vec![0; length];
         reader.read_exact(&mut buf).unwrap();
-        let _ = tx.send((head, serde_json::from_slice(&buf).unwrap()));
-        let kind = if status == 200 { "text/event-stream" } else { "application/json" };
+        let _ = tx.send((head, serde_json::from_slice(&buf).unwrap_or(Value::Null)));
+        let kind = if status == 200 && !body.starts_with('{') { "text/event-stream" } else { "application/json" };
         write!(stream, "HTTP/1.1 {status} X\r\ncontent-type: {kind}\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{body}", body.len()).unwrap();
     });
     (url, rx)
@@ -219,4 +219,22 @@ fn messages_keep_their_shape_as_json() {
     assert_eq!(v, json!({ "role": "assistant", "parts": [{ "type": "text", "text": "hi" }] }));
     let back: Message = serde_json::from_value(json!({ "role": "tools", "results": [{ "id": "a", "content": "x" }] })).unwrap();
     assert_eq!(back, Message::Tools { results: vec![ToolResult { id: "a".into(), content: "x".into(), is_error: false }] });
+}
+
+#[test]
+fn models_are_listed_with_the_protocols_own_key_header() {
+    let (url, rx) = serve(200, json!({ "data": [{ "id": "claude-opus-5-5" }, { "id": "claude-sonnet-5-5" }], "has_more": false }).to_string());
+    let ids = list_models(Protocol::Anthropic, &url, Some("k-1")).unwrap();
+    assert_eq!(ids, ["claude-opus-5-5", "claude-sonnet-5-5"]);
+    let (head, _) = rx.recv().unwrap();
+    assert!(head.starts_with("GET /v1/models?limit=1000"));
+    assert!(head.contains("x-api-key: k-1"));
+
+    let (url, rx) = serve(200, json!({ "object": "list", "data": [{ "id": "qwen3" }, { "id": "deepseek-chat" }] }).to_string());
+    assert_eq!(list_models(Protocol::OpenAi, &url, Some("k-2")).unwrap(), ["deepseek-chat", "qwen3"]);
+    assert!(rx.recv().unwrap().0.contains("authorization: Bearer k-2"));
+
+    let (url, _) = serve(401, json!({ "error": { "message": "invalid x-api-key" } }).to_string());
+    let err = list_models(Protocol::Anthropic, &url, Some("bad")).unwrap_err();
+    assert_eq!(err.to_string(), "401: invalid x-api-key");
 }

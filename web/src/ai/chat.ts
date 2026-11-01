@@ -218,7 +218,7 @@ export async function send(id: string, text: string, context: ChatContext | null
       let streamed = "";
       const calls: { id: string; name: string }[] = [];
       setLive(id, { text: "", tools: [], turn, stopping: useChatLive.getState().live[id]?.stopping ?? false });
-      const reply = await backend.aiTurn({ turn, provider: provider.id, system: systemPrompt(new Date(now())), messages, tools: toolList }, (e) => {
+      const reply = await backend.aiTurn({ turn, provider: provider.id, model: provider.model, system: systemPrompt(new Date(now())), messages, tools: toolList }, (e) => {
         if (e.type === "text") streamed += e.text;
         else calls.push({ id: e.id, name: e.name });
         const cur = useChatLive.getState().live[id];

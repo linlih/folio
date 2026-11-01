@@ -35,6 +35,10 @@ backend.aiTool ─────────────────────�
   - 模型返回的原始内容（含思考块）原样保存、原样发回；
   - 在 api.anthropic.com 上开启服务端回退（`server-side-fallback-2026-07-01`，`fallbacks: "default"`）。
 - **OpenAI 兼容：** `chat/completions` 流式，`tool_calls` 按 index 拼接。
+- **服务商和模型分两层**（参照 Cherry Studio、Raycast）：一家服务商只填一次地址和 key，下面挂多个模型。
+  - 添加时：选预设 → 填 key → 「测试连接」→ 从服务商的模型列表里勾选。也可以手动输入模型 ID，供不提供列表的服务商使用。预设的地址和协议默认收起。
+  - 测试连接就是请求 `GET {base}/models`（`folio_ai::list_models`，宿主命令 `ai_models`）。两种协议和 Ollama 都返回 `{"data": [{"id"}]}`。
+  - 输入框的模型菜单按服务商分组。每台设备记住自己选的服务商和模型（镜像里的 `current` 和 `model`），`ai_turn` 带上这个模型。
 - **思考程度：** 在输入框的模型菜单里直接选（像 Claude 和 ChatGPT 的应用），不放在设置里，下一轮就生效。按服务商分别记住。Anthropic 用 `output_config.effort`（低到最高五档）；OpenAI 兼容用 `reasoning_effort`（低、中、高），只在选了的时候才发送，因为不是每家都认这个参数。
 - **工具（只读）：** search、read_card、read_journal、get_backlinks、list_tags、find_by_tag、list_recent_cards、list_topics、topic_cards、list_tasks。用户当前看的卡片和选中的文字会随消息一起发送（输入框上方的标签可以去掉）。
 - **来源：** 系统提示要求模型用 `[标题](folio:card/<id>)` 和 `[几个字](folio:block/<卡片 id>/<块 id>)` 标出来源。点击后打开卡片并定位到那个块。
@@ -70,7 +74,8 @@ backend.aiTool ─────────────────────�
 ## 设置同步
 
 - **存在哪：** 工作区文档的 `ai` 映射（`web/src/docs/aiConfig.ts`）。
-  - `providers`：id → {name, protocol, base_url, model, effort, created_at, deleted_at}；
+  - `providers`：id → {name, protocol, base_url, model, models, effort, created_at, deleted_at}；
+  - `models` 是用户选的模型 id，一行一个；`model` 始终写成其中第一个，旧版本只读它。旧版本只改了 `model` 时会清空 `models`，读的时候就只剩那一个模型。
   - `writes`：修改模式；
   - `keys`：id → 加密后的 key。
   - 都是可合并映射（§4.5 规则 2），两台设备同时添加的模型都会保留。

@@ -19,7 +19,11 @@ export interface AiProvider {
   protocol: AiProtocol;
   /** Up to the version, as the provider documents it. */
   baseUrl: string;
+  /** The model chats use: in the settings, the first of `models`; from
+   *  currentProvider, the one this device chose. */
   model: string;
+  /** The provider's models the user picked, one key for all of them. */
+  models: string[];
   /** How hard it thinks; empty for the model's default. */
   effort?: string;
 }
@@ -30,6 +34,8 @@ export type WriteMode = "ask" | "auto";
 export interface AiSettings {
   providers: AiProvider[];
   current: string | null;
+  /** Which of the current provider's models; this device's, like `current`. */
+  model: string | null;
   writes: WriteMode;
 }
 
@@ -62,7 +68,7 @@ export const PRESETS: Preset[] = [
 
 type Stored = Partial<AiSettings> & { shared?: boolean };
 
-export const useAiSettings = create<AiSettings & { loaded: boolean; keys: string[] }>(() => ({ providers: [], current: null, writes: "ask", loaded: false, keys: [] }));
+export const useAiSettings = create<AiSettings & { loaded: boolean; keys: string[] }>(() => ({ providers: [], current: null, model: null, writes: "ask", loaded: false, keys: [] }));
 
 /** One change at a time: keys are sealed and opened in order with the
  *  settings that name them. */
@@ -90,7 +96,7 @@ async function shareLocal(stored: Stored) {
       await backend.aiMoveKey(p.id, same.id).catch(() => {});
       if (current === p.id) current = same.id;
     } else {
-      writeProvider(ws, { id: p.id, name: p.name, protocol: p.protocol, baseUrl: p.baseUrl, model: p.model, ...(p.effort ? { effort: p.effort } : {}) });
+      writeProvider(ws, { id: p.id, name: p.name, protocol: p.protocol, baseUrl: p.baseUrl, model: p.model, models: p.model ? [p.model] : [], ...(p.effort ? { effort: p.effort } : {}) });
     }
   }
   if (shared.writes === null && stored.writes) setSharedWrites(ws, stored.writes);
@@ -98,15 +104,18 @@ async function shareLocal(stored: Stored) {
 }
 
 /** The settings as the workspace document has them now, with this
- *  device's choice of provider; written where the host reads them. */
-async function apply(current?: string | null) {
+ *  device's choice of provider and model; written where the host reads them. */
+async function apply(current?: string | null, model?: string | null) {
   const ws = (await workspaceDoc()).doc;
   const shared = readAiConfig(ws);
-  const want = current === undefined ? useAiSettings.getState().current : current;
+  const state = useAiSettings.getState();
+  const want = current === undefined ? state.current : current;
   const providers: AiProvider[] = shared.providers;
-  const chosen = providers.some((p) => p.id === want) ? want! : (providers[0]?.id ?? null);
-  const value: AiSettings & { shared: true } = { providers, current: chosen, writes: shared.writes ?? "ask", shared: true };
-  useAiSettings.setState({ providers, current: chosen, writes: value.writes });
+  const chosen = providers.find((p) => p.id === want) ?? providers[0];
+  const wantModel = model === undefined ? state.model : model;
+  const chosenModel = chosen ? (chosen.models.includes(wantModel ?? "") ? wantModel! : (chosen.models[0] ?? null)) : null;
+  const value: AiSettings & { shared: true } = { providers, current: chosen?.id ?? null, model: chosenModel, writes: shared.writes ?? "ask", shared: true };
+  useAiSettings.setState({ providers, current: value.current, model: chosenModel, writes: value.writes });
   await backend.setLocalSetting(SETTING, value);
 }
 
@@ -142,7 +151,7 @@ export function loadAiSettings() {
     const stored = await backend.getLocalSetting<Stored>(SETTING).catch(() => null);
     let current = stored?.current ?? null;
     if (stored && !stored.shared) current = await shareLocal(stored);
-    await apply(current);
+    await apply(current, stored?.model ?? null);
     await reconcileKeys();
     useAiSettings.setState({ loaded: true });
     if (watching) return;
@@ -158,12 +167,13 @@ export function loadAiSettings() {
 }
 
 /** Adds or changes a provider; `key` null leaves its key as it is, "" removes it. */
-export function saveProvider(p: Omit<AiProvider, "id"> & { id?: string }, key: string | null): Promise<string> {
+export function saveProvider(p: Omit<AiProvider, "id" | "model"> & { id?: string }, key: string | null): Promise<string> {
   return serial(async () => {
     const ws = (await workspaceDoc()).doc;
     const id = p.id ?? uuidv7();
     const effort = p.effort?.trim();
-    writeProvider(ws, { id, name: p.name.trim() || p.model.trim() || p.baseUrl.trim(), protocol: p.protocol, baseUrl: p.baseUrl.trim(), model: p.model.trim(), ...(effort ? { effort } : {}) });
+    const models = [...new Set(p.models.map((m) => m.trim()).filter(Boolean))];
+    writeProvider(ws, { id, name: p.name.trim() || models[0] || p.baseUrl.trim(), protocol: p.protocol, baseUrl: p.baseUrl.trim(), model: models[0] ?? "", models, ...(effort ? { effort } : {}) });
     if (key !== null) {
       await backend.aiSetKey(id, key);
       setSealedKey(ws, id, key.trim() ? await backend.aiSealKey(id).catch(() => null) : null);
@@ -183,8 +193,8 @@ export function removeProvider(id: string) {
   });
 }
 
-/** This device's choice of provider. */
-export const chooseProvider = (id: string) => serial(() => apply(id));
+/** This device's choice of provider, and of its models. */
+export const chooseProvider = (id: string, model?: string) => serial(() => apply(id, model ?? null));
 
 export const setWriteMode = (writes: WriteMode) =>
   serial(async () => {
@@ -192,7 +202,9 @@ export const setWriteMode = (writes: WriteMode) =>
     await apply();
   });
 
+/** The provider chats use, with the model this device chose as `model`. */
 export function currentProvider(): AiProvider | null {
-  const { providers, current } = useAiSettings.getState();
-  return providers.find((p) => p.id === current) ?? null;
+  const { providers, current, model } = useAiSettings.getState();
+  const p = providers.find((p) => p.id === current);
+  return p ? { ...p, model: model ?? p.model } : null;
 }

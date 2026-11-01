@@ -167,6 +167,38 @@ pub fn run_turn(provider: &Provider, system: &str, messages: &[Message], tools: 
     }
 }
 
+/// The models the provider offers, by id: the check that its address and
+/// key work, and the list the user picks from. Both protocols answer
+/// `GET {base}/models` with `{"data": [{"id": …}]}`; so does Ollama.
+pub fn list_models(protocol: Protocol, base_url: &str, key: Option<&str>) -> Result<Vec<String>> {
+    let agent = ureq::AgentBuilder::new().timeout_connect(Duration::from_secs(15)).timeout_read(Duration::from_secs(30)).build();
+    let base = base_url.trim_end_matches('/');
+    let mut req = match protocol {
+        // Anthropic's list is paged; one page of the most it gives is all of them.
+        Protocol::Anthropic => agent.get(&format!("{base}/models?limit=1000")).set("anthropic-version", anthropic::VERSION),
+        Protocol::OpenAi => agent.get(&format!("{base}/models")),
+    };
+    if let Some(k) = key.filter(|k| !k.is_empty()) {
+        req = match protocol {
+            Protocol::Anthropic => req.set("x-api-key", k),
+            Protocol::OpenAi => req.set("authorization", &format!("Bearer {k}")),
+        };
+    }
+    let body: Value = match req.call() {
+        Ok(resp) => resp.into_json().map_err(|e| AiError::Protocol(e.to_string()))?,
+        Err(ureq::Error::Status(status, resp)) => return Err(AiError::Api { status, message: error_message(&resp.into_string().unwrap_or_default()) }),
+        Err(e) => return Err(AiError::Network(e.to_string())),
+    };
+    let list = body.get("data").and_then(Value::as_array).ok_or_else(|| AiError::Protocol("no model list".into()))?;
+    let mut ids: Vec<String> = list.iter().filter_map(|m| m.get("id").and_then(Value::as_str)).map(str::to_owned).collect();
+    if protocol == Protocol::OpenAi {
+        // Anthropic lists newest first; the others in no order worth keeping.
+        ids.sort();
+    }
+    ids.dedup();
+    Ok(ids)
+}
+
 /// The conversation with every tool call answered: a call left without a
 /// result (the turn was stopped, the app closed) gets one saying it did not
 /// run, since both protocols refuse a call without its result.
