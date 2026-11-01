@@ -44,7 +44,7 @@ Logseq 里 `* _ ~ ^ = / +` 在有选中文字时也会包起来，那是 Markdow
 
 ### `/` 命令（逐条对照 Logseq `src/main/frontend/commands.cljs` 的 `commands-map`）
 
-输入 `/` 弹出菜单，按 Logseq 的分组列出；继续输入可过滤，`↑` `↓` 选择，`Enter` 执行，`Esc` 关闭。
+输入 `/` 弹出菜单（行首、空格后或紧跟中日韩文字时；`a/b`、网址里不弹出），按 Logseq 的分组列出；继续输入可过滤，`↑` `↓` 选择，`Enter` 执行，`Esc` 关闭。
 
 | 分组 | Logseq 命令 | Folio |
 |---|---|---|

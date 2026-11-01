@@ -5,7 +5,7 @@
 import { insertNewTable } from "../table";
 import { computePosition, flip, offset, shift } from "@floating-ui/dom";
 import { Extension, type Editor, type Range } from "@tiptap/core";
-import type { Node as PMNode } from "@tiptap/pm/model";
+import type { Node as PMNode, ResolvedPos } from "@tiptap/pm/model";
 import { PluginKey, TextSelection, type Transaction } from "@tiptap/pm/state";
 import { Suggestion, type SuggestionKeyDownProps, type SuggestionProps } from "@tiptap/suggestion";
 import { addDays, journalId, localDate } from "../../docs/ids";
@@ -448,6 +448,13 @@ async function tagChoices(query: string): Promise<Choice[]> {
   return out;
 }
 
+/** Whether a "/" at `$at` starts a command: at a line's start, after a
+ *  space, or after CJK text and punctuation. */
+function slashMayOpen($at: ResolvedPos): boolean {
+  const before = $at.parent.textBetween(Math.max(0, $at.parentOffset - 1), $at.parentOffset, undefined, "\ufffc");
+  return before === "" || /[\s\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}\u3000-\u303f\uff01-\uff0f\uff1a-\uff20\ufffc]/u.test(before);
+}
+
 /** For tests: the commands with their ids. */
 export const _slashChoices = slashChoices;
 
@@ -463,8 +470,10 @@ export const Suggestions = Extension.create({
         editor: this.editor,
         pluginKey: new PluginKey("slashMenu"),
         char: "/",
-        // Not inside words or URLs ("a/b", "http://").
-        allowedPrefixes: [" ", "　"],
+        // Not inside words or URLs ("a/b", "http://"), but right after
+        // Chinese or Japanese text, which has no spaces ("记下/").
+        allowedPrefixes: null,
+        allow: ({ state, range }) => slashMayOpen(state.doc.resolve(range.from)),
         items: ({ query }) => slashChoices().filter((c) => matches(c, query)),
         command: run,
         render: popup,
