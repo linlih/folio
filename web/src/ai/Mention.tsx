@@ -78,16 +78,8 @@ export function useMention(draft: string, input: RefObject<HTMLTextAreaElement |
     return true;
   };
 
-  /** Inserts an @ at the caret, for the button. */
-  const start = () => {
-    const el = input.current;
-    const pos = el?.selectionStart ?? draft.length;
-    const space = pos > 0 && !/\s/.test(draft[pos - 1]) ? " " : "";
-    return { text: `${draft.slice(0, pos)}${space}@${draft.slice(pos)}`, caret: pos + space.length + 1 };
-  };
-
   const menu = shown ? <MentionMenu items={items} index={index} onPick={pick} onHover={setIndex} /> : null;
-  return { menu, onKey, track: (el: HTMLTextAreaElement) => setCaret(el.selectionStart ?? 0), start, setCaret };
+  return { menu, onKey, track: (el: HTMLTextAreaElement) => setCaret(el.selectionStart ?? 0) };
 }
 
 function MentionMenu({ items, index, onPick, onHover }: { items: CardRow[]; index: number; onPick: (c: CardRow) => void; onHover: (i: number) => void }) {

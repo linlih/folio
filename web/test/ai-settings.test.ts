@@ -4,7 +4,8 @@
 import type { LoroMap } from "loro-crdt";
 import { beforeAll, describe, expect, it } from "vitest";
 import { startDocs } from "../src/app";
-import { chooseProvider, currentProvider, loadAiSettings, removeProvider, saveProvider, useAiSettings } from "../src/ai/settings";
+import { chooseProvider, currentProvider, loadAiSettings, modelInfo, providerModels, refreshModels, removeProvider, saveProvider, useAiSettings } from "../src/ai/settings";
+import { effortLevels } from "../src/ai/effort";
 import { deleteProvider, readAiConfig, setSealedKey, setSharedWrites, writeProvider } from "../src/docs/aiConfig";
 import { workspaceDoc } from "../src/docs/topics";
 import { backend } from "../src/platform";
@@ -123,5 +124,23 @@ describe("AI settings on a device", () => {
     // The chosen model taken out of the list: the provider's first is used.
     await saveProvider({ ...useAiSettings.getState().providers.find((p) => p.id === id)!, models: ["gpt-5"] }, null);
     expect(currentProvider()?.model).toBe("gpt-5");
+  });
+
+  it("lists the models the provider offers, fetched again when old, beside those added by id", async () => {
+    const g = globalThis as { __folioFakeModels?: unknown };
+    g.__folioFakeModels = [{ id: "claude-opus-5-5", efforts: ["low", "medium", "high", "xhigh", "max"] }, { id: "claude-haiku-4-5", efforts: [] }];
+    const id = await saveProvider({ name: "Anthropic", protocol: "anthropic", baseUrl: "https://api.anthropic.com/v1", models: ["claude-custom"] }, "sk-a", [{ id: "claude-opus-5-5" }]);
+    const p = () => useAiSettings.getState().providers.find((x) => x.id === id)!;
+    expect(providerModels(p())).toEqual(["claude-opus-5-5", "claude-custom"]);
+    // Versions before read `model`: one it offers.
+    expect(readAiConfig((await workspaceDoc()).doc).providers.find((x) => x.id === id)?.model).toBe("claude-custom");
+    await refreshModels(true);
+    expect(providerModels(p())).toEqual(["claude-opus-5-5", "claude-haiku-4-5", "claude-custom"]);
+    expect(effortLevels("anthropic", "claude-haiku-4-5", modelInfo(id, "claude-haiku-4-5")?.efforts)).toEqual([]);
+    // Not chat models are left out.
+    g.__folioFakeModels = ["gpt-5", "text-embedding-3-large", "tts-1", "whisper-1"];
+    const o = await saveProvider({ name: "OpenAI 2", protocol: "openai", baseUrl: "https://api.openai.com/v1", models: [] }, "sk-o", [{ id: "gpt-5" }, { id: "text-embedding-3-large" }, { id: "tts-1" }]);
+    expect(providerModels(useAiSettings.getState().providers.find((x) => x.id === o)!)).toEqual(["gpt-5"]);
+    delete g.__folioFakeModels;
   });
 });

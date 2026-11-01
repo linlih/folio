@@ -167,10 +167,23 @@ pub fn run_turn(provider: &Provider, system: &str, messages: &[Message], tools: 
     }
 }
 
-/// The models the provider offers, by id: the check that its address and
-/// key work, and the list the user picks from. Both protocols answer
+/// A model a provider offers.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ModelInfo {
+    pub id: String,
+    /// The thinking levels it takes, lowest first, where the provider says
+    /// (Anthropic's `capabilities.effort`); None where it does not.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub efforts: Option<Vec<String>>,
+}
+
+const EFFORT_LEVELS: [&str; 5] = ["low", "medium", "high", "xhigh", "max"];
+
+/// The models the provider offers: the check that its address and key
+/// work, and the list the model menu shows. Both protocols answer
 /// `GET {base}/models` with `{"data": [{"id": …}]}`; so does Ollama.
-pub fn list_models(protocol: Protocol, base_url: &str, key: Option<&str>) -> Result<Vec<String>> {
+pub fn list_models(protocol: Protocol, base_url: &str, key: Option<&str>) -> Result<Vec<ModelInfo>> {
     let agent = ureq::AgentBuilder::new().timeout_connect(Duration::from_secs(15)).timeout_read(Duration::from_secs(30)).build();
     let base = base_url.trim_end_matches('/');
     let mut req = match protocol {
@@ -190,13 +203,25 @@ pub fn list_models(protocol: Protocol, base_url: &str, key: Option<&str>) -> Res
         Err(e) => return Err(AiError::Network(e.to_string())),
     };
     let list = body.get("data").and_then(Value::as_array).ok_or_else(|| AiError::Protocol("no model list".into()))?;
-    let mut ids: Vec<String> = list.iter().filter_map(|m| m.get("id").and_then(Value::as_str)).map(str::to_owned).collect();
+    let mut models: Vec<ModelInfo> = list
+        .iter()
+        .filter_map(|m| {
+            let id = m.get("id").and_then(Value::as_str)?.to_owned();
+            let efforts = m.pointer("/capabilities/effort").map(|e| {
+                if e.get("supported").and_then(Value::as_bool) != Some(true) {
+                    return Vec::new();
+                }
+                EFFORT_LEVELS.iter().filter(|l| e.pointer(&format!("/{l}/supported")).and_then(Value::as_bool) == Some(true)).map(|l| (*l).to_owned()).collect()
+            });
+            Some(ModelInfo { id, efforts })
+        })
+        .collect();
     if protocol == Protocol::OpenAi {
         // Anthropic lists newest first; the others in no order worth keeping.
-        ids.sort();
+        models.sort_by(|a, b| a.id.cmp(&b.id));
     }
-    ids.dedup();
-    Ok(ids)
+    models.dedup_by(|a, b| a.id == b.id);
+    Ok(models)
 }
 
 /// The conversation with every tool call answered: a call left without a

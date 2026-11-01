@@ -1,4 +1,4 @@
-import { ArrowUp, AtSign, BookPlus, CalendarPlus, Check, Copy, FileText, History, Pencil, Plus, RotateCcw, Settings, Square, Trash2, Undo2, X } from "lucide-react";
+import { ArrowUp, BookPlus, CalendarPlus, Check, Copy, FileText, History, Pencil, Plus, RotateCcw, Settings, Square, Trash2, Undo2, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { docs } from "../app";
@@ -15,7 +15,7 @@ import { answerTitle, appendToJournal, saveAsCard } from "./actions";
 import { allowAll, decide, editLast, messageText, newChat, openChat, regenerate, send, stop, useChatLive, type CardRef, type ChatContext, type LiveTurn as LiveTurnState, type PendingWrite, type UserMessage } from "./chat";
 import { parseMarkdown, renderBlocks, type Target } from "./markdown";
 import { useMention } from "./Mention";
-import { ModelPicker } from "./ModelPicker";
+import { EffortPicker, ModelPicker, WriteModePicker } from "./ModelPicker";
 import { fromPreset, ProviderForm, type Draft } from "./AiSettings";
 import { loadAiSettings, PRESETS, useAiSettings } from "./settings";
 import type { AiPart, AiToolResult } from "./types";
@@ -258,7 +258,7 @@ function Panel() {
                 )}
                 {cards.map((c) => (
                   <span key={c.cardId} className="chat-context attached">
-                    <AtSign size={12} />
+                    <FileText size={12} />
                     <span>{c.title}</span>
                     <button aria-label={t("ai.contextRemove")} onClick={() => setCards((cs) => cs.filter((x) => x.cardId !== c.cardId))}>
                       <X size={11} />
@@ -283,28 +283,19 @@ function Panel() {
             />
             <div className="chat-compose-bar">
               <span className="chat-compose-tools">
-                {!editing && (
-                  <button
-                    className="chat-tool-button"
-                    title={t("ai.mentionHint")}
-                    aria-label={t("ai.mentionHint")}
-                    onClick={() => {
-                      const next = mention.start();
-                      setDraft(next.text);
-                      mention.setCaret(next.caret);
-                      setTimeout(() => (input.current?.focus(), input.current?.setSelectionRange(next.caret, next.caret)));
-                    }}
-                  >
-                    <AtSign size={14} />
-                  </button>
-                )}
                 {settings.providers.length > 0 ? (
-                  <ModelPicker onManage={openSettings} />
+                  <>
+                    <WriteModePicker />
+                    <ModelPicker onManage={openSettings} />
+                    <EffortPicker />
+                  </>
                 ) : (
                   // The empty conversation shows the setup itself.
-                  messages.length > 0 && <button className="chat-link" onClick={openSettings}>
-                    {t("ai.addModel")}
-                  </button>
+                  messages.length > 0 && (
+                    <button className="chat-link" onClick={openSettings}>
+                      {t("ai.addModel")}
+                    </button>
+                  )
                 )}
               </span>
               {live ? (
@@ -538,7 +529,7 @@ function Messages({ chatId, messages, undone, answering, pending, onEdit }: { ch
               {Array.isArray(cards) &&
                 cards.map((c) => (
                   <button key={c.cardId} className="chat-context quiet link" onClick={(e) => void openCard(c.cardId, null, toSide(e))}>
-                    <AtSign size={11} />
+                    <FileText size={11} />
                     {c.title}
                   </button>
                 ))}

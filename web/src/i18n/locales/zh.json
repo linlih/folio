@@ -945,7 +945,7 @@
     "history": "对话记录",
     "newChat": "新对话",
     "settings": "AI 设置",
-    "placeholder": "问问你的笔记，@ 引用卡片…",
+    "placeholder": "问问你的笔记…",
     "model": "模型",
     "addModel": "添加模型…",
     "send": "发送",
@@ -991,9 +991,7 @@
       "other": "出错了：{{message}}"
     },
     "setup": {
-      "models": "模型",
       "none": "还没有模型。从下面选一家服务商，填上 API key。",
-      "add": "添加：",
       "custom": "自定义",
       "edit": "编辑",
       "remove": "移除",
@@ -1023,14 +1021,17 @@
       "advanced": "接口地址和协议",
       "test": "测试连接",
       "testing": "连接中…",
-      "testOk": "连接成功，有 {{count}} 个模型可选",
+      "testOk": "连接成功，找到 {{count}} 个模型，会自动出现在对话的模型菜单里，以后有新模型也会自动更新。",
       "needBaseUrl": "请填写接口地址。",
-      "needModel": "至少选择一个模型。",
-      "pickModels": "从下面的列表勾选要用的模型。",
-      "testFirst": "填好 key 后点「测试连接」，从服务商的模型列表里选；也可以直接输入模型 ID。",
-      "filterModels": "筛选模型",
+      "needModel": "没有拿到模型列表：请先测试连接，或者手动添加模型 ID。",
       "typeModel": "输入模型 ID，回车添加",
-      "removeModel": "移除 {{model}}"
+      "removeModel": "移除 {{model}}",
+      "providers": "服务商",
+      "addProvider": "添加服务商",
+      "modelCount": "{{count}} 个模型",
+      "showModels": "查看",
+      "hideModels": "收起",
+      "moreModels": "其他模型（服务商列表里没有的）"
     },
     "writes": {
       "create_card": "新建卡片",
@@ -1068,9 +1069,7 @@
         "deepest": "最深入，较慢"
       }
     },
-    "manageModels": "管理模型…",
     "mention": "引用卡片",
-    "mentionHint": "引用卡片（@）",
     "retry": "重试",
     "regenerate": "重新回答",
     "edit": "修改这条消息",
@@ -1085,6 +1084,13 @@
       "week": "7 天内",
       "month": "30 天内",
       "older": "更早"
+    },
+    "searchModels": "搜索模型",
+    "noModelsYet": "还没有模型列表，检查 key 后会自动获取",
+    "manageProviders": "添加或管理服务商…",
+    "writeShort": {
+      "ask": "先问我",
+      "auto": "直接改"
     }
   }
 }

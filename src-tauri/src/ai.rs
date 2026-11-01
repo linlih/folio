@@ -153,7 +153,7 @@ fn read_key(app: &tauri::AppHandle, provider: &str) -> CmdResult<Option<String>>
 /// The models a provider offers, which also checks its address and key:
 /// `key` as typed in the form, or else the one kept for `provider`.
 #[tauri::command]
-pub(crate) async fn ai_models(app: tauri::AppHandle, protocol: Protocol, base_url: String, key: Option<String>, provider: Option<String>) -> CmdResult<Vec<String>> {
+pub(crate) async fn ai_models(app: tauri::AppHandle, protocol: Protocol, base_url: String, key: Option<String>, provider: Option<String>) -> CmdResult<Vec<folio_ai::ModelInfo>> {
     let key = match key.map(|k| k.trim().to_owned()).filter(|k| !k.is_empty()) {
         Some(k) => Some(k),
         None => match provider {

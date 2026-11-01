@@ -5,6 +5,7 @@ import { isJournalId, journalDate, localDate, uuidv7 } from "../docs/ids";
 import { extractIndex } from "../docs/index";
 import { isBoardId } from "../docs/board";
 import { WORKSPACE_ID } from "../docs/workspace";
+import type { AiModelInfo } from "../ai/types";
 import type { Backend } from "./backend";
 
 /** The peer ids this fake host uses: its own replica and the one it hands to
@@ -361,10 +362,10 @@ export function memoryBackend(now: () => number = Date.now): Backend {
     // The browser cannot reach providers; a test may stand a list in
     // (globalThis.__folioFakeModels: the models, or why not).
     aiModels: async () => {
-      const fake = (globalThis as { __folioFakeModels?: string[] | string }).__folioFakeModels;
+      const fake = (globalThis as { __folioFakeModels?: (string | AiModelInfo)[] | string }).__folioFakeModels;
       if (fake === undefined) throw new Error("unavailable");
       if (typeof fake === "string") throw new Error(fake);
-      return fake;
+      return fake.map((m) => (typeof m === "string" ? { id: m } : m));
     },
     aiTools: async () => [{ name: "search", description: "Search notes", schema: { type: "object", properties: { query: { type: "string" } }, required: ["query"] } }],
     aiTool: async (name, input) => {

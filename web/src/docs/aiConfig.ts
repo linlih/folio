@@ -18,7 +18,8 @@ export interface SharedProvider {
   baseUrl: string;
   /** The first of `models`, which versions before them read. */
   model: string;
-  /** The provider's models the user picked, in their order. */
+  /** Models the user added by id; the ones the provider lists are fetched
+   *  by each device (ai/settings.ts). From before, the models picked. */
   models: string[];
   effort?: string;
 }
@@ -73,8 +74,8 @@ export function writeProvider(ws: LoroDoc, p: SharedProvider, now = Date.now()) 
   const all = providersMap(ws);
   const m = all.ensureMergeableMap(p.id);
   if (m.get("created_at") === undefined) m.set("created_at", now);
-  const models = p.models.length ? p.models : p.model ? [p.model] : [];
-  const fields: [string, string][] = [["name", p.name], ["protocol", p.protocol], ["base_url", p.baseUrl], ["model", models[0] ?? ""], ["models", models.join("\n")], ["effort", p.effort ?? ""]];
+  // `model` is what versions before `models` use: its first, or any model it offers.
+  const fields: [string, string][] = [["name", p.name], ["protocol", p.protocol], ["base_url", p.baseUrl], ["model", p.models[0] ?? p.model], ["models", p.models.join("\n")], ["effort", p.effort ?? ""]];
   for (const [k, v] of fields) if (m.get(k) !== v) m.set(k, v);
   ws.commit({ origin: AI_ORIGIN });
 }

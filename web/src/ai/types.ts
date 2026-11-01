@@ -5,6 +5,13 @@ import type { WriteRecord } from "./writes";
 
 export type AiProtocol = "anthropic" | "openai";
 
+/** A model a provider offers (backend.aiModels). */
+export interface AiModelInfo {
+  id: string;
+  /** The thinking levels it takes, where the provider says; absent where it does not. */
+  efforts?: string[];
+}
+
 export type AiPart =
   | { type: "text"; text: string }
   /** `invalid`: the arguments as sent, when they were not JSON. */

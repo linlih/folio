@@ -1,10 +1,12 @@
-import { Check, ChevronRight, Pencil, Trash2, X } from "lucide-react";
+import { Menu } from "@base-ui/react/menu";
+import { Check, ChevronRight, Pencil, Plus, Trash2, X } from "lucide-react";
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { backend } from "../platform";
 import { useShell } from "../shell/tabs";
 import "./ai.css";
-import { loadAiSettings, PRESETS, removeProvider, saveProvider, setWriteMode, useAiSettings, type AiProvider, type Preset } from "./settings";
+import { loadAiSettings, PRESETS, providerModels, refreshModels, removeProvider, saveProvider, useAiSettings, type AiProvider, type Preset } from "./settings";
+import type { AiModelInfo } from "./types";
 
 export type Draft = Omit<AiProvider, "id" | "model"> & { id?: string; key: string; keyless?: boolean; custom: boolean };
 
@@ -12,17 +14,17 @@ export const fromPreset = (p: Preset): Draft => ({
   name: p.name,
   protocol: p.protocol,
   baseUrl: p.baseUrl,
-  models: p.model ? [p.model] : [],
+  models: [],
   effort: p.effort ?? "",
   key: "",
   keyless: p.keyless,
   custom: !p.baseUrl,
 });
 
-/** Settings → AI: the providers the assistant may use, each with one key
- *  and the models picked from what it offers (as Cherry Studio and Raycast
- *  do), and how its changes to notes are made. Which model a chat uses is
- *  chosen where the message is written (ModelPicker). */
+/** Settings → AI: the providers the assistant may use, each with one key;
+ *  their models come from the provider itself and stay current (as in
+ *  Raycast). Which model, how hard it thinks and whether changes are asked
+ *  first are chosen where the message is written. */
 export function AiSettingsPanel() {
   const { t } = useTranslation();
   const s = useAiSettings();
@@ -31,17 +33,19 @@ export function AiSettingsPanel() {
 
   useEffect(() => {
     if (!s.loaded) void loadAiSettings();
+    else void refreshModels(true);
   }, [s.loaded]);
 
   const form = draft && <ProviderForm draft={draft} hasKey={!!draft.id && s.keys.includes(draft.id)} onChange={setDraft} onDone={() => setDraft(null)} />;
 
   return (
     <div className="ai-settings">
-      <h3 className="ai-settings-title">{t("ai.setup.models")}</h3>
+      <h3 className="ai-settings-title">{t("ai.setup.providers")}</h3>
       {s.providers.length === 0 && !draft && <p className="ai-settings-hint">{t("ai.setup.none")}</p>}
       <ul className="ai-providers">
-        {s.providers.map((p) =>
-          draft?.id === p.id ? (
+        {s.providers.map((p) => {
+          const models = providerModels(p, s.catalog);
+          return draft?.id === p.id ? (
             <li key={p.id} className="editing">
               {form}
             </li>
@@ -49,7 +53,7 @@ export function AiSettingsPanel() {
             <li key={p.id}>
               <div className="ai-provider-main">
                 <span className="ai-provider-name">{p.name}</span>
-                <span className="ai-provider-models">{p.models.join(" · ") || t("ai.setup.noModels")}</span>
+                <span className="ai-provider-models">{models.length ? t("ai.setup.modelCount", { count: models.length }) : t("ai.setup.noModels")}</span>
               </div>
               {s.keys.includes(p.id) ? (
                 <span className="ai-provider-key">
@@ -71,70 +75,83 @@ export function AiSettingsPanel() {
                 </button>
               )}
             </li>
-          ),
-        )}
+          );
+        })}
       </ul>
 
-      {draft && !draft.id
-        ? form
-        : !draft && (
-            <div className="ai-presets">
-              <span>{t("ai.setup.add")}</span>
-              {PRESETS.map((p) => (
-                <button key={p.id} className="button" onClick={() => setDraft(fromPreset(p))}>
-                  {p.name || t("ai.setup.custom")}
-                </button>
-              ))}
-            </div>
-          )}
-
-      <h3 className="ai-settings-title">{t("ai.setup.writes")}</h3>
-      <div className="ai-writes" role="radiogroup">
-        {(["ask", "auto"] as const).map((m) => (
-          <label key={m}>
-            <input type="radio" name="ai-writes" checked={s.writes === m} onChange={() => void setWriteMode(m)} />
-            <span>
-              {t(`ai.setup.writeModes.${m}`)}
-              <small>{t(`ai.setup.writeHints.${m}`)}</small>
-            </span>
-          </label>
-        ))}
-      </div>
+      {draft && !draft.id ? form : !draft && <AddProvider onPick={(p) => setDraft(fromPreset(p))} />}
     </div>
   );
 }
 
-type Probe = { state: "idle" } | { state: "checking" } | { state: "ok"; models: string[] } | { state: "failed"; message: string };
+/** "Add a provider", with the common ones to start from. */
+export function AddProvider({ onPick }: { onPick: (p: Preset) => void }) {
+  const { t } = useTranslation();
+  return (
+    <Menu.Root>
+      <Menu.Trigger className="button ai-add-provider">
+        <Plus size={14} /> {t("ai.setup.addProvider")}
+      </Menu.Trigger>
+      <Menu.Portal>
+        <Menu.Positioner className="ai-add-positioner" side="bottom" align="start" sideOffset={4}>
+          <Menu.Popup className="popup">
+            {PRESETS.map((p) => (
+              <Menu.Item key={p.id} className="popup-item" onClick={() => onPick(p)}>
+                {p.name || t("ai.setup.custom")}
+              </Menu.Item>
+            ))}
+          </Menu.Popup>
+        </Menu.Positioner>
+      </Menu.Portal>
+    </Menu.Root>
+  );
+}
 
-/** Adding or changing one provider: its key, a check that the key and
- *  address work (which also lists its models), and the models to use. */
+type Probe = { state: "idle" } | { state: "checking" } | { state: "ok"; models: AiModelInfo[] } | { state: "failed"; message: string };
+
+/** Adding or changing one provider: its key, and a check that the key and
+ *  address work, which also fetches the models it offers. A model it does
+ *  not list can be added by id. */
 export function ProviderForm({ draft, hasKey, onChange, onDone }: { draft: Draft; hasKey: boolean; onChange: (d: Draft) => void; onDone: () => void }) {
   const { t } = useTranslation();
   const [check, setCheck] = useState<Probe>({ state: "idle" });
-  const [filter, setFilter] = useState("");
   const [typed, setTyped] = useState("");
   const [advanced, setAdvanced] = useState(draft.custom);
+  const [showAll, setShowAll] = useState(false);
   const run = useRef(0);
+  const testing = useRef<Promise<AiModelInfo[] | null> | null>(null);
   const set = (patch: Partial<Draft>) => onChange({ ...draft, ...patch });
 
-  const test = async (d = draft) => {
-    if (!d.baseUrl.trim()) return setCheck({ state: "failed", message: t("ai.setup.needBaseUrl") });
+  const test = (d = draft): Promise<AiModelInfo[] | null> => (testing.current = probe(d));
+  const probe = async (d: Draft): Promise<AiModelInfo[] | null> => {
+    if (!d.baseUrl.trim()) return (setCheck({ state: "failed", message: t("ai.setup.needBaseUrl") }), null);
     const n = ++run.current;
     setCheck({ state: "checking" });
     try {
       const models = await backend.aiModels({ protocol: d.protocol, baseUrl: d.baseUrl.trim(), key: d.key.trim() || undefined, provider: d.id });
       if (n === run.current) setCheck({ state: "ok", models });
+      return models;
     } catch (e) {
       if (n === run.current) setCheck({ state: "failed", message: String(e).replace(/^Error: /, "") });
+      return null;
     }
   };
 
-  // A provider being changed, with its key: what it offers is shown at once.
+  // What the provider offers is fetched as soon as it can be: a provider
+  // being changed that has its key, or a local server that needs none.
   useEffect(() => {
-    if (draft.id && hasKey) void test();
+    if ((draft.id && hasKey) || draft.keyless) void test();
   }, []);
 
-  const toggle = (m: string) => set({ models: draft.models.includes(m) ? draft.models.filter((x) => x !== m) : [...draft.models, m] });
+  // A key typed or pasted is checked once typing stops, not when the field
+  // is left: the result would move the buttons under the pointer.
+  useEffect(() => {
+    if (!draft.key.trim()) return;
+    const timer = setTimeout(() => void test(), 900);
+    return () => clearTimeout(timer);
+  }, [draft.key]);
+
+  const removeModel = (m: string) => set({ models: draft.models.filter((x) => x !== m) });
   const addTyped = () => {
     const m = typed.trim();
     if (m && !draft.models.includes(m)) set({ models: [...draft.models, m] });
@@ -149,18 +166,24 @@ export function ProviderForm({ draft, hasKey, onChange, onDone }: { draft: Draft
 
   const save = async () => {
     if (!draft.baseUrl.trim()) return setCheck({ state: "failed", message: t("ai.setup.needBaseUrl") });
-    if (draft.models.length === 0) return setCheck({ state: "failed", message: t("ai.setup.needModel") });
+    // Checked when saved if not before (or the check under way awaited):
+    // the models come from there.
+    const listed = check.state === "ok" ? check.models : check.state === "checking" && testing.current ? await testing.current : draft.key.trim() || hasKey || draft.keyless ? await test() : null;
+    if (!listed?.length && draft.models.length === 0) {
+      if (check.state !== "failed") setCheck({ state: "failed", message: t("ai.setup.needModel") });
+      return;
+    }
     try {
       // A provider keeps its key unless a new one is typed.
       const { key, keyless: _, custom: __, ...provider } = draft;
-      await saveProvider(provider, key.trim() || null);
+      await saveProvider(provider, key.trim() || null, listed ?? undefined);
       onDone();
     } catch (e) {
       useShell.getState().setNotice(t("error.generic", { message: String(e) }));
     }
   };
 
-  const offered = check.state === "ok" ? check.models.filter((m) => m.toLowerCase().includes(filter.trim().toLowerCase())) : [];
+  const listed = check.state === "ok" ? providerModels({ id: "", name: "", protocol: draft.protocol, baseUrl: "", model: "", models: [] }, { "": { at: 0, models: check.models } }) : [];
 
   return (
     <div className="ai-form">
@@ -208,42 +231,34 @@ export function ProviderForm({ draft, hasKey, onChange, onDone }: { draft: Draft
         <small>{t("ai.setup.keyWhere")}</small>
       </label>
       {check.state === "ok" && (
-        <p className="ai-check ok">
-          <Check size={12} /> {t("ai.setup.testOk", { count: check.models.length })}
-        </p>
+        <div className="ai-check ok">
+          <Check size={12} />
+          <span>
+            {t("ai.setup.testOk", { count: listed.length })}
+            {listed.length > 0 && (
+              <button type="button" className="chat-link" onClick={() => setShowAll((v) => !v)}>
+                {t(showAll ? "ai.setup.hideModels" : "ai.setup.showModels")}
+              </button>
+            )}
+          </span>
+        </div>
       )}
+      {check.state === "ok" && showAll && <p className="ai-model-preview">{listed.join(" · ")}</p>}
       {check.state === "failed" && <p className="ai-check failed">{check.message}</p>}
 
       <div className="ai-models">
-        <span className="ai-models-label">{t("ai.setup.model")}</span>
-        {draft.models.length > 0 ? (
+        <span className="ai-models-label">{t("ai.setup.moreModels")}</span>
+        {draft.models.length > 0 && (
           <div className="ai-model-chips">
             {draft.models.map((m) => (
               <span key={m} className="ai-model-chip">
                 {m}
-                <button type="button" aria-label={t("ai.setup.removeModel", { model: m })} onClick={() => toggle(m)}>
+                <button type="button" aria-label={t("ai.setup.removeModel", { model: m })} onClick={() => removeModel(m)}>
                   <X size={11} />
                 </button>
               </span>
             ))}
           </div>
-        ) : (
-          <small>{t(check.state === "ok" ? "ai.setup.pickModels" : "ai.setup.testFirst")}</small>
-        )}
-        {check.state === "ok" && check.models.length > 0 && (
-          <>
-            {check.models.length > 8 && <input className="ai-model-filter" value={filter} placeholder={t("ai.setup.filterModels")} spellCheck={false} autoCapitalize="off" onChange={(e) => setFilter(e.target.value)} />}
-            <ul className="ai-model-list">
-              {offered.map((m) => (
-                <li key={m}>
-                  <label>
-                    <input type="checkbox" checked={draft.models.includes(m)} onChange={() => toggle(m)} />
-                    <span>{m}</span>
-                  </label>
-                </li>
-              ))}
-            </ul>
-          </>
         )}
         <input className="ai-model-typed" value={typed} placeholder={t("ai.setup.typeModel")} spellCheck={false} autoCapitalize="off" onChange={(e) => setTyped(e.target.value)} onKeyDown={onTypedKey} onBlur={addTyped} />
       </div>

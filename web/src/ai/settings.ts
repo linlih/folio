@@ -11,7 +11,7 @@ import { deleteProvider, readAiConfig, setSealedKey, setSharedWrites, writeProvi
 import { uuidv7 } from "../docs/ids";
 import { workspaceDoc } from "../docs/topics";
 import { backend } from "../platform";
-import type { AiProtocol } from "./types";
+import type { AiModelInfo, AiProtocol } from "./types";
 
 export interface AiProvider {
   id: string;
@@ -22,7 +22,7 @@ export interface AiProvider {
   /** The model chats use: in the settings, the first of `models`; from
    *  currentProvider, the one this device chose. */
   model: string;
-  /** The provider's models the user picked, one key for all of them. */
+  /** Models added by id, beside those the provider lists (`catalog`). */
   models: string[];
   /** How hard it thinks; empty for the model's default. */
   effort?: string;
@@ -68,7 +68,67 @@ export const PRESETS: Preset[] = [
 
 type Stored = Partial<AiSettings> & { shared?: boolean };
 
-export const useAiSettings = create<AiSettings & { loaded: boolean; keys: string[] }>(() => ({ providers: [], current: null, model: null, writes: "ask", loaded: false, keys: [] }));
+/** Each provider's models as it listed them, fetched by this device. */
+export type Catalog = Record<string, { at: number; models: AiModelInfo[] }>;
+const CATALOG = "ai.models";
+/** How long a provider's list is used before it is fetched again. */
+const STALE = 6 * 3600_000;
+
+export const useAiSettings = create<AiSettings & { loaded: boolean; keys: string[]; catalog: Catalog }>(() => ({
+  providers: [],
+  current: null,
+  model: null,
+  writes: "ask",
+  loaded: false,
+  keys: [],
+  catalog: {},
+}));
+
+/** Not chat models: what a provider lists for speech, images, embeddings. */
+const NOT_CHAT = /embed|tts|whisper|dall-e|davinci|babbage|moderation|rerank|transcribe|audio|image|realtime|sora|search-preview|computer-use/i;
+
+/** The models a provider's menu shows: those it lists, then those added by id. */
+export function providerModels(p: AiProvider, catalog: Catalog = useAiSettings.getState().catalog): string[] {
+  const listed = (catalog[p.id]?.models ?? []).map((m) => m.id).filter((id) => !NOT_CHAT.test(id));
+  return [...new Set([...listed, ...p.models])];
+}
+
+/** What the provider said about one of its models. */
+export const modelInfo = (providerId: string, model: string): AiModelInfo | undefined => useAiSettings.getState().catalog[providerId]?.models.find((m) => m.id === model);
+
+async function saveCatalog(f: (c: Catalog) => Catalog) {
+  const catalog = f(useAiSettings.getState().catalog);
+  useAiSettings.setState({ catalog });
+  await backend.setLocalSetting(CATALOG, catalog).catch(() => {});
+}
+
+/** Keeps a provider's list as fetched now. */
+export const keepModels = (id: string, models: AiModelInfo[]) => saveCatalog((c) => ({ ...c, [id]: { at: Date.now(), models } }));
+
+const refreshing = new Set<string>();
+
+/** Fetches the providers' model lists again where they are old (or all,
+ *  with `force`), so a model a provider adds shows without the user doing
+ *  anything; a provider that cannot be reached keeps its last list. */
+export async function refreshModels(force = false) {
+  const { providers, keys, catalog } = useAiSettings.getState();
+  await Promise.all(
+    providers.map(async (p) => {
+      if (refreshing.has(p.id) || (!force && Date.now() - (catalog[p.id]?.at ?? 0) < STALE)) return;
+      // Anthropic answers nothing without a key; a local server may need none.
+      if (p.protocol === "anthropic" && !keys.includes(p.id)) return;
+      refreshing.add(p.id);
+      try {
+        await keepModels(p.id, await backend.aiModels({ protocol: p.protocol, baseUrl: p.baseUrl, provider: p.id }));
+        await serial(() => apply());
+      } catch {
+        // Offline, or no list there: the last one stays.
+      } finally {
+        refreshing.delete(p.id);
+      }
+    }),
+  );
+}
 
 /** One change at a time: keys are sealed and opened in order with the
  *  settings that name them. */
@@ -113,7 +173,8 @@ async function apply(current?: string | null, model?: string | null) {
   const providers: AiProvider[] = shared.providers;
   const chosen = providers.find((p) => p.id === want) ?? providers[0];
   const wantModel = model === undefined ? state.model : model;
-  const chosenModel = chosen ? (chosen.models.includes(wantModel ?? "") ? wantModel! : (chosen.models[0] ?? null)) : null;
+  const offered = chosen ? providerModels(chosen) : [];
+  const chosenModel = chosen ? (offered.includes(wantModel ?? "") ? wantModel! : (offered[0] ?? (chosen.model || null))) : null;
   const value: AiSettings & { shared: true } = { providers, current: chosen?.id ?? null, model: chosenModel, writes: shared.writes ?? "ask", shared: true };
   useAiSettings.setState({ providers, current: value.current, model: chosenModel, writes: value.writes });
   await backend.setLocalSetting(SETTING, value);
@@ -149,11 +210,14 @@ let watching = false;
 export function loadAiSettings() {
   return serial(async () => {
     const stored = await backend.getLocalSetting<Stored>(SETTING).catch(() => null);
+    const catalog = await backend.getLocalSetting<Catalog>(CATALOG).catch(() => null);
+    if (catalog && typeof catalog === "object") useAiSettings.setState({ catalog });
     let current = stored?.current ?? null;
     if (stored && !stored.shared) current = await shareLocal(stored);
     await apply(current, stored?.model ?? null);
     await reconcileKeys();
     useAiSettings.setState({ loaded: true });
+    void refreshModels();
     if (watching) return;
     watching = true;
     // Changes from other devices (and from here, which settle at once).
@@ -166,14 +230,17 @@ export function loadAiSettings() {
   });
 }
 
-/** Adds or changes a provider; `key` null leaves its key as it is, "" removes it. */
-export function saveProvider(p: Omit<AiProvider, "id" | "model"> & { id?: string }, key: string | null): Promise<string> {
+/** Adds or changes a provider; `key` null leaves its key as it is, "" removes
+ *  it. `listed` is what the provider listed when the form checked it. */
+export function saveProvider(p: Omit<AiProvider, "id" | "model"> & { id?: string }, key: string | null, listed?: AiModelInfo[]): Promise<string> {
   return serial(async () => {
     const ws = (await workspaceDoc()).doc;
     const id = p.id ?? uuidv7();
     const effort = p.effort?.trim();
     const models = [...new Set(p.models.map((m) => m.trim()).filter(Boolean))];
-    writeProvider(ws, { id, name: p.name.trim() || models[0] || p.baseUrl.trim(), protocol: p.protocol, baseUrl: p.baseUrl.trim(), model: models[0] ?? "", models, ...(effort ? { effort } : {}) });
+    if (listed) await keepModels(id, listed);
+    const first = models[0] ?? providerModels({ ...p, id, model: "", models }).at(0) ?? "";
+    writeProvider(ws, { id, name: p.name.trim() || first || p.baseUrl.trim(), protocol: p.protocol, baseUrl: p.baseUrl.trim(), model: first, models, ...(effort ? { effort } : {}) });
     if (key !== null) {
       await backend.aiSetKey(id, key);
       setSealedKey(ws, id, key.trim() ? await backend.aiSealKey(id).catch(() => null) : null);
@@ -187,6 +254,7 @@ export function saveProvider(p: Omit<AiProvider, "id" | "model"> & { id?: string
 export function removeProvider(id: string) {
   return serial(async () => {
     deleteProvider((await workspaceDoc()).doc, id);
+    await saveCatalog(({ [id]: _, ...rest }) => rest);
     await backend.aiSetKey(id, "").catch(() => {});
     await apply();
     useAiSettings.setState({ keys: (await backend.aiKeys().catch(() => [])).map((k) => k.provider) });

@@ -4,8 +4,11 @@
 
 import type { AiProtocol } from "./types";
 
-/** The levels `model` takes, lowest first; none when it takes no level. */
-export function effortLevels(protocol: AiProtocol, model: string): string[] {
+/** The levels `model` takes, lowest first; none when it takes no level.
+ *  `known` is what the provider said (Anthropic's Models API); without it
+ *  the model's name decides. */
+export function effortLevels(protocol: AiProtocol, model: string, known?: string[]): string[] {
+  if (known) return known;
   // A router's id may carry the maker first (openai/gpt-5).
   const id = model.toLowerCase().split("/").pop() ?? "";
   if (protocol === "anthropic") {
@@ -22,4 +25,4 @@ export function effortLevels(protocol: AiProtocol, model: string): string[] {
 }
 
 /** The level to send with a turn: the provider's, where the model takes it. */
-export const turnEffort = (protocol: AiProtocol, model: string, effort?: string) => (effort && effortLevels(protocol, model).includes(effort) ? effort : "");
+export const turnEffort = (protocol: AiProtocol, model: string, effort?: string, known?: string[]) => (effort && effortLevels(protocol, model, known).includes(effort) ? effort : "");

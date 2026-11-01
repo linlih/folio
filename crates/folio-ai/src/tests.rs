@@ -222,16 +222,21 @@ fn messages_keep_their_shape_as_json() {
 }
 
 #[test]
-fn models_are_listed_with_the_protocols_own_key_header() {
-    let (url, rx) = serve(200, json!({ "data": [{ "id": "claude-opus-5-5" }, { "id": "claude-sonnet-5-5" }], "has_more": false }).to_string());
-    let ids = list_models(Protocol::Anthropic, &url, Some("k-1")).unwrap();
-    assert_eq!(ids, ["claude-opus-5-5", "claude-sonnet-5-5"]);
+fn models_are_listed_with_the_protocols_own_key_header_and_their_thinking_levels() {
+    let opus = json!({ "id": "claude-opus-5-5", "capabilities": { "effort": { "supported": true, "low": { "supported": true }, "medium": { "supported": true }, "high": { "supported": true }, "xhigh": { "supported": true }, "max": { "supported": true } } } });
+    let haiku = json!({ "id": "claude-haiku-4-5", "capabilities": { "effort": { "supported": false } } });
+    let (url, rx) = serve(200, json!({ "data": [opus, haiku, { "id": "claude-x" }], "has_more": false }).to_string());
+    let models = list_models(Protocol::Anthropic, &url, Some("k-1")).unwrap();
+    assert_eq!(models[0], ModelInfo { id: "claude-opus-5-5".into(), efforts: Some(vec!["low".into(), "medium".into(), "high".into(), "xhigh".into(), "max".into()]) });
+    assert_eq!(models[1].efforts, Some(vec![]));
+    assert_eq!(models[2].efforts, None);
     let (head, _) = rx.recv().unwrap();
     assert!(head.starts_with("GET /v1/models?limit=1000"));
     assert!(head.contains("x-api-key: k-1"));
 
     let (url, rx) = serve(200, json!({ "object": "list", "data": [{ "id": "qwen3" }, { "id": "deepseek-chat" }] }).to_string());
-    assert_eq!(list_models(Protocol::OpenAi, &url, Some("k-2")).unwrap(), ["deepseek-chat", "qwen3"]);
+    let ids: Vec<String> = list_models(Protocol::OpenAi, &url, Some("k-2")).unwrap().into_iter().map(|m| m.id).collect();
+    assert_eq!(ids, ["deepseek-chat", "qwen3"]);
     assert!(rx.recv().unwrap().0.contains("authorization: Bearer k-2"));
 
     let (url, _) = serve(401, json!({ "error": { "message": "invalid x-api-key" } }).to_string());

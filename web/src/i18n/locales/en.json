@@ -945,7 +945,7 @@
     "history": "Chats",
     "newChat": "New chat",
     "settings": "AI settings",
-    "placeholder": "Ask about your notes; @ to attach a card…",
+    "placeholder": "Ask about your notes…",
     "model": "Model",
     "addModel": "Add a model…",
     "send": "Send",
@@ -991,9 +991,7 @@
       "other": "Something went wrong: {{message}}"
     },
     "setup": {
-      "models": "Models",
       "none": "No models yet. Pick a provider below and enter its API key.",
-      "add": "Add:",
       "custom": "Custom",
       "edit": "Edit",
       "remove": "Remove",
@@ -1023,14 +1021,17 @@
       "advanced": "Base URL and API",
       "test": "Test",
       "testing": "Testing…",
-      "testOk": "Connected; {{count}} models available",
+      "testOk": "Connected; found {{count}} models. They appear in the chat's model menu and stay up to date.",
       "needBaseUrl": "Enter the base URL.",
-      "needModel": "Pick at least one model.",
-      "pickModels": "Tick the models to use in the list below.",
-      "testFirst": "Enter the key and press Test to pick from the provider's models, or type a model ID.",
-      "filterModels": "Filter models",
+      "needModel": "No model list yet: test the connection, or add a model ID.",
       "typeModel": "Type a model ID and press Enter",
-      "removeModel": "Remove {{model}}"
+      "removeModel": "Remove {{model}}",
+      "providers": "Providers",
+      "addProvider": "Add provider",
+      "modelCount": "{{count}} models",
+      "showModels": "Show",
+      "hideModels": "Hide",
+      "moreModels": "Other models (not in the provider's list)"
     },
     "writes": {
       "create_card": "New card",
@@ -1068,9 +1069,7 @@
         "deepest": "Deepest, slower"
       }
     },
-    "manageModels": "Manage models…",
     "mention": "Attach a card",
-    "mentionHint": "Attach a card (@)",
     "retry": "Retry",
     "regenerate": "Answer again",
     "edit": "Edit this message",
@@ -1085,6 +1084,13 @@
       "week": "Previous 7 days",
       "month": "Previous 30 days",
       "older": "Older"
+    },
+    "searchModels": "Search models",
+    "noModelsYet": "No model list yet; it is fetched once the key works",
+    "manageProviders": "Add or manage providers…",
+    "writeShort": {
+      "ask": "Ask first",
+      "auto": "Auto"
     }
   }
 }

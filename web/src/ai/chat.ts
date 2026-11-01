@@ -13,7 +13,7 @@ import { workspaceDoc } from "../docs/topics";
 import i18n from "../i18n";
 import { backend } from "../platform";
 import { turnEffort } from "./effort";
-import { currentProvider, useAiSettings } from "./settings";
+import { currentProvider, modelInfo, useAiSettings } from "./settings";
 import type { AiMessage, AiPart, AiTool, AiToolResult } from "./types";
 import { apply, isWriteTool, propose, WRITE_TOOLS, type Proposal, type WriteRecord } from "./writes";
 
@@ -271,7 +271,7 @@ async function run(id: string, user: UserMessage | null | (() => UserMessage | n
       let streamed = "";
       const calls: { id: string; name: string }[] = [];
       setLive(id, { text: "", tools: [], turn, stopping: useChatLive.getState().live[id]?.stopping ?? false });
-      const reply = await backend.aiTurn({ turn, provider: provider.id, model: provider.model, effort: turnEffort(provider.protocol, provider.model, provider.effort), system: systemPrompt(new Date(now())), messages, tools: toolList }, (e) => {
+      const reply = await backend.aiTurn({ turn, provider: provider.id, model: provider.model, effort: turnEffort(provider.protocol, provider.model, provider.effort, modelInfo(provider.id, provider.model)?.efforts), system: systemPrompt(new Date(now())), messages, tools: toolList }, (e) => {
         if (e.type === "text") streamed += e.text;
         else calls.push({ id: e.id, name: e.name });
         const cur = useChatLive.getState().live[id];
