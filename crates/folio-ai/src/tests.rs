@@ -209,6 +209,7 @@ fn openai_compatible_streams_text_and_tool_calls() {
     assert_eq!(m[2]["tool_calls"][0]["function"], json!({ "name": "search", "arguments": "{\"query\":\"x\"}" }));
     assert_eq!(m[3], json!({ "role": "tool", "tool_call_id": "c0", "content": "found" }));
     assert_eq!(sent["tools"][0]["function"]["parameters"]["type"], json!("object"));
+    assert_eq!(sent["reasoning_effort"], json!("medium"));
 }
 
 #[test]

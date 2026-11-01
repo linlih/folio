@@ -41,6 +41,11 @@ pub fn request(provider: &Provider, system: &str, messages: &[Message], tools: &
         "stream_options": { "include_usage": true },
         "messages": out,
     });
+    // Reasoning models' effort; sent only when chosen, as not every
+    // compatible provider knows it.
+    if let Some(effort) = provider.effort.as_deref().filter(|e| !e.is_empty()) {
+        body["reasoning_effort"] = json!(effort);
+    }
     if !tools.is_empty() {
         body["tools"] = tools.iter().map(|t| json!({ "type": "function", "function": { "name": t.name, "description": t.description, "parameters": t.schema } })).collect();
     }

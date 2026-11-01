@@ -1009,8 +1009,6 @@
       "keyKeep": "Saved; leave empty to keep",
       "keyOptional": "Optional for a local server",
       "keyWhere": "The key stays in this device's keychain. It isn't synced and is sent only to this provider.",
-      "effort": "Effort",
-      "effortDefault": "Default",
       "incomplete": "Enter the base URL and the model.",
       "writes": "Changing notes",
       "writeModes": {
@@ -1044,6 +1042,21 @@
       "changedSince": "This was changed again since; undoing would lose the later edit, so it wasn't undone.",
       "topicAdd": "File under “{{topic}}”",
       "topicRemove": "Take out of “{{topic}}”"
-    }
+    },
+    "effort": {
+      "label": "Thinking",
+      "default": "Default",
+      "low": "Low",
+      "medium": "Medium",
+      "high": "High",
+      "xhigh": "Extra high",
+      "max": "Max",
+      "hints": {
+        "default": "The model decides",
+        "low": "Faster",
+        "deepest": "Deepest, slower"
+      }
+    },
+    "manageModels": "Manage models…"
   }
 }

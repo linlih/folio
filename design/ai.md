@@ -34,6 +34,7 @@ backend.aiTool ─────────────────────�
   - 模型返回的原始内容（含思考块）原样保存、原样发回；
   - 在 api.anthropic.com 上开启服务端回退（`server-side-fallback-2026-07-01`，`fallbacks: "default"`）。
 - **OpenAI 兼容：** `chat/completions` 流式，`tool_calls` 按 index 拼接。
+- **思考程度：** 在输入框的模型菜单里直接选（像 Claude 和 ChatGPT 的应用），不放在设置里，下一轮就生效。按服务商分别记住。Anthropic 用 `output_config.effort`（低到最高五档）；OpenAI 兼容用 `reasoning_effort`（低、中、高），只在选了的时候才发送，因为不是每家都认这个参数。
 - **工具（只读）：** search、read_card、read_journal、get_backlinks、list_tags、find_by_tag、list_recent_cards、list_topics、topic_cards、list_tasks。用户当前看的卡片和选中的文字会随消息一起发送（输入框上方的标签可以去掉）。
 - **来源：** 系统提示要求模型用 `[标题](folio:card/<id>)` 和 `[几个字](folio:block/<卡片 id>/<块 id>)` 标出来源。点击后打开卡片并定位到那个块。
 - **Markdown 渲染：** 自己解析成语法树再渲染，不用 innerHTML，模型的输出不会变成页面上的标签或脚本。

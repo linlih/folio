@@ -13,7 +13,8 @@ import { focusedPane, toSide, useShell } from "../shell/tabs";
 import { answerTitle, appendToJournal, saveAsCard } from "./actions";
 import { allowAll, decide, messageText, newChat, openChat, send, stop, useChatLive, type ChatContext, type LiveTurn as LiveTurnState, type PendingWrite, type UserMessage } from "./chat";
 import { parseMarkdown, renderBlocks, type Target } from "./markdown";
-import { chooseProvider, loadAiSettings, useAiSettings } from "./settings";
+import { ModelPicker } from "./ModelPicker";
+import { loadAiSettings, useAiSettings } from "./settings";
 import type { AiPart, AiToolResult } from "./types";
 import { ChangedSince, isWriteTool, undo as undoChange, type WriteRecord } from "./writes";
 
@@ -215,14 +216,7 @@ function Panel() {
             />
             <div className="chat-compose-bar">
               {settings.providers.length > 0 ? (
-                <select className="chat-model" value={settings.current ?? ""} onChange={(e) => void chooseProvider(e.target.value)} aria-label={t("ai.model")}>
-                  {settings.providers.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name}
-                      {p.model && p.model !== p.name ? ` · ${p.model}` : ""}
-                    </option>
-                  ))}
-                </select>
+                <ModelPicker onManage={openSettings} />
               ) : (
                 <button className="chat-link" onClick={openSettings}>
                   {t("ai.addModel")}

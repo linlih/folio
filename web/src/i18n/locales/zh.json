@@ -1009,8 +1009,6 @@
       "keyKeep": "已保存，留空不改",
       "keyOptional": "本机服务可以不填",
       "keyWhere": "key 只保存在这台设备的系统钥匙串里，不会同步，也不会发给除这家服务商以外的任何地方。",
-      "effort": "思考力度",
-      "effortDefault": "默认",
       "incomplete": "请填写接口地址和模型。",
       "writes": "修改笔记",
       "writeModes": {
@@ -1044,6 +1042,21 @@
       "changedSince": "这里之后又被改过了，撤销会丢掉后来的修改，所以没有撤销。",
       "topicAdd": "归入主题「{{topic}}」",
       "topicRemove": "移出主题「{{topic}}」"
-    }
+    },
+    "effort": {
+      "label": "思考程度",
+      "default": "默认",
+      "low": "低",
+      "medium": "中",
+      "high": "高",
+      "xhigh": "很高",
+      "max": "最高",
+      "hints": {
+        "default": "由模型决定",
+        "low": "更快",
+        "deepest": "最深入，较慢"
+      }
+    },
+    "manageModels": "管理模型…"
   }
 }

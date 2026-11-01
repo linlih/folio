@@ -91,8 +91,14 @@ body.phone-typing .chat-panel.phone .chat-compose { margin-bottom: 8px; }
 .chat-compose textarea { display: block; width: 100%; min-height: 22px; max-height: 180px; border: 0; outline: 0; resize: none; background: transparent; color: var(--text); font: inherit; line-height: 1.5; }
 .chat-panel.phone .chat-compose textarea { font-size: 16px; }
 .chat-compose-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 4px; }
-.chat-model { min-width: 0; max-width: 70%; padding: 2px 4px; border: 0; border-radius: var(--radius); background: transparent; color: var(--muted); font: 12px var(--font-ui); }
-.chat-model:hover { background: var(--hover); color: var(--text); }
+.chat-model { display: inline-flex; align-items: center; gap: 4px; min-width: 0; max-width: 75%; padding: 3px 6px; border-radius: var(--radius); color: var(--muted); font: 12px var(--font-ui); }
+.chat-model:hover, .chat-model[data-popup-open] { background: var(--hover); color: var(--text); }
+.chat-model-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chat-model-effort { flex: none; padding: 0 5px; border-radius: 4px; background: var(--hover); color: var(--secondary); font-size: 11px; line-height: 16px; }
+.chat-model[data-popup-open] .chat-model-effort { background: var(--selected); }
+.chat-model-menu { min-width: 220px; max-width: min(320px, calc(100vw - 24px)); }
+.chat-model-item > span { display: flex; flex-direction: column; min-width: 0; }
+.chat-model-item small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 11px; }
 .chat-send { display: grid; flex: none; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: var(--accent); color: var(--paper); }
 .chat-send:disabled { background: var(--hover); color: var(--muted); }
 .chat-context { display: inline-flex; align-items: center; gap: 4px; max-width: 100%; margin-bottom: 4px; padding: 1px 4px 1px 6px; border-radius: 6px; background: var(--hover); color: var(--secondary); font-size: 12px; }
@@ -158,3 +164,5 @@ p.chat-before { margin: 0 0 6px; }
 .chat-write-status { flex: none; }
 .chat-write-undo { display: inline-flex; flex: none; align-items: center; gap: 3px; margin-left: auto; padding: 1px 6px; border-radius: var(--radius); color: var(--muted); font-size: 12px; }
 .chat-write-undo:hover { background: var(--hover); color: var(--text); }
+/* Above the panel, which is full screen on a phone. */
+.chat-model-positioner { z-index: 80; }

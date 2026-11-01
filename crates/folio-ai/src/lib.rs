@@ -33,7 +33,8 @@ pub struct Provider {
     pub base_url: String,
     pub model: String,
     pub key: Option<String>,
-    /// Anthropic's effort (low … max); None leaves the model's default.
+    /// How hard the model thinks: Anthropic's effort (low … max), or a
+    /// reasoning model's `reasoning_effort`; None leaves the model's default.
     pub effort: Option<String>,
 }
 

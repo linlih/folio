@@ -89,19 +89,6 @@ export function AiSettingsPanel() {
             />
             <small>{t("ai.setup.keyWhere")}</small>
           </label>
-          {draft.protocol === "anthropic" && (
-            <label>
-              <span>{t("ai.setup.effort")}</span>
-              <select value={draft.effort ?? ""} onChange={(e) => setDraft({ ...draft, effort: e.target.value })}>
-                <option value="">{t("ai.setup.effortDefault")}</option>
-                {["low", "medium", "high", "xhigh", "max"].map((e) => (
-                  <option key={e} value={e}>
-                    {e}
-                  </option>
-                ))}
-              </select>
-            </label>
-          )}
           <div className="dialog-actions">
             <button className="button" onClick={() => setDraft(null)}>
               {t("dialog.cancel")}
