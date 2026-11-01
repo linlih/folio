@@ -120,7 +120,9 @@ body.resizing { cursor: col-resize; user-select: none; }
 .tab[aria-selected="true"] { background: var(--selected); color: var(--text); }
 .tab-title { overflow: hidden; text-overflow: ellipsis; }
 .tab-close { width: 20px; height: 20px; opacity: 0; }
-.tabbar-actions { display: flex; align-items: center; gap: 2px; margin-left: auto; padding-left: 8px; position: sticky; right: 0; }
+/* Over the tabs that do not fit, which slide under it (fading out) rather
+   than showing through the buttons. */
+.tabbar-actions { display: flex; flex: none; align-items: center; gap: 2px; margin: 0 -10px 0 auto; padding: 0 10px 0 20px; position: sticky; right: -10px; background: linear-gradient(to right, transparent, var(--bg) 16px); }
 .tabbar-actions .icon-button { width: 26px; height: 26px; }
 /* ---- title bar drawn by the app (macOS desktop, main.tsx) ----
    The sidebar's top row holds the traffic lights; each pane's tab bar is
