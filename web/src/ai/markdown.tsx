@@ -263,52 +263,58 @@ export function renderBlocks(blocks: Block[], onLink: (t: NonNullable<Target>, e
 
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
-/** HTML the editor reads as a card's content: links into the notes become
+/** Inline content as the editor reads it: links into the notes become
  *  card links and block references, as if typed. */
-export function toHtml(blocks: Block[]): string {
-  const inl = (c: Inline[]): string =>
-    c
-      .map((n) => {
-        switch (n.t) {
-          case "text":
-            return esc(n.v).replace(/\n/g, "<br>");
-          case "code":
-            return `<code>${esc(n.v)}</code>`;
-          case "strong":
-            return `<strong>${inl(n.c)}</strong>`;
-          case "em":
-            return `<em>${inl(n.c)}</em>`;
-          case "del":
-            return `<s>${inl(n.c)}</s>`;
-          case "link": {
-            const t = linkTarget(n.href);
-            if (t?.kind === "web") return `<a href="${esc(t.url)}">${inl(n.c)}</a>`;
-            if (t?.kind === "card" && t.bid) return `<span data-ref="${esc(t.bid)}" data-card-hint="${esc(t.cardId)}"></span>`;
-            if (t?.kind === "card") return `<span data-card-id="${esc(t.cardId)}">${esc(plain(n.c))}</span>`;
-            return inl(n.c);
-          }
+export function inlineHtml(c: Inline[]): string {
+  return c
+    .map((n) => {
+      switch (n.t) {
+        case "text":
+          return esc(n.v).replace(/\n/g, "<br>");
+        case "code":
+          return `<code>${esc(n.v)}</code>`;
+        case "strong":
+          return `<strong>${inlineHtml(n.c)}</strong>`;
+        case "em":
+          return `<em>${inlineHtml(n.c)}</em>`;
+        case "del":
+          return `<s>${inlineHtml(n.c)}</s>`;
+        case "link": {
+          const t = linkTarget(n.href);
+          if (t?.kind === "web") return `<a href="${esc(t.url)}">${inlineHtml(n.c)}</a>`;
+          if (t?.kind === "card" && t.bid) return `<span data-ref="${esc(t.bid)}" data-card-hint="${esc(t.cardId)}"></span>`;
+          if (t?.kind === "card") return `<span data-card-id="${esc(t.cardId)}">${esc(plain(n.c))}</span>`;
+          return inlineHtml(n.c);
         }
-      })
-      .join("");
+      }
+    })
+    .join("");
+}
+
+/** HTML the editor reads as a card's content. With `source` ("ai:<model>"),
+ *  every block is marked as written by it (§0.3 provenance). */
+export function toHtml(blocks: Block[], source?: string): string {
+  const inl = inlineHtml;
+  const by = source ? ` data-source="${esc(source)}"` : "";
   const blk = (b: Block): string => {
     switch (b.t) {
       case "h":
-        return `<h${Math.min(3, b.level)}>${inl(b.c)}</h${Math.min(3, b.level)}>`;
+        return `<h${Math.min(3, b.level)}${by}>${inl(b.c)}</h${Math.min(3, b.level)}>`;
       case "p":
-        return `<p>${inl(b.c)}</p>`;
+        return `<p${by}>${inl(b.c)}</p>`;
       case "code":
-        return `<pre><code>${esc(b.v)}</code></pre>`;
+        return `<pre${by}><code>${esc(b.v)}</code></pre>`;
       case "quote":
-        return `<blockquote>${b.blocks.map(blk).join("")}</blockquote>`;
+        return `<blockquote${by}>${b.blocks.map(blk).join("")}</blockquote>`;
       case "hr":
         return "";
       case "table":
-        return `<table><tr>${b.head.map((c) => `<th><p>${inl(c)}</p></th>`).join("")}</tr>${b.rows.map((r) => `<tr>${r.map((c) => `<td><p>${inl(c)}</p></td>`).join("")}</tr>`).join("")}</table>`;
+        return `<table${by}><tr>${b.head.map((c) => `<th><p${by}>${inl(c)}</p></th>`).join("")}</tr>${b.rows.map((r) => `<tr>${r.map((c) => `<td><p${by}>${inl(c)}</p></td>`).join("")}</tr>`).join("")}</table>`;
       case "list": {
         if (b.items.some((it) => it.task !== null))
-          return `<ul data-type="taskList">${b.items.map((it) => `<li data-type="taskItem" data-checked="${it.task ? "true" : "false"}">${it.blocks.map(blk).join("")}</li>`).join("")}</ul>`;
+          return `<ul data-type="taskList"${by}>${b.items.map((it) => `<li data-type="taskItem" data-checked="${it.task ? "true" : "false"}"${by}>${it.blocks.map(blk).join("")}</li>`).join("")}</ul>`;
         const L = b.ordered ? "ol" : "ul";
-        return `<${L}>${b.items.map((it) => `<li>${it.blocks.map(blk).join("")}</li>`).join("")}</${L}>`;
+        return `<${L}${by}>${b.items.map((it) => `<li${by}>${it.blocks.map(blk).join("")}</li>`).join("")}</${L}>`;
       }
     }
   };

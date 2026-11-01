@@ -1018,10 +1018,32 @@
         "auto": "Change directly"
       },
       "writeHints": {
-        "ask": "When the AI wants to change or add notes, it shows you the change and writes only once you agree.",
-        "auto": "The AI writes directly; you can undo. (Coming soon: the AI changing notes.)"
+        "ask": "When the AI wants to change or add notes, it shows you the change and writes only once you allow it.",
+        "auto": "The AI writes directly; each change can be undone from the chat."
       },
       "mcp": "External AI tools (MCP)"
+    },
+    "writes": {
+      "create_card": "New card",
+      "append_to_card": "Add to",
+      "update_block": "Change",
+      "rename_card": "Rename",
+      "set_card_topic": "File under topic"
+    },
+    "write": {
+      "allow": "Allow",
+      "decline": "Decline",
+      "allowAll": "Allow all",
+      "allowChat": "Allow for this chat, don't ask again",
+      "allowed": "Allowed",
+      "declined": "Declined",
+      "failed": "Didn't work",
+      "undone": "Undone",
+      "undo": "Undo",
+      "undoFailed": "Couldn't undo: {{message}}",
+      "changedSince": "This was changed again since; undoing would lose the later edit, so it wasn't undone.",
+      "topicAdd": "File under “{{topic}}”",
+      "topicRemove": "Take out of “{{topic}}”"
     }
   }
 }

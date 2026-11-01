@@ -1,6 +1,8 @@
 // The assistant's conversation as the host takes it (crates/folio-ai): the
 // same for every provider.
 
+import type { WriteRecord } from "./writes";
+
 export type AiProtocol = "anthropic" | "openai";
 
 export type AiPart =
@@ -18,7 +20,9 @@ export type AiMessage =
   | { role: "user"; text: string }
   /** `raw`: the provider's own content, sent back as it was. */
   | { role: "assistant"; parts: AiPart[]; raw?: { protocol: AiProtocol; content: unknown } }
-  | { role: "tools"; results: AiToolResult[] };
+  /** `writes`: the write tool calls among them, by call id (ai/writes.ts);
+   *  kept for the conversation, not sent to the model. */
+  | { role: "tools"; results: AiToolResult[]; writes?: Record<string, WriteRecord> };
 
 export interface AiTool {
   name: string;

@@ -3,10 +3,12 @@
 // several turns with tool calls.
 import { LoroDoc, LoroMap } from "loro-crdt";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
-import { startDocs } from "../src/app";
-import { openChat, send, stop, useChatLive, newChat } from "../src/ai/chat";
+import { docs, notes, startDocs } from "../src/app";
+import { decide, openChat, send, stop, useChatLive, newChat } from "../src/ai/chat";
 import { linkTarget, parseMarkdown, toHtml } from "../src/ai/markdown";
-import { saveProvider, useAiSettings } from "../src/ai/settings";
+import { saveProvider, setWriteMode, useAiSettings } from "../src/ai/settings";
+import { ChangedSince, undo } from "../src/ai/writes";
+import { withHeadlessEditor } from "../src/editor/headless";
 import type { AiTurnRequest, AiEvent, AiReply } from "../src/ai/types";
 import { appendMessage, chatDeleted, createChat, deleteChat, readChats, readMessages, touchChat } from "../src/docs/chat";
 import { readBoards } from "../src/docs/workspace";
@@ -135,5 +137,137 @@ describe("answering a message", () => {
     await send(id, "loop", null);
     expect(turns).toBe(1);
     expect(useChatLive.getState().live[id]).toBeUndefined();
+  });
+});
+
+describe("changing notes", () => {
+  beforeAll(async () => {
+    await startDocs();
+    if (!useAiSettings.getState().current) await saveProvider({ name: "Test", protocol: "anthropic", baseUrl: "https://example.test/v1", model: "test-model" }, "k");
+  });
+  afterEach(() => {
+    delete g.__folioFakeAi;
+  });
+
+  const until = async (cond: () => boolean) => {
+    for (let i = 0; i < 200 && !cond(); i++) await new Promise((r) => setTimeout(r, 5));
+    expect(cond()).toBe(true);
+  };
+
+  /** A model that makes one tool call, then ends. */
+  const once = (name: string, input: Record<string, unknown>) => {
+    let n = 0;
+    const seen: AiTurnRequest[] = [];
+    g.__folioFakeAi = async (request) => {
+      seen.push(structuredClone(request));
+      return n++ === 0
+        ? { parts: [{ type: "tool", id: `w${Math.random()}`, name, input }], raw: null, stop: "toolUse", inputTokens: 0, outputTokens: 0 }
+        : { parts: [{ type: "text", text: "好了" }], raw: null, stop: "end", inputTokens: 0, outputTokens: 0 };
+    };
+    return seen;
+  };
+
+  const lastTools = async (chatId: string) => {
+    const h = await openChat(chatId);
+    const tools = readMessages(h.doc).filter((m) => m.message.role === "tools").at(-1)!.message;
+    return tools.role === "tools" ? tools : null!;
+  };
+
+  const blocks = async (cardId: string) => {
+    const h = await docs().open(cardId);
+    try {
+      return await withHeadlessEditor(h, (e) => {
+        const out: { bid: string; text: string; source: string | null }[] = [];
+        e.state.doc.descendants((n) => {
+          if (n.isTextblock) out.push({ bid: n.attrs.bid, text: n.textContent, source: n.attrs.source });
+        });
+        return out;
+      });
+    } finally {
+      await docs().release(cardId);
+    }
+  };
+
+  it("creates a card directly in auto mode, marked as the model's, and undoes it", async () => {
+    await setWriteMode("auto");
+    once("create_card", { title: "复习计划", content: "## 第一周\n\n- [ ] 所有权\n- [ ] 借用" });
+    const id = await newChat("做个复习计划");
+    await send(id, "做个复习计划", null);
+    const tools = await lastTools(id);
+    const record = Object.values(tools.writes!)[0];
+    expect(record.status).toBe("done");
+    const cardId = record.cardId!;
+    const card = await notes().readCard(cardId);
+    expect(card.title).toBe("复习计划");
+    const written = await blocks(cardId);
+    expect(written.map((b) => b.text)).toEqual(["第一周", "所有权", "借用"]);
+    expect(written.every((b) => b.source === "ai:test-model")).toBe(true);
+    await undo(record.change!);
+    expect((await backend.listCards()).map((c) => c.id)).not.toContain(cardId);
+  });
+
+  it("asks first in ask mode, and writes only once allowed", async () => {
+    await setWriteMode("ask");
+    const cardId = await notes().createCard({ title: "Rust", lines: ["所有权"], source: "human" });
+    once("append_to_card", { card_id: cardId, content: "补充：**借用**不转移所有权" });
+    const id = await newChat("补充一下");
+    const done = send(id, "补充一下", null);
+    await until(() => !!useChatLive.getState().live[id]?.pending);
+    const pending = useChatLive.getState().live[id]!.pending!;
+    expect(pending[0].proposal).toMatchObject({ target: "Rust", cardId });
+    expect((await blocks(cardId)).map((b) => b.text)).toEqual(["所有权"]);
+    decide(id, pending[0].part.id, true);
+    await done;
+    expect((await blocks(cardId)).map((b) => b.text)).toEqual(["所有权", "补充：借用不转移所有权"]);
+    const record = Object.values((await lastTools(id)).writes!)[0];
+    await undo(record.change!);
+    expect((await blocks(cardId)).map((b) => b.text)).toEqual(["所有权"]);
+  });
+
+  it("tells the model when the user declines or stops, and changes nothing", async () => {
+    await setWriteMode("ask");
+    const cardId = await notes().createCard({ title: "旧标题", source: "human" });
+    const seen = once("rename_card", { card_id: cardId, title: "新标题" });
+    const id = await newChat("改名");
+    const done = send(id, "改名", null);
+    await until(() => !!useChatLive.getState().live[id]?.pending);
+    decide(id, useChatLive.getState().live[id]!.pending![0].part.id, false);
+    await done;
+    const result = seen[1].messages.at(-1)!;
+    expect(result.role === "tools" && result.results[0]).toMatchObject({ isError: true, content: expect.stringMatching(/declined/) });
+    expect("writes" in result).toBe(false);
+    expect((await notes().readCard(cardId)).title).toBe("旧标题");
+
+    once("rename_card", { card_id: cardId, title: "新标题" });
+    const again = send(id, "还是改吧", null);
+    await until(() => !!useChatLive.getState().live[id]?.pending);
+    stop(id);
+    await again;
+    expect((await notes().readCard(cardId)).title).toBe("旧标题");
+    expect(Object.values((await lastTools(id)).writes!)[0].status).toBe("declined");
+  });
+
+  it("changes a block's text, and does not undo over a later edit", async () => {
+    await setWriteMode("auto");
+    const cardId = await notes().createCard({ title: "笔记", lines: ["第一行", "第二行"], source: "human" });
+    const [, second] = await blocks(cardId);
+    once("update_block", { card_id: cardId, block_id: second.bid, text: "第二行，**改过**" });
+    const id = await newChat("改");
+    await send(id, "改", null);
+    const after = await blocks(cardId);
+    expect(after[1]).toMatchObject({ text: "第二行，改过", source: "ai:test-model" });
+    const record = Object.values((await lastTools(id)).writes!)[0];
+    await undo(record.change!);
+    expect((await blocks(cardId))[1]).toMatchObject({ text: "第二行", source: null });
+    await expect(undo(record.change!)).rejects.toBeInstanceOf(ChangedSince);
+  });
+
+  it("reports a card that does not exist without asking", async () => {
+    await setWriteMode("ask");
+    const seen = once("append_to_card", { card_id: "no-such-card", content: "x" });
+    const id = await newChat("x");
+    await send(id, "x", null);
+    const result = seen[1].messages.at(-1)!;
+    expect(result.role === "tools" && result.results[0]).toMatchObject({ isError: true, content: expect.stringMatching(/No card/) });
   });
 });

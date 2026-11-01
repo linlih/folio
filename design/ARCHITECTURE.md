@@ -182,7 +182,7 @@
 | 测试 | Rust：单测 + proptest；TS：Vitest；E2E：Playwright（Web 模式）+ WebDriver（Tauri） | 每个 bug 先写复现测试（0.1 第 3 条） |
 | 发布 | GitHub Actions 构建各平台安装包 + `tauri-plugin-updater` 自动更新 | 签名、公证、商店审核见 7.2 |
 | AI 接入 | **MCP 服务**（规划，见 0.3） | 只读版 M2 上线 |
-| 应用内 AI 助手 | 对话窗口，自填 key 多家模型，Rust 发请求，对话同步（见 [ai.md](ai.md)） | 第一阶段 2026-11-01 完成 |
+| 应用内 AI 助手 | 对话窗口，自填 key 多家模型，Rust 发请求，对话同步（见 [ai.md](ai.md)） | 第一、二阶段（对话、修改笔记）2026-11-01 完成 |
 | 插件运行时 | **QuickJS（wasm，`quickjs-emscripten`）跑在 Web Worker 里** | 插件用 TS/JS 写，但运行环境里没有任何浏览器/Tauri API，只有宿主注入的 `folio` 对象 |
 
 ---

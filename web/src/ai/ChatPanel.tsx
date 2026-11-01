@@ -1,20 +1,23 @@
-import { ArrowUp, BookPlus, CalendarPlus, Check, Copy, FileText, History, Plus, Settings, Square, Trash2, X } from "lucide-react";
+import { ArrowUp, BookPlus, CalendarPlus, Check, Copy, FileText, History, Pencil, Plus, Settings, Square, Trash2, Undo2, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { docs } from "../app";
 import { cardName, openAt } from "../card/reveal";
 import { readMeta } from "../docs/card";
-import { chatDeleted, deleteChat, readChats, readMessages, type ChatInfo, type ChatMessage } from "../docs/chat";
+import { chatDeleted, deleteChat, markUndone, readChats, readMessages, readUndone, type ChatInfo, type ChatMessage } from "../docs/chat";
 import { workspaceDoc } from "../docs/topics";
 import { backend } from "../platform";
 import { usePhone } from "../shell/phone";
 import { CHAT_COMBO, keyLabel } from "../shell/shortcuts";
 import { focusedPane, toSide, useShell } from "../shell/tabs";
 import { answerTitle, appendToJournal, saveAsCard } from "./actions";
-import { messageText, newChat, openChat, send, stop, useChatLive, type ChatContext, type UserMessage } from "./chat";
+import { allowAll, decide, messageText, newChat, openChat, send, stop, useChatLive, type ChatContext, type LiveTurn as LiveTurnState, type PendingWrite, type UserMessage } from "./chat";
 import { parseMarkdown, renderBlocks, type Target } from "./markdown";
 import { chooseProvider, loadAiSettings, useAiSettings } from "./settings";
 import type { AiPart, AiToolResult } from "./types";
+import { ChangedSince, isWriteTool, undo as undoChange, type WriteRecord } from "./writes";
+
+type ToolPart = Extract<AiPart, { type: "tool" }>;
 import "./ai.css";
 
 /** The conversation shown, remembered on this device. */
@@ -47,10 +50,10 @@ function useChats(): ChatInfo[] {
   return chats;
 }
 
-function useMessages(chatId: string | null): ChatMessage[] {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+function useMessages(chatId: string | null): { messages: ChatMessage[]; undone: Set<string> } {
+  const [state, setState] = useState<{ messages: ChatMessage[]; undone: Set<string> }>({ messages: [], undone: new Set() });
   useEffect(() => {
-    setMessages([]);
+    setState({ messages: [], undone: new Set() });
     if (!chatId) return;
     let off = () => {};
     let gone = false;
@@ -58,7 +61,7 @@ function useMessages(chatId: string | null): ChatMessage[] {
     void openChat(chatId).then((h) => {
       held = true;
       if (gone) return void docs().release(chatId);
-      const read = () => setMessages(readMessages(h.doc));
+      const read = () => setState({ messages: readMessages(h.doc), undone: readUndone(h.doc) });
       read();
       off = h.doc.subscribe(read);
     });
@@ -68,7 +71,7 @@ function useMessages(chatId: string | null): ChatMessage[] {
       if (held) void docs().release(chatId);
     };
   }, [chatId]);
-  return messages;
+  return state;
 }
 
 /** The card in the focused pane, to talk about. */
@@ -95,7 +98,7 @@ function Panel() {
   const chats = useChats();
   const [chatId, setChatId] = useState<string | null>(null);
   const [listing, setListing] = useState(false);
-  const messages = useMessages(chatId);
+  const { messages, undone } = useMessages(chatId);
   const live = useChatLive((s) => (chatId ? s.live[chatId] : undefined));
   const error = useChatLive((s) => (chatId ? s.errors[chatId] : undefined));
   const focused = useFocusedCard();
@@ -121,7 +124,7 @@ function Panel() {
   useEffect(() => {
     const el = scroller.current;
     if (el) el.scrollTop = el.scrollHeight;
-  }, [messages.length, live?.text, live?.tools.length, error]);
+  }, [messages.length, live?.text, live?.tools.length, live?.pending?.length, error]);
 
   const choose = (id: string | null) => {
     setChatId(id);
@@ -176,8 +179,8 @@ function Panel() {
             {messages.length === 0 && !live && (
               <Welcome noProvider={noProvider} onSettings={openSettings} onPick={(text) => void submit(text)} hasCard={!!focused} />
             )}
-            <Messages messages={messages} />
-            {live && <LiveTurn text={live.text} tools={live.tools} />}
+            <Messages chatId={chatId} messages={messages} undone={undone} answering={!!live} pending={live?.pending} />
+            {live && chatId && <LiveTurn chatId={chatId} live={live} />}
             {error && (
               <div className="chat-error" role="alert">
                 <p>{error}</p>
@@ -332,9 +335,16 @@ function ToolLine({ part, result }: { part: { name: string; input?: Record<strin
   );
 }
 
-function Messages({ messages }: { messages: ChatMessage[] }) {
+function Messages({ chatId, messages, undone, answering, pending }: { chatId: string | null; messages: ChatMessage[]; undone: Set<string>; answering: boolean; pending?: PendingWrite[] }) {
+  // Proposed changes show as proposals, under the conversation.
+  const proposed = new Set(pending?.map((p) => p.part.id));
   const results = new Map<string, AiToolResult>();
-  for (const m of messages) if (m.message.role === "tools") for (const r of m.message.results) results.set(r.id, r);
+  const writes = new Map<string, WriteRecord>();
+  for (const m of messages) {
+    if (m.message.role !== "tools") continue;
+    for (const r of m.message.results) results.set(r.id, r);
+    for (const [id, w] of Object.entries(m.message.writes ?? {})) writes.set(id, w);
+  }
   const out: ReactNode[] = [];
   messages.forEach((m, i) => {
     const msg = m.message;
@@ -356,13 +366,17 @@ function Messages({ messages }: { messages: ChatMessage[] }) {
       const text = messageText(m);
       // The actions go under the last text of the answer to one message.
       const next = messages.slice(i + 1).find((x) => x.message.role !== "tools");
-      const lastOfAnswer = !next || next.message.role === "user";
+      const lastOfAnswer = next ? next.message.role === "user" : !answering;
       out.push(
         <div key={m.id || i} className="chat-msg assistant">
           {text && <Markdown text={text} />}
-          {tools.map((p) => (
-            <ToolLine key={p.id} part={p} result={results.get(p.id)} />
-          ))}
+          {tools.filter((p) => !proposed.has(p.id)).map((p) =>
+            isWriteTool(p.name) && chatId ? (
+              <WriteLine key={p.id} chatId={chatId} part={p} result={results.get(p.id)} record={writes.get(p.id)} undone={undone.has(p.id)} />
+            ) : (
+              <ToolLine key={p.id} part={p} result={results.get(p.id)} />
+            ),
+          )}
           {text && lastOfAnswer && <Actions messages={messages} upTo={i} />}
         </div>,
       );
@@ -422,13 +436,126 @@ function Actions({ messages, upTo }: { messages: ChatMessage[]; upTo: number }) 
   );
 }
 
-function LiveTurn({ text, tools }: { text: string; tools: { id: string; name: string }[] }) {
+function LiveTurn({ chatId, live }: { chatId: string; live: LiveTurnState }) {
+  const { text, tools, pending } = live;
   return (
     <div className="chat-msg assistant live">
-      {text ? <Markdown text={text} /> : tools.length === 0 && <span className="chat-dots" aria-label="…" />}
-      {tools.map((p) => (
-        <ToolLine key={p.id} part={p} result="running" />
+      {text ? <Markdown text={text} /> : tools.length === 0 && !pending && <span className="chat-dots" aria-label="…" />}
+      {!pending && tools.map((p) => <ToolLine key={p.id} part={p} result="running" />)}
+      {pending && <Proposals chatId={chatId} pending={pending} />}
+    </div>
+  );
+}
+
+/** Changes the assistant wants to make, for the user to allow or decline. */
+function Proposals({ chatId, pending }: { chatId: string; pending: PendingWrite[] }) {
+  const { t } = useTranslation();
+  const open = pending.filter((p) => p.allowed === undefined).length;
+  return (
+    <div className="chat-proposals">
+      {pending.map((p) => (
+        <ProposalView key={p.part.id} chatId={chatId} pending={p} />
       ))}
+      {open > 0 && (
+        <div className="chat-proposals-all">
+          {open > 1 && (
+            <button className="button" onClick={() => allowAll(chatId)}>
+              {t("ai.write.allowAll")}
+            </button>
+          )}
+          <button className="chat-link" onClick={() => allowAll(chatId, true)}>
+            {t("ai.write.allowChat")}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ProposalView({ chatId, pending }: { chatId: string; pending: PendingWrite }) {
+  const { t } = useTranslation();
+  const { part, proposal: p, allowed } = pending;
+  return (
+    <div className="chat-proposal">
+      <div className="chat-proposal-head">
+        <Pencil size={12} />
+        <span>{t(`ai.writes.${part.name}`)}</span>
+        <b>{p.target}</b>
+      </div>
+      <div className="chat-proposal-body">
+        {p.content !== undefined && <Markdown text={p.content} />}
+        {part.name === "update_block" && (
+          <>
+            <p className="chat-before">{p.before}</p>
+            <Markdown text={p.after ?? ""} />
+          </>
+        )}
+        {part.name === "rename_card" && (
+          <p>
+            <span className="chat-before">{p.before}</span> → {p.after}
+          </p>
+        )}
+        {p.topic !== undefined && <p>{t(p.add ? "ai.write.topicAdd" : "ai.write.topicRemove", { topic: p.topic })}</p>}
+      </div>
+      <div className="chat-proposal-actions">
+        {allowed === undefined ? (
+          <>
+            <button className="button" onClick={() => decide(chatId, part.id, false)}>
+              {t("ai.write.decline")}
+            </button>
+            <button className="button primary" onClick={() => decide(chatId, part.id, true)}>
+              {t("ai.write.allow")}
+            </button>
+          </>
+        ) : (
+          <span className="chat-proposal-status">{t(allowed ? "ai.write.allowed" : "ai.write.declined")}</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** A change the assistant made (or was not let make), with a way back. */
+function WriteLine({ chatId, part, result, record, undone }: { chatId: string; part: ToolPart; result?: AiToolResult; record?: WriteRecord; undone: boolean }) {
+  const { t } = useTranslation();
+  const [busy, setBusy] = useState(false);
+  const notice = (s: string) => useShell.getState().setNotice(s);
+  const status = !result ? "running" : record?.status === "done" ? (undone ? "undone" : "done") : record?.status === "declined" ? "declined" : "failed";
+  const title = typeof part.input?.title === "string" ? part.input.title : "";
+  const target = record?.target ?? title;
+  const canOpen = record?.cardId && status === "done";
+  const revert = async () => {
+    if (!record?.change || busy) return;
+    setBusy(true);
+    try {
+      await undoChange(record.change);
+      const h = await openChat(chatId);
+      markUndone(h.doc, part.id);
+      void docs().release(chatId);
+    } catch (e) {
+      notice(e instanceof ChangedSince ? t("ai.write.changedSince") : t("ai.write.undoFailed", { message: e instanceof Error ? e.message : String(e) }));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className={`chat-tool chat-write ${status}`} title={status === "failed" ? result?.content : undefined}>
+      {status === "running" ? <span className="chat-spinner" /> : status === "done" ? <Check size={12} /> : <Pencil size={12} />}
+      <span>{t(`ai.writes.${part.name}`)}</span>
+      {target &&
+        (canOpen ? (
+          <button className="chat-tool-what chat-write-target" onClick={(e) => void openCard(record.cardId!, null, toSide(e))}>
+            {target}
+          </button>
+        ) : (
+          <span className="chat-tool-what">{target}</span>
+        ))}
+      {status !== "running" && status !== "done" && <span className="chat-write-status">{t(`ai.write.${status}`)}</span>}
+      {status === "done" && record?.change && (
+        <button className="chat-write-undo" disabled={busy} onClick={() => void revert()}>
+          <Undo2 size={11} /> {t("ai.write.undo")}
+        </button>
+      )}
     </div>
   );
 }

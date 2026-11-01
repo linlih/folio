@@ -12,8 +12,11 @@ import { localDate, uuidv7 } from "../docs/ids";
 import { workspaceDoc } from "../docs/topics";
 import i18n from "../i18n";
 import { backend } from "../platform";
-import { currentProvider } from "./settings";
+import { currentProvider, useAiSettings } from "./settings";
 import type { AiMessage, AiPart, AiTool, AiToolResult } from "./types";
+import { apply, isWriteTool, propose, WRITE_TOOLS, type Proposal, type WriteRecord } from "./writes";
+
+type ToolPart = Extract<AiPart, { type: "tool" }>;
 
 /** At most this many turns for one message: a model that keeps calling
  *  tools is stopped. */
@@ -38,6 +41,15 @@ export interface LiveTurn {
   tools: { id: string; name: string }[];
   turn: string;
   stopping: boolean;
+  /** Changes waiting for the user's yes or no ("ask" mode). */
+  pending?: PendingWrite[];
+}
+
+export interface PendingWrite {
+  part: ToolPart;
+  proposal: Proposal;
+  /** The user's answer, once given. */
+  allowed?: boolean;
 }
 
 interface LiveState {
@@ -55,6 +67,75 @@ const setLive = (chatId: string, t: LiveTurn | null) =>
     else delete live[chatId];
     return { live };
   });
+
+/** Answers awaited by a conversation, and conversations allowed to change
+ *  notes without asking until the app restarts. */
+const waiting = new Map<string, () => void>();
+const allowedChats = new Set<string>();
+
+const patchLive = (chatId: string, f: (t: LiveTurn) => LiveTurn) => {
+  const cur = useChatLive.getState().live[chatId];
+  if (cur) setLive(chatId, f(cur));
+};
+
+/** The user's answer to a proposed change. */
+export function decide(chatId: string, toolId: string, allowed: boolean) {
+  patchLive(chatId, (t) => ({ ...t, pending: t.pending?.map((p) => (p.part.id === toolId ? { ...p, allowed } : p)) }));
+  const pending = useChatLive.getState().live[chatId]?.pending ?? [];
+  if (pending.every((p) => p.allowed !== undefined)) waiting.get(chatId)?.();
+}
+
+/** Allows every change proposed now, and with `forChat` the conversation's
+ *  later ones too. */
+export function allowAll(chatId: string, forChat = false) {
+  if (forChat) allowedChats.add(chatId);
+  for (const p of useChatLive.getState().live[chatId]?.pending ?? []) if (p.allowed === undefined) decide(chatId, p.part.id, true);
+}
+
+/** Shows the proposals and resolves once each is answered (or the answer stopped). */
+function ask(chatId: string, pending: PendingWrite[]): Promise<void> {
+  patchLive(chatId, (t) => ({ ...t, pending }));
+  return new Promise<void>((resolve) => waiting.set(chatId, resolve)).finally(() => waiting.delete(chatId));
+}
+
+/** Runs a reply's write calls: proposed first unless the user lets the
+ *  assistant change notes directly, then made one by one, in order. */
+async function runWrites(chatId: string, parts: ToolPart[], source: string): Promise<{ results: AiToolResult[]; writes: Record<string, WriteRecord> }> {
+  const results: AiToolResult[] = [];
+  const writes: Record<string, WriteRecord> = {};
+  const proposals: PendingWrite[] = [];
+  for (const part of parts) {
+    try {
+      proposals.push({ part, proposal: await propose(part.name, part.input) });
+    } catch (e) {
+      results.push({ id: part.id, content: e instanceof Error ? e.message : String(e), isError: true });
+    }
+  }
+  const direct = useAiSettings.getState().writes === "auto" || allowedChats.has(chatId);
+  if (proposals.length && !direct) {
+    await ask(chatId, proposals);
+    proposals.splice(0, proposals.length, ...(useChatLive.getState().live[chatId]?.pending ?? proposals));
+  }
+  for (const { part, proposal, allowed } of proposals) {
+    const at = { target: proposal.target, cardId: proposal.cardId };
+    if (!direct && !allowed) {
+      const stopped = useChatLive.getState().live[chatId]?.stopping;
+      results.push({ id: part.id, content: stopped ? "Stopped by the user before this change was made." : "The user declined this change.", isError: true });
+      writes[part.id] = { ...at, status: "declined" };
+      continue;
+    }
+    try {
+      const r = await apply(part.name, part.input, source);
+      results.push({ id: part.id, content: r.content, isError: false });
+      writes[part.id] = { ...at, cardId: r.change?.cardId ?? at.cardId, status: "done", ...(r.change ? { change: r.change } : {}) };
+    } catch (e) {
+      results.push({ id: part.id, content: e instanceof Error ? e.message : String(e), isError: true });
+      writes[part.id] = { ...at, status: "failed" };
+    }
+  }
+  patchLive(chatId, (t) => ({ ...t, pending: undefined }));
+  return { results, writes };
+}
 
 const setError = (chatId: string, e: string | null) =>
   useChatLive.setState((s) => {
@@ -75,6 +156,7 @@ export function systemPrompt(now = new Date()): string {
     "You are the assistant inside Folio, the user's personal notes app. The notes are cards (each with a title) and a journal (one document per day, id journal:YYYY-MM-DD). Blocks are the lines of a card, each with a block id.",
     "Use the tools to find and read the user's notes before answering questions about them; search with several wordings when a first search finds little. Answer from what the notes say, and say so when they do not cover something rather than guessing. You may also help with things beyond the notes (explaining, studying, writing), using your own knowledge; then make clear what comes from the notes and what does not.",
     "When you use something from a note, link it so the user can open it: a card as [its title](folio:card/<card id>), a block as [a few words](folio:block/<card id>/<block id>). Only link ids the tools gave you.",
+    "You can also change the notes with the write tools: create cards, add to a card or the journal, change a block's text, rename a card, file a card under a topic. Change notes only when the user asks for it or clearly wants it, and read first so you change the right place. Never remove or overwrite what the user wrote unless they ask. The user may be asked to approve each change; when they decline one, do not make it again — ask what they want instead. Content you write may link to notes in the same folio: forms; they become links in the notes.",
     `Write in Markdown. Answer in the user's language (the app is set to ${lang}).`,
     `Today is ${localDate(now)}.`,
   ].join("\n\n");
@@ -83,6 +165,7 @@ export function systemPrompt(now = new Date()): string {
 /** The message as the host takes it: what the user was looking at goes
  *  before what they typed. */
 function forModel(m: AiMessage | UserMessage): AiMessage {
+  if (m.role === "tools") return { role: "tools", results: m.results };
   if (m.role !== "user" || !("context" in m) || !m.context) return m.role === "user" ? { role: "user", text: m.text } : m;
   const c = m.context;
   const lines = [`[The user is looking at the card “${c.title || i18n.t("library.untitled")}” (id ${c.cardId}).]`];
@@ -91,9 +174,9 @@ function forModel(m: AiMessage | UserMessage): AiMessage {
 }
 
 let tools: Promise<AiTool[]> | null = null;
-const readTools = () => (tools ??= backend.aiTools().catch((e) => ((tools = null), Promise.reject(e))));
+const readTools = () => (tools ??= backend.aiTools().then((read) => [...read, ...WRITE_TOOLS]).catch((e) => ((tools = null), Promise.reject(e))));
 
-async function runTool(part: Extract<AiPart, { type: "tool" }>): Promise<AiToolResult> {
+async function runTool(part: ToolPart): Promise<AiToolResult> {
   if (part.invalid !== undefined) return { id: part.id, content: JSON.stringify({ INVALID_JSON: part.invalid }), isError: true };
   try {
     const r = await backend.aiTool(part.name, part.input);
@@ -143,12 +226,19 @@ export async function send(id: string, text: string, context: ChatContext | null
       });
       const parts = reply.parts.filter((p) => p.type !== "text" || p.text);
       if (parts.length || reply.raw) appendMessage(handle.doc, { role: "assistant", parts, ...(reply.raw ? { raw: reply.raw } : {}) }, now(), provider.model);
+      // Shown from the conversation now, not from what streamed.
+      patchLive(id, (t) => ({ ...t, text: "", tools: [] }));
       if (reply.stop === "refusal") throw new Error("refusal");
       if (reply.stop === "maxTokens") throw new Error("max-tokens");
-      const toolParts = parts.filter((p): p is Extract<AiPart, { type: "tool" }> => p.type === "tool");
+      const toolParts = parts.filter((p): p is ToolPart => p.type === "tool");
       if (reply.stop !== "toolUse" || toolParts.length === 0) break;
-      const results = await Promise.all(toolParts.map(runTool));
-      appendMessage(handle.doc, { role: "tools", results }, now());
+      const isWrite = (p: ToolPart) => isWriteTool(p.name) && p.invalid === undefined;
+      const [read, written] = await Promise.all([Promise.all(toolParts.filter((p) => !isWrite(p)).map(runTool)), runWrites(id, toolParts.filter(isWrite), `ai:${provider.model}`)]);
+      // In the order called.
+      const byId = new Map([...read, ...written.results].map((r) => [r.id, r]));
+      const results = toolParts.map((p) => byId.get(p.id)!);
+      const hasWrites = Object.keys(written.writes).length > 0;
+      appendMessage(handle.doc, { role: "tools", results, ...(hasWrites ? { writes: written.writes } : {}) }, now());
       if (i === MAX_TURNS - 1) throw new Error("too-many-turns");
     }
   } catch (e) {
@@ -165,6 +255,8 @@ export function stop(chatId: string) {
   if (!cur) return;
   setLive(chatId, { ...cur, stopping: true });
   void backend.aiCancel(cur.turn);
+  // Proposals not answered are declined.
+  for (const p of cur.pending ?? []) if (p.allowed === undefined) decide(chatId, p.part.id, false);
 }
 
 /** The error as the user reads it. */

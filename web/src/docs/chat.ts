@@ -119,4 +119,15 @@ export function appendMessage(doc: LoroDoc, message: AiMessage, now = Date.now()
   return id;
 }
 
+/** The assistant's changes undone, by tool call id (ai/writes.ts). Kept
+ *  apart from the messages, which are never changed. */
+const UNDONE = "undone";
+
+export function markUndone(doc: LoroDoc, toolId: string, now = Date.now()) {
+  doc.getMap(UNDONE).set(toolId, now);
+  doc.commit({ origin: CHAT_ORIGIN });
+}
+
+export const readUndone = (doc: LoroDoc): Set<string> => new Set(doc.getMap(UNDONE).keys());
+
 export const hasMessages = (doc: LoroDoc) => doc.getList(MESSAGES).length > 0;
