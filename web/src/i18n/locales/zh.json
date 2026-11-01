@@ -1091,6 +1091,11 @@
     "writeShort": {
       "ask": "先问我",
       "auto": "直接改"
-    }
+    },
+    "askAi": "问 AI",
+    "cut": "剪切",
+    "aboutQuote": "解释一下这段内容。",
+    "removeQuote": "去掉引用",
+    "quotePlaceholder": "想问这段什么？直接发送就是让 AI 解释"
   }
 }

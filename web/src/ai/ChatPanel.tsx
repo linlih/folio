@@ -14,6 +14,7 @@ import { focusedPane, toSide, useShell } from "../shell/tabs";
 import { answerTitle, appendToJournal, saveAsCard } from "./actions";
 import { allowAll, decide, editLast, messageText, newChat, openChat, regenerate, send, stop, useChatLive, type CardRef, type ChatContext, type LiveTurn as LiveTurnState, type PendingWrite, type UserMessage } from "./chat";
 import { parseMarkdown, renderBlocks, type Target } from "./markdown";
+import { clearQuote, useAskAi } from "./ask";
 import { useMention } from "./Mention";
 import { EffortPicker, ModelPicker, WriteModePicker } from "./ModelPicker";
 import { fromPreset, ProviderForm, type Draft } from "./AiSettings";
@@ -109,6 +110,8 @@ function Panel() {
   const [withCard, setWithCard] = useState(true);
   const [draft, setDraft] = useState("");
   const [cards, setCards] = useState<CardRef[]>([]);
+  /** Text asked about from a card, quoted above the message. */
+  const quote = useAskAi((s) => s.quote);
   /** Editing the last message sent: the next send takes its place. */
   const [editing, setEditing] = useState(false);
   const scroller = useRef<HTMLDivElement>(null);
@@ -133,6 +136,14 @@ function Panel() {
   // A new card focused: it is offered again.
   useEffect(() => setWithCard(true), [focused?.cardId]);
 
+  // Asked about from a card: the quote waits for the user's words.
+  useEffect(() => {
+    if (!quote) return;
+    setEditing(false);
+    setListing(false);
+    setTimeout(() => input.current?.focus());
+  }, [quote]);
+
   useEffect(() => {
     const el = scroller.current;
     if (el) el.scrollTop = el.scrollHeight;
@@ -147,7 +158,8 @@ function Panel() {
   };
 
   const submit = async (text = draft) => {
-    const body = text.trim();
+    // A quote may go alone: the model is asked about it.
+    const body = text.trim() || (quote && !editing ? t("ai.aboutQuote") : "");
     if (!body || live) return;
     setDraft("");
     setCards([]);
@@ -155,8 +167,9 @@ function Panel() {
       setEditing(false);
       return editLast(chatId, body);
     }
-    const context = withCard && focused ? focused : null;
-    const id = chatId ?? (await newChat(body));
+    const context = quote ? { cardId: quote.cardId, title: quote.title, selection: quote.text } : withCard && focused ? focused : null;
+    clearQuote();
+    const id = chatId ?? (await newChat(text.trim() || quote?.text || body));
     if (id !== chatId) choose(id);
     await send(id, body, context, cards);
   };
@@ -245,9 +258,21 @@ function Panel() {
                 </button>
               </div>
             )}
-            {!editing && ((focused && withCard) || cards.length > 0) && (
+            {quote && !editing && (
+              <div className="chat-quote">
+                <div className="chat-quote-head">
+                  <FileText size={11} />
+                  <span>{quote.title}</span>
+                  <button aria-label={t("ai.removeQuote")} title={t("ai.removeQuote")} onClick={clearQuote}>
+                    <X size={11} />
+                  </button>
+                </div>
+                <blockquote>{quote.text}</blockquote>
+              </div>
+            )}
+            {!editing && ((focused && withCard && !quote) || cards.length > 0) && (
               <div className="chat-contexts">
-                {focused && withCard && !cards.some((c) => c.cardId === focused.cardId) && (
+                {focused && withCard && !quote && !cards.some((c) => c.cardId === focused.cardId) && (
                   <span className="chat-context" title={t("ai.contextHint")}>
                     <FileText size={12} />
                     <span>{focused.title}</span>
@@ -271,7 +296,7 @@ function Panel() {
               ref={input}
               value={draft}
               rows={1}
-              placeholder={t(editing ? "ai.editPlaceholder" : "ai.placeholder")}
+              placeholder={t(editing ? "ai.editPlaceholder" : quote ? "ai.quotePlaceholder" : "ai.placeholder")}
               onChange={(e) => {
                 setDraft(e.target.value);
                 mention.track(e.target);
@@ -303,7 +328,7 @@ function Panel() {
                   <Square size={12} fill="currentColor" />
                 </button>
               ) : (
-                <button className="chat-send" aria-label={t("ai.send")} title={t("ai.send")} disabled={!draft.trim()} onClick={() => void submit()}>
+                <button className="chat-send" aria-label={t("ai.send")} title={t("ai.send")} disabled={!draft.trim() && !(quote && !editing)} onClick={() => void submit()}>
                   <ArrowUp size={15} />
                 </button>
               )}
@@ -535,6 +560,7 @@ function Messages({ chatId, messages, undone, answering, pending, onEdit }: { ch
                 ))}
             </span>
           )}
+          {context?.selection && <blockquote className="chat-sent-quote">{context.selection}</blockquote>}
           <div className="chat-bubble">{msg.text}</div>
           {i === lastUser && !answering && (
             <button className="chat-edit" title={t("ai.edit")} aria-label={t("ai.edit")} onClick={() => onEdit(msg.text)}>

@@ -1091,6 +1091,11 @@
     "writeShort": {
       "ask": "Ask first",
       "auto": "Auto"
-    }
+    },
+    "askAi": "Ask AI",
+    "cut": "Cut",
+    "aboutQuote": "Explain this passage.",
+    "removeQuote": "Remove the quote",
+    "quotePlaceholder": "What about this passage? Send as is to have it explained"
   }
 }

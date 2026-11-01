@@ -7,6 +7,7 @@ import type { EditorMode } from "../docs/card";
 import { readMeta } from "../docs/card";
 import type { DocHandle } from "../docs/hub";
 import { redo as loroRedo, undo as loroUndo } from "../vendor/loro-prosemirror";
+import { AskAiBubble, AskAiMenu } from "./askAi";
 import { isBindTx, isRemoteTx, LoroBinding } from "./binding";
 import { focusTrail } from "./outliner/focus";
 import { baseExtensions } from "./extensions";
@@ -69,6 +70,7 @@ function BoundEditor({ handle, mode, placeholder, autoFocus, onOpenCard, extensi
         ...baseExtensions(isRemoteTx, placeholder, editorMode),
         LoroBinding(handle.doc, handle.undo),
         UndoKeys,
+        AskAiMenu.configure({ handle }),
         ...(extensions?.(handle) ?? []),
       ],
       // Read-only until the binding has loaded the document (§5.1 point 1).
@@ -107,6 +109,7 @@ function BoundEditor({ handle, mode, placeholder, autoFocus, onOpenCard, extensi
     <div className="editor-host">
       {editor && <FocusTrail editor={editor} />}
       <EditorContent editor={editor} />
+      {editor && <AskAiBubble editor={editor} handle={handle} />}
     </div>
   );
 }

@@ -139,6 +139,15 @@ body.phone-typing .chat-panel.phone .chat-compose { margin-bottom: 8px; }
 .chat-mention .popup-item { width: 100%; text-align: left; }
 .chat-mention .popup-item span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .chat-mention .popup-item.active { background: var(--hover); }
+.chat-quote { margin-bottom: 6px; padding: 6px 8px; border-radius: 8px; background: var(--hover); }
+.chat-quote-head { display: flex; align-items: center; gap: 4px; color: var(--muted); font-size: 11.5px; }
+.chat-quote-head span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chat-quote-head button { display: grid; place-items: center; width: 18px; height: 18px; border-radius: 4px; color: var(--muted); }
+.chat-quote-head button:hover { background: var(--selected); color: var(--text); }
+.chat-quote blockquote, .chat-sent-quote { display: -webkit-box; margin: 4px 0 0; padding-left: 8px; overflow: hidden; border-left: 2px solid var(--border); color: var(--secondary); font-size: 12.5px; line-height: 1.5; white-space: pre-wrap; -webkit-box-orient: vertical; -webkit-line-clamp: 4; }
+.chat-sent-quote { max-width: 88%; margin: 0; -webkit-line-clamp: 3; }
+.ask-ai-bubble { position: fixed; z-index: 55; display: inline-flex; align-items: center; gap: 4px; padding: 6px 12px; border: 1px solid var(--border); border-radius: 999px; background: var(--paper); box-shadow: 0 2px 8px color-mix(in srgb, var(--ink) 14%, transparent); color: var(--text); font: 13px var(--font-ui); }
+.folio-popover .ask-ai-item { color: var(--accent); }
 .chat-error-actions { display: flex; flex-wrap: wrap; gap: 12px; }
 
 .chat-history { flex: 1; min-height: 0; overflow-y: auto; padding: 6px 8px; }
