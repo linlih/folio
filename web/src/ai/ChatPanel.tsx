@@ -110,7 +110,8 @@ function Panel() {
   useEffect(() => {
     if (!settings.loaded) void loadAiSettings();
     void backend.getLocalSetting<string>(CURRENT).then((id) => id && setChatId((c) => c ?? id), () => {});
-    setTimeout(() => input.current?.focus());
+    // Not on a phone: the keyboard would cover half the screen at once.
+    if (!phone) setTimeout(() => input.current?.focus());
   }, [settings.loaded]);
 
   // A conversation deleted (here or elsewhere) is not shown.
@@ -130,7 +131,7 @@ function Panel() {
     setChatId(id);
     setListing(false);
     void backend.setLocalSetting(CURRENT, id);
-    setTimeout(() => input.current?.focus());
+    if (!phone) setTimeout(() => input.current?.focus());
   };
 
   const submit = async (text = draft) => {

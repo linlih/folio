@@ -332,6 +332,10 @@ export function KeyboardBar() {
       keyboardHeight = Math.max(covered, Math.round(tallest.height - vv.height));
       setBottom(covered);
       root.style.setProperty("--keyboard", `${covered}px`);
+      // What shows of the page: Android may move it under the keyboard
+      // instead of shrinking it (a full-screen panel keeps to this).
+      root.style.setProperty("--vv-top", `${Math.round(vv.offsetTop)}px`);
+      root.style.setProperty("--vv-height", `${Math.round(vv.height)}px`);
       if (window.scrollY !== 0) window.scrollTo(0, 0);
       check();
       // The line being typed on may now be under the keyboard (after the
@@ -379,6 +383,8 @@ export function KeyboardBar() {
       window.removeEventListener("resize", place);
       document.body.classList.remove("phone-typing");
       root.style.removeProperty("--keyboard");
+      root.style.removeProperty("--vv-top");
+      root.style.removeProperty("--vv-height");
     };
   }, []);
   if (!editing) return null;

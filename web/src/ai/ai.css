@@ -18,6 +18,10 @@
   border: 0;
   background: var(--bg);
 }
+/* While typing, the part of the page that shows: Android moves the page
+   under the keyboard rather than shrinking it (shell/PhoneBars.tsx). */
+body.phone-typing .chat-panel.phone { top: var(--vv-top, 0px); bottom: auto; height: var(--vv-height, 100%); padding-bottom: 0; }
+body.phone-typing .chat-panel.phone .chat-compose { margin-bottom: 8px; }
 @media (max-width: 1100px) {
   .chat-panel:not(.phone) { position: fixed; z-index: 50; top: 0; right: 0; bottom: 0; box-shadow: var(--shadow); }
 }
