@@ -140,7 +140,7 @@ export class DocHub {
       born,
       onError: this.onError,
       // Written once it lists anything: a topic, a whiteboard, a template, a chat.
-      ...(workspace ? { kind: "workspace" as const, hasContent: (d: LoroDoc) => ["topics", "boards", "templates", "chats"].some((k) => d.getMap(k).size > 0) } : {}),
+      ...(workspace ? { kind: "workspace" as const, hasContent: (d: LoroDoc) => ["topics", "boards", "templates", "chats", "ai"].some((k) => d.getMap(k).size > 0) } : {}),
       ...(board ? { kind: "board" as const, hasContent: (d: LoroDoc) => d.getMap("items").size > 0 } : {}),
       // A chat is stored as a whiteboard (docs/chat.ts).
       ...(chat ? { kind: "board" as const, hasContent: hasMessages } : {}),

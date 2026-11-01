@@ -258,6 +258,36 @@ pub fn normalize_recovery_code(typed: &str) -> Option<String> {
     (out.len() == 39).then_some(out)
 }
 
+/// A small secret of the workspace's devices (an AI provider's API key),
+/// sealed to be kept in the synced notes: readable only with the workspace
+/// key, under its own key derived from it. The workspace and the secret's
+/// name are bound to it, so it cannot be moved to another name.
+pub fn seal_secret(key: &WorkspaceKey, workspace: &str, name: &str, plaintext: &[u8]) -> Vec<u8> {
+    let nonce: [u8; NONCE] = random_bytes();
+    let cipher = XChaCha20Poly1305::new((&secret_key(key)).into());
+    let aad = format!("{workspace}\nsecret\n{name}");
+    let ct = cipher.encrypt(XNonce::from_slice(&nonce), Payload { msg: plaintext, aad: aad.as_bytes() }).expect("encryption");
+    [nonce.as_slice(), &ct].concat()
+}
+
+pub fn open_secret(key: &WorkspaceKey, workspace: &str, name: &str, sealed: &[u8]) -> Result<Vec<u8>> {
+    if sealed.len() < NONCE {
+        return Err(SyncError::Crypto("secret too short".into()));
+    }
+    let (nonce, ct) = sealed.split_at(NONCE);
+    let cipher = XChaCha20Poly1305::new((&secret_key(key)).into());
+    let aad = format!("{workspace}\nsecret\n{name}");
+    cipher
+        .decrypt(XNonce::from_slice(nonce), Payload { msg: ct, aad: aad.as_bytes() })
+        .map_err(|_| SyncError::Crypto("cannot open the secret: wrong key or damaged data".into()))
+}
+
+fn secret_key(key: &WorkspaceKey) -> [u8; 32] {
+    let mut out = [0u8; 32];
+    Hkdf::<Sha256>::new(None, &key.0).expand(b"folio secrets v1", &mut out).expect("32 bytes");
+    out
+}
+
 pub fn b64(bytes: &[u8]) -> String {
     B64.encode(bytes)
 }
@@ -288,6 +318,18 @@ mod tests {
         let wrapped = wrap(&key, &code, TEST_COST).unwrap();
         assert_eq!(unwrap(&wrapped, &normalize_recovery_code(&typed).unwrap()).unwrap().0, key.0);
         assert!(matches!(unwrap(&wrapped, &new_recovery_code()), Err(SyncError::WrongPassphrase)));
+    }
+
+    #[test]
+    fn secrets_open_only_under_their_name_and_key() {
+        let key = WorkspaceKey::generate();
+        let sealed = seal_secret(&key, "ws", "ai key p1", b"sk-123");
+        assert_eq!(open_secret(&key, "ws", "ai key p1", &sealed).unwrap(), b"sk-123");
+        assert!(open_secret(&key, "ws", "ai key p2", &sealed).is_err(), "another name");
+        assert!(open_secret(&key, "ws2", "ai key p1", &sealed).is_err(), "another workspace");
+        assert!(open_secret(&WorkspaceKey::generate(), "ws", "ai key p1", &sealed).is_err(), "another key");
+        // Not the documents' key.
+        assert!(Keys::derive(&key).open("ws", "ai key p1", &sealed).is_err());
     }
 
     #[test]

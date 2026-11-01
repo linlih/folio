@@ -1,6 +1,6 @@
 import { Channel, convertFileSrc, invoke } from "@tauri-apps/api/core";
 import type { AppInfo, AssetInfo, BackupInfo, Backlink, BlockText, CardRow, JournalDay, McpStatus, SearchHit, SyncDevice, SyncStatus, TagInfo, TopicCount, CardText } from "../bindings/commands";
-import type { Backend, ExportResult } from "./backend";
+import type { AiKeyInfo, Backend, ExportResult } from "./backend";
 import type { AiEvent, AiReply, AiTool } from "../ai/types";
 import type { LatestRelease, LibraryLocation, PickedFolder } from "../bindings/commands";
 import type { InboxItem, LinkPreview, TagCard, TaskRow } from "../bindings/commands";
@@ -67,8 +67,11 @@ export function tauriBackend(): Backend {
     installUpdate: (path) => invoke<boolean>("install_update", { path }),
     openReleaseDownload: (url) => invoke<void>("open_release_download", { url }),
     setAppearance: (theme) => invoke<void>("set_appearance", { theme }),
-    aiKeys: () => invoke<string[]>("ai_keys"),
+    aiKeys: () => invoke<AiKeyInfo[]>("ai_keys"),
     aiSetKey: (provider, key) => invoke<void>("ai_set_key", { provider, key }),
+    aiSealKey: (provider) => invoke<string | null>("ai_seal_key", { provider }),
+    aiOpenKey: (provider, sealed) => invoke<void>("ai_open_key", { provider, sealed }),
+    aiMoveKey: (from, to) => invoke<void>("ai_move_key", { from, to }),
     aiTools: () => invoke<AiTool[]>("ai_tools"),
     aiTool: (name, input) => invoke<{ content: string; isError: boolean }>("ai_tool", { name, input }),
     aiTurn: (request, onEvent) => {

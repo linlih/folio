@@ -4,8 +4,10 @@
 //! page; the read-only tools, the same as the MCP server's.
 //!
 //! The providers themselves (name, protocol, address, model) are the page's
-//! setting `ai.providers`; only the keys are kept here, in `ai.keys`, which
-//! the page cannot read.
+//! setting `ai.providers` (synced through the workspace document, mirrored
+//! there); only the keys are kept here, in `ai.keys`, which the page cannot
+//! read. A key also goes to the workspace's other devices sealed with the
+//! sync workspace key, so the page and the server only see it encrypted.
 
 use std::collections::{HashMap, HashSet};
 use std::sync::Mutex;
@@ -48,6 +50,11 @@ struct KeptKey {
     /// The key itself, only where the device has no keychain.
     #[serde(default, skip_serializing_if = "String::is_empty")]
     key: String,
+    /// The key sealed for the workspace's devices, as synced: the copy this
+    /// key was sealed to or opened from, to tell when another device has
+    /// sent a new one.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    synced: String,
 }
 
 fn entry_name(provider: &str) -> String {
@@ -66,28 +73,73 @@ fn save_keys(state: &AppState, keys: &HashMap<String, KeptKey>) -> CmdResult<()>
 /// or in the library where there is none.
 #[tauri::command]
 pub(crate) fn ai_set_key(app: tauri::AppHandle, state: tauri::State<AppState>, provider: String, key: String) -> CmdResult<()> {
-    let key = key.trim().to_owned();
-    let mut keys = kept_keys(&state)?;
+    keep(&app, &state, provider, key.trim().to_owned(), String::new())
+}
+
+fn keep(app: &tauri::AppHandle, state: &AppState, provider: String, key: String, synced: String) -> CmdResult<()> {
+    let mut keys = kept_keys(state)?;
     if let Some(old) = keys.remove(&provider) {
         secret::delete(&old.place, &entry_name(&provider));
     }
     if !key.is_empty() {
-        let kept = match secret::put(&app, &entry_name(&provider), &key) {
-            Ok((place, sealed)) => KeptKey { place: place.into(), sealed, key: String::new() },
+        let kept = match secret::put(app, &entry_name(&provider), &key) {
+            Ok((place, sealed)) => KeptKey { place: place.into(), sealed, key: String::new(), synced },
             Err(e) => {
                 tracing::warn!(error = %e, "no keychain for the API key; it is kept in the library");
-                KeptKey { place: IN_LIBRARY.into(), sealed: String::new(), key }
+                KeptKey { place: IN_LIBRARY.into(), sealed: String::new(), key, synced }
             }
         };
         keys.insert(provider, kept);
     }
-    save_keys(&state, &keys)
+    save_keys(state, &keys)
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct KeyInfo {
+    provider: String,
+    /// The synced copy it matches; None when not synced (yet).
+    synced: Option<String>,
 }
 
 /// The providers that have a key on this device.
 #[tauri::command]
-pub(crate) fn ai_keys(state: tauri::State<AppState>) -> CmdResult<Vec<String>> {
-    Ok(kept_keys(&state)?.into_keys().collect())
+pub(crate) fn ai_keys(state: tauri::State<AppState>) -> CmdResult<Vec<KeyInfo>> {
+    Ok(kept_keys(&state)?.into_iter().map(|(provider, k)| KeyInfo { provider, synced: Some(k.synced).filter(|s| !s.is_empty()) }).collect())
+}
+
+/// The provider's key sealed for the workspace's other devices, to be
+/// synced; None where this device does not sync or has no key.
+#[tauri::command]
+pub(crate) fn ai_seal_key(app: tauri::AppHandle, state: tauri::State<AppState>, provider: String) -> CmdResult<Option<String>> {
+    let Some((workspace, wk)) = crate::sync::workspace_key(&app) else { return Ok(None) };
+    let Some(key) = read_key(&app, &provider)?.filter(|k| !k.is_empty()) else { return Ok(None) };
+    let sealed = folio_sync::crypto::b64(&folio_sync::crypto::seal_secret(&wk, &workspace, &entry_name(&provider), key.as_bytes()));
+    let mut keys = kept_keys(&state)?;
+    if let Some(k) = keys.get_mut(&provider) {
+        k.synced = sealed.clone();
+        save_keys(&state, &keys)?;
+    }
+    Ok(Some(sealed))
+}
+
+/// Keeps a provider's key under another provider: two devices' entries for
+/// the same provider made one when their settings first sync.
+#[tauri::command]
+pub(crate) fn ai_move_key(app: tauri::AppHandle, state: tauri::State<AppState>, from: String, to: String) -> CmdResult<()> {
+    let Some(key) = read_key(&app, &from)? else { return Ok(()) };
+    keep(&app, &state, to, key, String::new())?;
+    keep(&app, &state, from, String::new(), String::new())
+}
+
+/// Keeps a key another device synced, sealed (see [`ai_seal_key`]).
+#[tauri::command]
+pub(crate) fn ai_open_key(app: tauri::AppHandle, state: tauri::State<AppState>, provider: String, sealed: String) -> CmdResult<()> {
+    let (workspace, wk) = crate::sync::workspace_key(&app).ok_or_else(|| CommandError::Other("no-sync".into()))?;
+    let bytes = folio_sync::crypto::unb64(&sealed).map_err(|e| CommandError::Other(e.to_string()))?;
+    let key = folio_sync::crypto::open_secret(&wk, &workspace, &entry_name(&provider), &bytes).map_err(|e| CommandError::Other(e.to_string()))?;
+    let key = String::from_utf8(key).map_err(|e| CommandError::Other(e.to_string()))?;
+    keep(&app, &state, provider, key, sealed)
 }
 
 fn read_key(app: &tauri::AppHandle, provider: &str) -> CmdResult<Option<String>> {

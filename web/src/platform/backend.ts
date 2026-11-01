@@ -4,6 +4,12 @@ import type { AppInfo, Backlink, BlockText, CardRow, DocKind, JournalDay, Search
 import type { ClipInfo, InboxItem, LinkPreview, TagCard, TaskRow } from "../bindings/commands";
 import type { AiEvent, AiReply, AiTool, AiTurnRequest } from "../ai/types";
 
+/** A provider with a key on this device, and the synced copy it matches. */
+export interface AiKeyInfo {
+  provider: string;
+  synced: string | null;
+}
+
 /** Everything the UI may ask of the host. The Tauri app and web mode each
  *  implement it; UI code never imports `@tauri-apps/api` directly. */
 export interface Backend {
@@ -117,8 +123,15 @@ export interface Backend {
   /** The assistant (design/ai.md). The providers with an API key on this
    *  device, and keeping one (an empty key removes it); keys never come
    *  back to the page. */
-  aiKeys(): Promise<string[]>;
+  aiKeys(): Promise<AiKeyInfo[]>;
   aiSetKey(provider: string, key: string): Promise<void>;
+  /** The provider's key sealed with the sync workspace key, for the other
+   *  devices; null where this device does not sync or has no key. */
+  aiSealKey(provider: string): Promise<string | null>;
+  /** Keeps a key another device sealed. Fails with "no-sync" here without sync. */
+  aiOpenKey(provider: string, sealed: string): Promise<void>;
+  /** Keeps a provider's key under another provider instead. */
+  aiMoveKey(from: string, to: string): Promise<void>;
   /** The read-only tools, and running one. */
   aiTools(): Promise<AiTool[]>;
   aiTool(name: string, input: unknown): Promise<{ content: string; isError: boolean }>;

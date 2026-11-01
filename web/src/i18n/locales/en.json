@@ -1008,7 +1008,7 @@
       "key": "API key",
       "keyKeep": "Saved; leave empty to keep",
       "keyOptional": "Optional for a local server",
-      "keyWhere": "The key stays in this device's keychain. It isn't synced and is sent only to this provider.",
+      "keyWhere": "The key is kept in this device's keychain. With sync on, it goes to your other devices encrypted end to end (the sync server can't read it); without sync it stays on this device.",
       "incomplete": "Enter the base URL and the model.",
       "writes": "Changing notes",
       "writeModes": {

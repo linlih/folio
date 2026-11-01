@@ -24,7 +24,8 @@ export function memoryBackend(now: () => number = Date.now): Backend {
   const settings = new Map<string, unknown>();
   /** Documents written as whiteboards, chats among them (bare ids, not cards). */
   const boards = new Set<string>();
-  const aiKeys = new Set<string>();
+  /** Keys by provider, and the synced copy each matches. */
+  const aiKeys = new Map<string, { key: string; synced: string | null }>();
   const backups: { info: BackupInfo; docs: Map<string, Uint8Array> }[] = [];
   /** Added files: hash → object URL. */
   const assets = new Map<string, string>();
@@ -337,8 +338,26 @@ export function memoryBackend(now: () => number = Date.now): Backend {
     setAppearance: async () => {},
     // No server in the browser.
     // No model here: a test may stand one in (globalThis.__folioFakeAi).
-    aiKeys: async () => [...aiKeys],
-    aiSetKey: async (provider, key) => void (key.trim() ? aiKeys.add(provider) : aiKeys.delete(provider)),
+    aiKeys: async () => [...aiKeys].map(([provider, k]) => ({ provider, synced: k.synced })),
+    aiSetKey: async (provider, key) => void (key.trim() ? aiKeys.set(provider, { key: key.trim(), synced: null }) : aiKeys.delete(provider)),
+    // "Sealed" in the open: there is no sync here; for tests of what syncs.
+    aiSealKey: async (provider) => {
+      const k = aiKeys.get(provider);
+      if (!k) return null;
+      k.synced = `sealed:${provider}:${k.key}:${now()}`;
+      return k.synced;
+    },
+    aiOpenKey: async (provider, sealed) => {
+      const m = sealed.match(/^sealed:([^:]+):(.*):\d+$/);
+      if (!m || m[1] !== provider) throw new Error("cannot open the secret");
+      aiKeys.set(provider, { key: m[2], synced: sealed });
+    },
+    aiMoveKey: async (from, to) => {
+      const k = aiKeys.get(from);
+      if (!k) return;
+      aiKeys.set(to, { key: k.key, synced: null });
+      aiKeys.delete(from);
+    },
     aiTools: async () => [{ name: "search", description: "Search notes", schema: { type: "object", properties: { query: { type: "string" } }, required: ["query"] } }],
     aiTool: async (name, input) => {
       if (name !== "search") return { content: `unknown tool ${name}`, isError: true };

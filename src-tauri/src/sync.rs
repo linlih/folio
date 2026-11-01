@@ -119,6 +119,13 @@ fn device_name(s: &SyncSettings) -> String {
     if s.name.trim().is_empty() { system_device_name() } else { s.name.clone() }
 }
 
+/// The workspace and its key, where this device syncs: for secrets kept
+/// in the synced notes (ai.rs).
+pub(crate) fn workspace_key(app: &tauri::AppHandle) -> Option<(String, WorkspaceKey)> {
+    let s = load(app)?;
+    Some((s.workspace.clone(), key_of(&s)?))
+}
+
 fn keys_of(s: &SyncSettings) -> Option<Keys> {
     Some(Keys::derive(&key_of(s)?))
 }
