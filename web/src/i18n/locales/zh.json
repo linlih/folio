@@ -35,6 +35,8 @@
     "moveToTrash": "移到回收站",
     "search": "搜索卡片标题和内容",
     "edited": "编辑于",
+    "origin": "来源",
+    "origins": { "all": "全部来源", "inbox": "来自收集箱" },
     "within": {
       "all": "不限",
       "today": "今天",
@@ -778,7 +780,8 @@
     "openSource": "打开原文",
     "markDone": "已整理",
     "done": "「{{title}}」已整理，仍在卡片库里",
-    "inInbox": "在收集箱中"
+    "inInbox": "在收集箱中",
+    "fromInbox": "来自收集箱 · 收于 {{date}}"
   },
   "db": {
     "cards_one": "{{count}} 张卡片",

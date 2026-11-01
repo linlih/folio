@@ -14,15 +14,19 @@ export type LibraryView = "grid" | "list";
  *  cards in one list. */
 export type LibraryGrouping = "topics" | "all";
 
+/** Every card, or only those that came from the inbox and were dealt with. */
+export type CardOrigin = "all" | "inbox";
+
 export interface LibraryQuery {
   text: string;
   sort: SortKey;
   edited: EditedWithin;
   view: LibraryView;
   grouping: LibraryGrouping;
+  origin: CardOrigin;
 }
 
-export const DEFAULT_QUERY: LibraryQuery = { text: "", sort: "updated", edited: "all", view: "grid", grouping: "topics" };
+export const DEFAULT_QUERY: LibraryQuery = { text: "", sort: "updated", edited: "all", view: "grid", grouping: "topics", origin: "all" };
 
 /** A card nobody wrote anything in (Heptabase's "empty cards"). */
 export const isEmptyCard = (c: CardRow) => !c.title.trim() && !c.preview.trim();
@@ -50,6 +54,7 @@ export function applyQuery(rows: CardRow[], q: LibraryQuery, locale: string, now
   const since = startOf(q.edited, now);
   const out = rows.filter((c) => {
     if (c.updatedAt < since) return false;
+    if (q.origin === "inbox" && c.fromInbox == null) return false;
     const hay = `${c.title}\n${c.preview}`.toLowerCase();
     return words.every((w) => hay.includes(w));
   });

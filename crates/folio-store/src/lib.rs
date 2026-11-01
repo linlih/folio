@@ -129,6 +129,9 @@ pub struct CardRow {
     pub preview: String,
     pub created_at: Option<i64>,
     pub updated_at: i64,
+    /// When it was collected in the inbox, if it came from there and has
+    /// been dealt with (design/inbox-and-tags.md §2).
+    pub from_inbox: Option<i64>,
 }
 
 /// A link in the inbox.
@@ -759,7 +762,7 @@ impl Store {
     /// Pinned cards not in the trash, in the order they were pinned.
     pub fn pinned_cards(&self) -> Result<Vec<CardRow>> {
         self.query_cards(
-            "SELECT card_id, kind, title, preview, created_at, updated_at FROM idx.cards
+            "SELECT card_id, kind, title, preview, created_at, updated_at, inbox_from FROM idx.cards
              WHERE pinned_at IS NOT NULL AND deleted_at IS NULL ORDER BY pinned_at",
             [],
         )
@@ -821,7 +824,7 @@ impl Store {
     /// Cards in the trash, most recently trashed first.
     pub fn list_trash(&self, limit: u32) -> Result<Vec<CardRow>> {
         self.query_cards(
-            "SELECT card_id, kind, title, preview, created_at, updated_at FROM idx.cards
+            "SELECT card_id, kind, title, preview, created_at, updated_at, inbox_from FROM idx.cards
              WHERE deleted_at IS NOT NULL ORDER BY deleted_at DESC LIMIT ?1",
             params![limit],
         )
@@ -885,7 +888,7 @@ impl Store {
     /// and without journal days (they live in the journal).
     pub fn list_cards(&self, limit: u32) -> Result<Vec<CardRow>> {
         self.query_cards(
-            "SELECT card_id, kind, title, preview, created_at, updated_at FROM idx.cards
+            "SELECT card_id, kind, title, preview, created_at, updated_at, inbox_from FROM idx.cards
              WHERE deleted_at IS NULL AND kind != 'journal' ORDER BY updated_at DESC LIMIT ?1",
             params![limit],
         )
@@ -894,7 +897,7 @@ impl Store {
     /// Every card not in the trash, journal days included (export, MCP).
     pub fn live_cards(&self) -> Result<Vec<CardRow>> {
         self.query_cards(
-            "SELECT card_id, kind, title, preview, created_at, updated_at FROM idx.cards
+            "SELECT card_id, kind, title, preview, created_at, updated_at, inbox_from FROM idx.cards
              WHERE deleted_at IS NULL ORDER BY kind, updated_at DESC",
             [],
         )
@@ -917,7 +920,15 @@ impl Store {
     fn query_cards(&self, sql: &str, args: impl rusqlite::Params) -> Result<Vec<CardRow>> {
         let mut stmt = self.conn.prepare_cached(sql)?;
         let rows = stmt.query_map(args, |r| {
-            Ok(CardRow { id: r.get(0)?, kind: r.get(1)?, title: r.get(2)?, preview: r.get(3)?, created_at: r.get(4)?, updated_at: r.get(5)? })
+            Ok(CardRow {
+                id: r.get(0)?,
+                kind: r.get(1)?,
+                title: r.get(2)?,
+                preview: r.get(3)?,
+                created_at: r.get(4)?,
+                updated_at: r.get(5)?,
+                from_inbox: r.get(6)?,
+            })
         })?;
         Ok(rows.collect::<std::result::Result<_, _>>()?)
     }
@@ -1055,7 +1066,7 @@ impl Store {
     /// Cards in a topic (§4.7), most recently changed first.
     pub fn topic_cards(&self, topic: &str) -> Result<Vec<CardRow>> {
         self.query_cards(
-            "SELECT c.card_id, c.kind, c.title, c.preview, c.created_at, c.updated_at FROM idx.card_topics t
+            "SELECT c.card_id, c.kind, c.title, c.preview, c.created_at, c.updated_at, c.inbox_from FROM idx.card_topics t
                JOIN idx.cards c ON c.card_id = t.card_id
               WHERE t.topic = ?1 AND c.deleted_at IS NULL ORDER BY c.updated_at DESC",
             params![topic],
@@ -1281,12 +1292,13 @@ impl Store {
         let s = card::summarize(self.doc_mut(id, DocKind::Card)?);
         self.conn.execute(
             "INSERT INTO idx.cards(card_id, kind, title, preview, text, created_at, updated_at, deleted_at, pinned_at,
-                                   inbox_at, clip, clip_text, props, lines)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)
+                                   inbox_at, clip, clip_text, props, lines, inbox_from)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)
              ON CONFLICT(card_id) DO UPDATE SET kind = excluded.kind, title = excluded.title, preview = excluded.preview,
                text = excluded.text, created_at = excluded.created_at, updated_at = excluded.updated_at,
                deleted_at = excluded.deleted_at, pinned_at = excluded.pinned_at, inbox_at = excluded.inbox_at,
-               clip = excluded.clip, clip_text = excluded.clip_text, props = excluded.props, lines = excluded.lines",
+               clip = excluded.clip, clip_text = excluded.clip_text, props = excluded.props, lines = excluded.lines,
+               inbox_from = excluded.inbox_from",
             params![
                 id.as_str(),
                 s.kind,
@@ -1301,7 +1313,8 @@ impl Store {
                 s.clip.as_ref().map(|c| serde_json::to_string(c).expect("plain struct")),
                 clip_text(&s),
                 s.props,
-                s.lines
+                s.lines,
+                s.inbox_from
             ],
         )?;
         let x = folio_core::index::extract(self.doc_mut(id, DocKind::Card)?);
@@ -1875,8 +1888,12 @@ mod tests {
         assert!(s.search("GitHub", 10).unwrap().iter().any(|h| h.card_id == a.as_str()));
         s.set_inbox(&a, false, 3).unwrap();
         assert_eq!(ids(&s), vec![b.to_string()]);
-        // Still a card in the library, with its link.
-        assert!(s.list_cards(10).unwrap().iter().any(|c| c.id == a.as_str()));
+        // Still a card in the library, with its link, and it says it came
+        // from the inbox (collected at 1), also after a rebuild.
+        let from = |s: &Store| s.list_cards(10).unwrap().into_iter().find(|c| c.id == a.as_str()).unwrap().from_inbox;
+        assert_eq!(from(&s), Some(1));
+        s.rebuild_index().unwrap();
+        assert_eq!(from(&s), Some(1));
         s.trash_card(&b, 4).unwrap();
         assert!(ids(&s).is_empty());
         s.rebuild_index().unwrap();

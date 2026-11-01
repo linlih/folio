@@ -40,8 +40,12 @@ describe("the inbox", () => {
     // Found by its summary; listed in the library with it as the preview.
     expect((await b.search("what it")).map((h) => h.cardId)).toEqual([a]);
     expect((await b.listCards()).find((r) => r.id === a)?.preview).toBe("What it says");
+    expect((await b.listCards()).find((r) => r.id === a)?.fromInbox).toBeNull();
     await b.setInbox(a, false);
     expect((await b.inbox()).map((i) => i.id)).toEqual([c]);
+    // Dealt with, it still says it came from the inbox, and when.
+    const collected = (await b.listCards()).find((r) => r.id === a)?.fromInbox;
+    expect(collected).toBeTypeOf("number");
     await b.trashCard(c);
     expect(await b.inbox()).toEqual([]);
   });
@@ -70,7 +74,17 @@ describe("card fields", () => {
     setClip(doc, { url: "https://a.com", site: "a.com", excerpt: "", author: "" }, 5);
     expect(readMeta(doc)).toMatchObject({ clip: { url: "https://a.com", site: "a.com", excerpt: "", author: "" }, inboxAt: 5 });
     setInbox(doc, null);
-    expect(readMeta(doc).inboxAt).toBeNull();
+    expect(readMeta(doc)).toMatchObject({ inboxAt: null, inboxFrom: 5 });
+    // Back in the inbox (undo) and out again: still collected at 5.
+    setInbox(doc, 9);
+    setInbox(doc, null);
+    expect(readMeta(doc).inboxFrom).toBe(5);
+    // A plain note dealt with keeps it too; a card never in the inbox has none.
+    const note = new LoroDoc();
+    expect(readMeta(note).inboxFrom).toBeNull();
+    setInbox(note, 7);
+    setInbox(note, null);
+    expect(readMeta(note).inboxFrom).toBe(7);
     setProp(doc, "status", "在读");
     setProp(doc, "rating", 4);
     setProp(doc, "tags", ["a", "b"]);

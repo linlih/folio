@@ -46,6 +46,9 @@ export interface CardMeta {
   source: string;
   /** In the inbox since (design/inbox-and-tags.md §2). */
   inboxAt: number | null;
+  /** Collected in the inbox at, and dealt with since (a clip dealt with
+   *  before this was kept: when its card was made). */
+  inboxFrom: number | null;
   /** The link it keeps, when it is a clipped one. */
   clip: Clip | null;
 }
@@ -84,6 +87,7 @@ export function readMeta(doc: LoroDoc): CardMeta {
     pinnedAt: num("pinned_at"),
     source: str("source") || "human",
     inboxAt: num("inbox_at"),
+    inboxFrom: num("inbox_from") ?? (str("clip_url") && num("inbox_at") === null ? num("created_at") : null),
     clip: str("clip_url") ? { url: str("clip_url"), site: str("clip_site"), excerpt: str("clip_excerpt"), author: str("clip_author") } : null,
   };
 }
@@ -97,11 +101,15 @@ export function setClip(doc: LoroDoc, clip: Clip, inboxAt: number) {
   doc.commit({ origin: `${META_ORIGIN}clip` });
 }
 
-/** In the inbox since `at`, or out of it (dealt with) with null. */
+/** In the inbox since `at`, or out of it (dealt with) with null; when
+ *  it was collected stays as `inbox_from`. Same as `folio_core::card::set_inbox`. */
 export function setInbox(doc: LoroDoc, at: number | null) {
   const meta = doc.getMap(META);
-  if (at === null) meta.delete("inbox_at");
-  else meta.set("inbox_at", at);
+  if (at === null) {
+    const was = meta.get("inbox_at");
+    if (typeof was === "number" && meta.get("inbox_from") === undefined) meta.set("inbox_from", was);
+    meta.delete("inbox_at");
+  } else meta.set("inbox_at", at);
   doc.commit({ origin: `${META_ORIGIN}inbox` });
 }
 

@@ -35,7 +35,7 @@ export function memoryBackend(now: () => number = Date.now): Backend {
 
   const row = (id: string, e: { doc: LoroDoc; updatedAt: number }): CardRow => {
     const m = readMeta(e.doc);
-    return { id, kind: m.kind, title: m.title, preview: cardPreview(e.doc), createdAt: m.createdAt, updatedAt: e.updatedAt };
+    return { id, kind: m.kind, title: m.title, preview: cardPreview(e.doc), createdAt: m.createdAt, updatedAt: e.updatedAt, fromInbox: m.inboxAt === null ? m.inboxFrom : null };
   };
 
   /** The body's start; a clipped link with no notes shows its summary. */

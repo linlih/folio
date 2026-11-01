@@ -35,6 +35,8 @@
     "moveToTrash": "Move to trash",
     "search": "Search titles and text",
     "edited": "Edited",
+    "origin": "From",
+    "origins": { "all": "Any source", "inbox": "From the inbox" },
     "within": {
       "all": "Any time",
       "today": "Today",
@@ -778,7 +780,8 @@
     "openSource": "Open the original",
     "markDone": "Dealt with",
     "done": "“{{title}}” dealt with; it stays in the card library",
-    "inInbox": "In the inbox"
+    "inInbox": "In the inbox",
+    "fromInbox": "From the inbox · collected {{date}}"
   },
   "db": {
     "cards_one": "{{count}} card",

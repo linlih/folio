@@ -6,7 +6,7 @@ import type { CardRow } from "../bindings/commands";
 import { CARDS_CHANGED, moveManyToTrash } from "../card/actions";
 import { backend } from "../platform";
 import { useShell } from "../shell/tabs";
-import { applyQuery, DEFAULT_QUERY, isEmptyCard, withoutUnsorted, type EditedWithin, type LibraryGrouping, type LibraryQuery, type LibraryView, type SortKey } from "./query";
+import { applyQuery, DEFAULT_QUERY, isEmptyCard, withoutUnsorted, type CardOrigin, type EditedWithin, type LibraryGrouping, type LibraryQuery, type LibraryView, type SortKey } from "./query";
 import "./library.css";
 import { EmptyState } from "../shell/EmptyState";
 import { TopicPicker } from "../card/TopicRow";
@@ -132,9 +132,9 @@ export function CardLibrary({ active = true }: { active?: boolean }) {
     for (const [card, x] of pairs) if (names.has(x)) out.set(card, [...(out.get(card) ?? []), names.get(x)!]);
     return out;
   }, [withSubs, topics, subs, pairs]);
-  // Home with topics shows their tiles and the cards in none; a search
-  // always looks through every card.
-  const searching = query.text.trim() !== "";
+  // Home with topics shows their tiles and the cards in none; a search,
+  // and the cards from the inbox, look through every card.
+  const searching = query.text.trim() !== "" || query.origin !== "all";
   const home = !topic && query.grouping === "topics" && !searching;
   const inView = useMemo(() => {
     if (!cards) return null;
@@ -331,6 +331,17 @@ export function CardLibrary({ active = true }: { active?: boolean }) {
               {(["all", "today", "week", "month"] as const).map((k) => (
                 <option key={k} value={k}>
                   {t(`library.within.${k}`)}
+                </option>
+              ))}
+            </select>
+          </label>
+          {/* Not remembered, like the search: a library that looks half
+              empty next time would be a puzzle. */}
+          <label className="library-select">
+            <select value={query.origin} aria-label={t("library.origin")} onChange={(e) => update({ origin: e.target.value as CardOrigin })}>
+              {(["all", "inbox"] as const).map((k) => (
+                <option key={k} value={k}>
+                  {t(`library.origins.${k}`)}
                 </option>
               ))}
             </select>

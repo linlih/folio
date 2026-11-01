@@ -172,12 +172,21 @@ pub fn set_clip(doc: &LoroDoc, clip: &Clip, inbox_at: i64) -> LoroResult<()> {
     Ok(())
 }
 
-/// Takes the card out of the inbox (dealt with); the link stays on it.
+/// Takes the card out of the inbox (dealt with); the link stays on it, and
+/// `inbox_from` keeps when it was collected, so the card library can still
+/// tell it came from the inbox.
 pub fn set_inbox(doc: &LoroDoc, at: Option<i64>) -> LoroResult<()> {
     let meta = doc.get_map(META);
     match at {
         Some(t) => meta.insert("inbox_at", t)?,
-        None => meta.delete("inbox_at")?,
+        None => {
+            if let Some(ValueOrContainer::Value(v @ (LoroValue::I64(_) | LoroValue::Double(_)))) = meta.get("inbox_at")
+                && meta.get("inbox_from").is_none()
+            {
+                meta.insert("inbox_from", v)?;
+            }
+            meta.delete("inbox_at")?
+        }
     }
     doc.commit();
     Ok(())
@@ -276,6 +285,9 @@ pub struct CardSummary {
     pub pinned_at: Option<i64>,
     /// In the inbox since.
     pub inbox_at: Option<i64>,
+    /// Collected in the inbox at, and dealt with since. A clipped link dealt
+    /// with before this was kept counts from when its card was made.
+    pub inbox_from: Option<i64>,
     /// The link it keeps, when it is a clipped one.
     pub clip: Option<Clip>,
     /// Database field values by field id, as a JSON object (`{}` for none).
@@ -322,6 +334,7 @@ pub fn summarize(doc: &LoroDoc) -> CardSummary {
         deleted_at: int("deleted_at"),
         pinned_at: int("pinned_at"),
         inbox_at: int("inbox_at"),
+        inbox_from: int("inbox_from").or_else(|| (clip.is_some() && int("inbox_at").is_none()).then(|| int("created_at")).flatten()),
         clip,
         props: props_json(doc),
         preview,
@@ -621,9 +634,18 @@ mod tests {
         assert_eq!((s.inbox_at, s.clip.as_ref(), s.preview.as_str()), (Some(5), Some(&clip), "What it says"));
         append_paragraph(&doc, "my note").unwrap();
         assert_eq!(summarize(&doc).preview, "my note");
+        assert_eq!(summarize(&doc).inbox_from, None);
         set_inbox(&doc, None).unwrap();
-        assert_eq!(summarize(&doc).inbox_at, None);
+        assert_eq!((summarize(&doc).inbox_at, summarize(&doc).inbox_from), (None, Some(5)));
         assert_eq!(summarize(&doc).clip, Some(clip));
+        // Back in the inbox and out again: still collected at 5.
+        set_inbox(&doc, Some(9)).unwrap();
+        set_inbox(&doc, None).unwrap();
+        assert_eq!(summarize(&doc).inbox_from, Some(5));
+        // A clip dealt with by an older version (no inbox_from): from when
+        // the card was made.
+        doc.get_map(META).delete("inbox_from").unwrap();
+        assert_eq!(summarize(&doc).inbox_from, Some(1));
         let props = doc.get_map(META).ensure_mergeable_map(CARD_PROPS).unwrap();
         props.insert("p1", "在读").unwrap();
         props.insert("p2", 4.5).unwrap();

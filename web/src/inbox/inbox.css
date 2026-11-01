@@ -43,3 +43,4 @@
 .clip-source-excerpt { margin: 0; color: var(--secondary); line-height: 1.55; }
 .clip-source-inbox { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; }
 .clip-source-inbox .button { padding: 2px 10px; font-size: 12.5px; }
+.clip-source-from { margin-left: 0; }

@@ -11,6 +11,7 @@ const row = (id: string, title: string, preview: string, updatedDaysAgo: number,
   preview,
   updatedAt: now.getTime() - updatedDaysAgo * DAY,
   createdAt: now.getTime() - createdDaysAgo * DAY,
+  fromInbox: null,
 });
 const CARDS = [
   row("a", "卡片要独立可读", "先写结论，再写理由", 0, 10),
@@ -42,6 +43,12 @@ describe("card library query", () => {
     expect(ids(applyQuery(CARDS, { ...DEFAULT_QUERY, edited: "today" }, "en", now))).toEqual(["a"]);
     expect(ids(applyQuery(CARDS, { ...DEFAULT_QUERY, edited: "week" }, "en", now))).toEqual(["a", "e", "b"]);
     expect(ids(applyQuery(CARDS, { ...DEFAULT_QUERY, edited: "month" }, "en", now))).toEqual(["a", "e", "b", "c"]);
+  });
+
+  it("shows only the cards that came from the inbox", () => {
+    const rows = [...CARDS, { ...row("f", "一篇文章", "", 2, 2), fromInbox: now.getTime() - 5 * DAY }];
+    expect(applyQuery(rows, { ...DEFAULT_QUERY, origin: "inbox" }, "zh").map((c) => c.id)).toEqual(["f"]);
+    expect(applyQuery(rows, DEFAULT_QUERY, "zh")).toHaveLength(6);
   });
 
   it("finds empty cards", () => {

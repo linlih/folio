@@ -54,6 +54,9 @@ export interface CardRow {
   preview: string;
   createdAt: number | null;
   updatedAt: number;
+  /** When it was collected in the inbox, if it came from there and has
+   *  been dealt with. */
+  fromInbox: number | null;
 }
 
 /** A link clipped into the inbox (folio_core::card::Clip). */
