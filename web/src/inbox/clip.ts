@@ -84,25 +84,26 @@ export function clipErrorText(e: unknown): string {
   return i18n.t("error.generic", { message: raw.replace(/^Error: /, "") });
 }
 
-/** Picks up what other apps shared to Folio (Android's share sheet): when
- *  the app starts and each time it comes back to the front. */
+/** Picks up what other apps shared to Folio (the Android or iOS share
+ *  sheet): when the app starts and each time it comes back to the front.
+ *  iOS may have kept several shares; each is one call. */
 export function receiveShares() {
   let busy = false;
   const take = async () => {
     if (busy || document.visibilityState !== "visible") return;
     busy = true;
     try {
-      const text = await backend.takeShared();
-      if (!text) return;
-      // At a cold start, after the saved tabs are back (or 3 s at most).
-      await Promise.race([layoutRestored(), new Promise((r) => setTimeout(r, 3000))]);
-      const shell = useShell.getState();
-      shell.open({ kind: "inbox" });
-      try {
-        const { fetched } = await saveClip(text);
-        shell.setNotice(i18n.t(fetched ? "inbox.saved" : "inbox.savedBare"));
-      } catch (e) {
-        shell.setNotice(clipErrorText(e));
+      for (let text = await backend.takeShared(); text; text = await backend.takeShared()) {
+        // At a cold start, after the saved tabs are back (or 3 s at most).
+        await Promise.race([layoutRestored(), new Promise((r) => setTimeout(r, 3000))]);
+        const shell = useShell.getState();
+        shell.open({ kind: "inbox" });
+        try {
+          const { fetched } = await saveClip(text);
+          shell.setNotice(i18n.t(fetched ? "inbox.saved" : "inbox.savedBare"));
+        } catch (e) {
+          shell.setNotice(clipErrorText(e));
+        }
       }
     } catch {
       // Nothing shared, or the host cannot say.

@@ -43,6 +43,9 @@ tempfile = "3"
 # over a pure-Rust D-Bus (no libdbus to build against).
 [target.'cfg(any(target_os = "macos", target_os = "ios"))'.dependencies]
 keyring = { version = "3", features = ["apple-native"] }
+# The folder the share extension leaves shared text in (take_shared).
+[target.'cfg(target_os = "ios")'.dependencies]
+objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSFileManager", "NSURL", "NSString"] }
 [target.'cfg(target_os = "windows")'.dependencies]
 keyring = { version = "3", features = ["windows-native"] }
 [target.'cfg(target_os = "linux")'.dependencies]

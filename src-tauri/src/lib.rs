@@ -301,8 +301,8 @@ fn to_background(app: tauri::AppHandle) -> CmdResult<()> {
     }
 }
 
-/// What another app shared to this one (Android's share sheet) since it
-/// was last asked; None elsewhere.
+/// What another app shared to this one (the Android or iOS share sheet)
+/// since it was last asked, one share per call; None elsewhere.
 #[tauri::command]
 fn take_shared(app: tauri::AppHandle) -> CmdResult<Option<String>> {
     #[cfg(target_os = "android")]
@@ -310,11 +310,47 @@ fn take_shared(app: tauri::AppHandle) -> CmdResult<Option<String>> {
         use tauri_plugin_folio_apk::ApkExt;
         return app.apk().take_shared().map_err(CommandError::Other);
     }
-    #[cfg(not(target_os = "android"))]
+    #[cfg(target_os = "ios")]
+    {
+        let _ = app;
+        return take_shared_ios().map_err(|e| CommandError::Other(e.to_string()));
+    }
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
     {
         let _ = app;
         Ok(None)
     }
+}
+
+/// The oldest text the share extension (src-tauri/ios-share) left in the
+/// App Group's shared/ folder, removed as it is taken.
+#[cfg(target_os = "ios")]
+fn take_shared_ios() -> std::io::Result<Option<String>> {
+    use objc2_foundation::{NSFileManager, NSString};
+    let group = NSString::from_str("group.dev.folio.app");
+    let Some(dir) = NSFileManager::defaultManager()
+        .containerURLForSecurityApplicationGroupIdentifier(&group)
+        .and_then(|url| url.path())
+        .map(|path| std::path::PathBuf::from(path.to_string()).join("shared"))
+    else {
+        return Ok(None); // Built without the extension (scripts/ios-share.sh).
+    };
+    let mut files: Vec<_> = match std::fs::read_dir(&dir) {
+        Ok(entries) => entries.filter_map(|e| e.ok().map(|e| e.path())).filter(|p| p.extension().is_some_and(|x| x == "txt")).collect(),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(e) => return Err(e),
+    };
+    files.sort();
+    for file in files {
+        let text = std::fs::read_to_string(&file);
+        std::fs::remove_file(&file)?;
+        if let Ok(text) = text {
+            if !text.trim().is_empty() {
+                return Ok(Some(text));
+            }
+        }
+    }
+    Ok(None)
 }
 
 /// Every document with the tag, journal days and trash included.

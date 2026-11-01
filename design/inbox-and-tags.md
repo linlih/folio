@@ -26,7 +26,7 @@
 **怎么收进来**
 - **Android**：在其他 App 里点「分享」→ Folio。`folio-apk` 插件的清单给 `MainActivity` 合并了一个 `ACTION_SEND text/plain` 的 intent-filter；插件在启动（`load`）和运行中（`onNewIntent`）收下分享的文字，页面在启动和每次回到前台时用 `take_shared` 取走，存进收集箱并打开收集箱页面。
 - **所有平台**：收集箱页面顶部的输入框，粘贴链接回车；输入框为空时显示「粘贴」按钮，直接读剪贴板。
-- **iOS**：暂时只有粘贴。系统分享需要一个分享扩展（单独的 Xcode target），而 `src-tauri/gen/apple` 不在仓库里、每次生成，放不进去；以后要做的话，先决定把 Xcode 工程纳入仓库。
+- **iOS**（2026-11-01）：在其他 App 里点「分享」→ Folio。分享扩展（`src-tauri/ios-share/ShareViewController.swift`）把分享的文字和链接合成一段（文字在前，文字里没有链接时另起一行补上），写成 App Group `group.dev.folio.app` 共享目录 `shared/` 下的一个文件（文件名以毫秒时间开头，多次分享按先后取），提示“已存入 Folio 收集箱”后关闭，不联网；应用回到前台时 `take_shared` 每次取最早的一个并删掉，页面一直取到没有为止，后面和 Android 相同。`src-tauri/gen/apple` 仍不进仓库：`npx tauri ios init` 之后运行 `scripts/ios-share.sh`，它往生成的 `project.yml` 加扩展 target、两边的 App Group 权限，再跑 xcodegen；重复运行不改动。真机签名需要开发者账号的描述文件包含这个 App Group（免费的个人团队不支持 App Group）；模拟器不需要。
 - 分享的文字里没有链接时，作为一条笔记收进来（第一行作标题）。
 
 **读取标题和摘要**（`crates/folio-clip`）：在本机直接向网站请求，不经过同步服务器，内容照常加密同步。
