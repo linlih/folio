@@ -15,15 +15,15 @@ export function HabitDay({
   habit,
   date,
   today,
-  variant = "cell",
+  variant = "big",
   children,
 }: {
   habit: Habit;
   date: string;
   today: string;
-  /** A square in a row of days, a small square in a calendar, or a chip
-   *  with the habit's name (the journal). */
-  variant?: "cell" | "mini" | "chip";
+  /** The big button on a habit's card, a small square in a calendar, or
+   *  a chip with the habit's name (the journal). */
+  variant?: "big" | "mini" | "chip";
   children?: ReactNode;
 }) {
   const { t } = useTranslation();
@@ -38,7 +38,10 @@ export function HabitDay({
 
   const tap = () => {
     if (future) return;
-    if (measured) setAsking("amount");
+    // On a card, an amount goes up by one a tap (as in Habitify) until
+    // the goal is met; then the tap asks, to correct it.
+    if (measured && variant === "big" && !meets(habit, value) && habit.limit === "atLeast") void setCheck(habit.id, date, amount + 1);
+    else if (measured) setAsking("amount");
     else void toggle(habit, date);
   };
 
@@ -90,16 +93,17 @@ export function HabitDay({
             )}
             {note && <StickyNote size={11} className="habit-day-note" />}
           </>
-        ) : variant === "cell" ? (
+        ) : variant === "big" ? (
           state === "done" ? (
-            <Check size={15} strokeWidth={3} />
+            <Check size={20} strokeWidth={2.75} />
           ) : state === "skip" ? (
-            <Minus size={14} />
-          ) : state === "partial" ? (
-            <span className="habit-day-num">{amount}</span>
-          ) : null
+            <Minus size={18} />
+          ) : measured && habit.limit === "atLeast" ? (
+            <Plus size={19} strokeWidth={2.5} />
+          ) : (
+            <Check size={19} strokeWidth={2.5} />
+          )
         ) : null}
-        {variant === "cell" && note && <span className="habit-day-dot" />}
       </button>
       {asking && (
         <Popover.Root open onOpenChange={(open) => !open && setAsking(null)}>

@@ -1,10 +1,12 @@
-// The habits (打卡) in the Tasks tab: each with its last days to check at a
-// glance (as in Loop), and opened, its streaks, strength and calendar.
+// The habits (打卡) in the Tasks tab, centred on one day as Habitify,
+// TickTick and Streaks are: a strip of the last days to pick it, then a
+// card a habit with one button to check it; what is done moves below.
+// Opened, a card shows the habit's streaks, strength and calendar.
 
 import { Archive, ArchiveRestore, ArrowDown, ArrowUp, ChevronRight, Flame, Pencil, Plus, Repeat, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { habitsForDay, habitStats, meets, weekStart, type Habit } from "../docs/habits";
+import { habitsForDay, habitStats, meets, weekday, weekStart, type Habit } from "../docs/habits";
 import { addDays } from "../docs/ids";
 import { EmptyState } from "../shell/EmptyState";
 import { HabitDay } from "./HabitDay";
@@ -12,10 +14,12 @@ import { HabitForm } from "./HabitForm";
 import { archiveHabit, deleteHabit, habitStart, moveHabit, setInJournal, useHabits } from "./store";
 import "./habits.css";
 
-/** Days shown in each row (the narrowest screens show fewer). */
+/** Days in the strip. */
 const DAYS = 7;
 /** Weeks in a habit's calendar. */
 const WEEKS = 18;
+
+const finished = (h: Habit, day: string) => h.log[day] === "skip" || meets(h, h.log[day]);
 
 export function HabitsView({ today }: { today: string }) {
   const { t } = useTranslation();
@@ -23,16 +27,23 @@ export function HabitsView({ today }: { today: string }) {
   const [editing, setEditing] = useState<Habit | "new" | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
   const [showArchived, setShowArchived] = useState(false);
+  const [picked, setPicked] = useState<string | null>(null);
+  // A day picked yesterday is not kept past midnight.
+  const day = picked && picked <= today ? picked : today;
   const active = habits.filter((h) => h.archivedAt === null);
   const archived = habits.filter((h) => h.archivedAt !== null);
-  const days = Array.from({ length: DAYS }, (_, i) => addDays(today, i - DAYS + 1));
+  const due = habitsForDay(active, day, habitStart);
+  const todo = due.filter((h) => !finished(h, day));
+  const done = due.filter((h) => finished(h, day));
+  const resting = active.filter((h) => !due.includes(h) && habitStart(h) <= day);
 
-  const row = (h: Habit, i: number, list: Habit[]) => (
-    <HabitRow
+  const card = (h: Habit, i: number, list: Habit[], checkable = true) => (
+    <HabitCard
       key={h.id}
       habit={h}
-      days={days}
+      day={day}
       today={today}
+      checkable={checkable}
       open={openId === h.id}
       onToggle={() => setOpenId(openId === h.id ? null : h.id)}
       onEdit={() => setEditing(h)}
@@ -40,11 +51,12 @@ export function HabitsView({ today }: { today: string }) {
       onDown={i < list.length - 1 ? () => void moveHabit(h.id, list[i + 2]?.id ?? null) : undefined}
     />
   );
+  // Moving is among all of them, in their order.
+  const ordered = (list: Habit[]) => list.map((h) => card(h, active.indexOf(h), active));
 
   return (
     <div className="habits">
       <div className="habits-bar">
-        {active.length > 0 && <TodaySummary habits={active} today={today} />}
         <label className="habits-journal">
           <input type="checkbox" role="switch" className="switch" checked={inJournal} onChange={(e) => void setInJournal(e.target.checked)} />
           {t("habits.inJournal")}
@@ -57,25 +69,30 @@ export function HabitsView({ today }: { today: string }) {
         <EmptyState icon={<Repeat size={28} strokeWidth={1.5} />} title={t("habits.none")} hint={t("habits.noneHint")} />
       )}
       {active.length > 0 && (
-        <div className="habit-table" role="table" aria-label={t("habits.title")}>
-          <div className="habit-head" role="row">
-            <span role="columnheader" className="habit-head-name" />
-            {days.map((d) => (
-              <span key={d} role="columnheader" className="habit-head-day" data-today={d === today || undefined}>
-                <small>{t(`habits.weekdays.${weekdayOf(d)}`)}</small>
-                <b>{Number(d.slice(8))}</b>
-              </span>
-            ))}
-          </div>
-          {active.map(row)}
-        </div>
+        <>
+          <DayStrip habits={active} day={day} today={today} onPick={setPicked} />
+          <DaySummary due={due.length} done={done.length} day={day} today={today} />
+          {todo.length > 0 && <div className="habit-cards">{ordered(todo)}</div>}
+          {done.length > 0 && (
+            <section className="habit-section" data-section="done">
+              <h3>{t("habits.doneSection", { count: done.length })}</h3>
+              <div className="habit-cards">{ordered(done)}</div>
+            </section>
+          )}
+          {resting.length > 0 && (
+            <section className="habit-section" data-section="rest">
+              <h3>{t(day === today ? "habits.restToday" : "habits.restDay", { count: resting.length })}</h3>
+              <div className="habit-cards">{resting.map((h) => card(h, active.indexOf(h), active, false))}</div>
+            </section>
+          )}
+        </>
       )}
       {archived.length > 0 && (
-        <section className="habits-archived">
+        <section className="habit-section habits-archived">
           <button className="habits-archived-toggle" aria-expanded={showArchived} onClick={() => setShowArchived((v) => !v)}>
             <ChevronRight size={13} /> {t("habits.archived", { count: archived.length })}
           </button>
-          {showArchived && <div className="habit-table">{archived.map(row)}</div>}
+          {showArchived && <div className="habit-cards">{archived.map((h, i) => card(h, i, archived, false))}</div>}
         </section>
       )}
       {editing && <HabitForm habit={editing === "new" ? null : editing} onClose={() => setEditing(null)} />}
@@ -83,15 +100,47 @@ export function HabitsView({ today }: { today: string }) {
   );
 }
 
-const weekdayOf = (d: string) => {
-  const [y, m, day] = d.split("-").map(Number);
-  return ((new Date(y, m - 1, day).getDay() + 6) % 7) + 1;
-};
+/** The last days, each with a bar of how much of it is done. */
+function DayStrip({ habits, day, today, onPick }: { habits: Habit[]; day: string; today: string; onPick: (d: string) => void }) {
+  const { t } = useTranslation();
+  const days = Array.from({ length: DAYS }, (_, i) => addDays(today, i - DAYS + 1));
+  return (
+    <div className="habit-strip" role="tablist" aria-label={t("habits.pickDay")}>
+      {days.map((d) => {
+        const due = habitsForDay(habits, d, habitStart);
+        const done = due.filter((h) => finished(h, d)).length;
+        const share = due.length ? done / due.length : 0;
+        return (
+          <button key={d} role="tab" aria-selected={d === day} className="habit-strip-day" data-today={d === today || undefined} data-all={(due.length > 0 && done === due.length) || undefined} onClick={() => onPick(d)}>
+            <small>{d === today ? t("habits.today") : t(`habits.weekdays.${weekday(d)}`)}</small>
+            <b>{Number(d.slice(8))}</b>
+            <span className="habit-strip-bar" aria-label={`${done}/${due.length}`}>
+              <span style={{ width: `${share * 100}%` }} />
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 
-function HabitRow({
+/** The picked day: its name and how much of it is done. */
+function DaySummary({ due, done, day, today }: { due: number; done: number; day: string; today: string }) {
+  const { t } = useTranslation();
+  const name = day === today ? t("habits.today") : day === addDays(today, -1) ? t("habits.yesterday") : t("habits.dayName", { month: Number(day.slice(5, 7)), day: Number(day.slice(8)), weekday: t(`habits.weekdays.${weekday(day)}`) });
+  return (
+    <div className="habit-summary" data-all={(due > 0 && done === due) || undefined}>
+      <h2>{name}</h2>
+      <span>{due === 0 ? t("habits.nothingDue") : done === due ? t("habits.allDone") : t("habits.doneOf", { done, total: due })}</span>
+    </div>
+  );
+}
+
+function HabitCard({
   habit,
-  days,
+  day,
   today,
+  checkable,
   open,
   onToggle,
   onEdit,
@@ -99,8 +148,9 @@ function HabitRow({
   onDown,
 }: {
   habit: Habit;
-  days: string[];
+  day: string;
   today: string;
+  checkable: boolean;
   open: boolean;
   onToggle: () => void;
   onEdit: () => void;
@@ -110,15 +160,30 @@ function HabitRow({
   const { t } = useTranslation();
   const stats = habitStats(habit, today, habitStart(habit));
   const weekly = habit.schedule.kind === "weekly";
+  const value = habit.log[day];
+  const amount = typeof value === "number" ? value : 0;
+  const measured = habit.target !== null;
   return (
-    <div className="habit-row" role="rowgroup" data-open={open || undefined} data-archived={habit.archivedAt !== null || undefined}>
-      <div className="habit-line" role="row">
-        <button className="habit-name" role="rowheader" aria-expanded={open} onClick={onToggle}>
+    <div className="habit-card" data-color={habit.color} data-open={open || undefined} data-finished={(checkable && finished(habit, day)) || undefined} data-archived={habit.archivedAt !== null || undefined}>
+      <div className="habit-card-line">
+        {checkable && measured && (
+          <span className="habit-card-progress" aria-hidden>
+            <span style={{ width: `${Math.min(100, (amount / habit.target!) * 100)}%` }} />
+          </span>
+        )}
+        <button className="habit-card-main" aria-expanded={open} onClick={onToggle}>
           <HabitBadge habit={habit} />
           <span className="habit-title">
             <span className="habit-title-text">{habit.name}</span>
             <span className="habit-meta">
-              {scheduleText(t, habit)}
+              {checkable && measured ? (
+                <span className="habit-amount-text">
+                  {amount} / {habit.target} {habit.unit}
+                </span>
+              ) : (
+                <span>{scheduleText(t, habit)}</span>
+              )}
+              {checkable && weekly && <span>{t("habits.weekOf", { done: stats.week.done, goal: stats.week.goal })}</span>}
               {stats.streak > 0 && (
                 <span className="habit-streak">
                   <Flame size={11} /> {t(weekly ? "habits.streakWeeks" : "habits.streakDays", { count: stats.streak })}
@@ -127,7 +192,7 @@ function HabitRow({
             </span>
           </span>
         </button>
-        {habit.archivedAt === null && days.map((d) => <HabitDay key={d} habit={habit} date={d} today={today} />)}
+        {checkable && <HabitDay habit={habit} date={day} today={today} />}
       </div>
       {open && (
         <div className="habit-detail" data-color={habit.color}>
@@ -168,22 +233,6 @@ function HabitRow({
           </div>
         </div>
       )}
-    </div>
-  );
-}
-
-/** Today: how many of the habits due are done, as a bar. */
-function TodaySummary({ habits, today }: { habits: Habit[]; today: string }) {
-  const { t } = useTranslation();
-  const due = habitsForDay(habits, today, habitStart);
-  const done = due.filter((h) => meets(h, h.log[today])).length;
-  if (due.length === 0) return <div className="habits-today">{t("habits.todayNone")}</div>;
-  return (
-    <div className="habits-today" data-all={done === due.length || undefined}>
-      <span className="habits-today-text">{done === due.length ? t("habits.todayAll") : t("habits.todayProgress", { done, total: due.length })}</span>
-      <span className="habits-today-bar">
-        <span style={{ width: `${(done / due.length) * 100}%` }} />
-      </span>
     </div>
   );
 }

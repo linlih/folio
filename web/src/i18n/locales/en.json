@@ -1193,14 +1193,25 @@
       "open": "To do",
       "off": "Not due"
     },
-    "todayProgress": "Today {{done}}/{{total}}",
-    "todayAll": "All done today",
-    "todayNone": "Nothing due today",
     "daysUnit_one": "day",
     "daysUnit_other": "days",
     "weeksUnit_one": "week",
     "weeksUnit_other": "weeks",
     "noIcon": "None",
-    "create": "Create"
+    "create": "Create",
+    "doneSection_one": "Done {{count}}",
+    "doneSection_other": "Done {{count}}",
+    "restToday_one": "Resting today {{count}}",
+    "restToday_other": "Resting today {{count}}",
+    "restDay_one": "Resting that day {{count}}",
+    "restDay_other": "Resting that day {{count}}",
+    "pickDay": "Pick a day",
+    "today": "Today",
+    "yesterday": "Yesterday",
+    "dayName": "{{weekday}}, {{month}}/{{day}}",
+    "nothingDue": "Nothing due this day",
+    "allDone": "All done 🎉",
+    "doneOf": "{{done}} of {{total}} done",
+    "weekOf": "{{done}}/{{goal}} this week"
   }
 }
