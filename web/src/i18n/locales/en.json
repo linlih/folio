@@ -915,7 +915,8 @@
     "next": {
       "week": "Next week",
       "month": "Next month"
-    }
+    },
+    "habits": "Habits"
   },
   "table": {
     "bar": "Table actions",
@@ -1097,5 +1098,102 @@
     "aboutQuote": "Explain this passage.",
     "removeQuote": "Remove the quote",
     "quotePlaceholder": "What about this passage? Send as is to have it explained"
+  },
+  "habits": {
+    "title": "Habits",
+    "new": "New habit",
+    "edit": "Edit habit",
+    "formHint": "Every day, on some days, or a few times a week; just a check, or an amount.",
+    "name": "Name",
+    "namePlaceholder": "e.g. Read for 20 minutes",
+    "icon": "Icon",
+    "color": "Color",
+    "colors": {
+      "green": "Green",
+      "blue": "Blue",
+      "orange": "Orange",
+      "purple": "Purple",
+      "red": "Red",
+      "teal": "Teal",
+      "pink": "Pink",
+      "gray": "Gray"
+    },
+    "goal": "What counts as done",
+    "kind": {
+      "check": "Check",
+      "amount": "Amount"
+    },
+    "limitLabel": "Target direction",
+    "atLeast": "At least",
+    "atMost": "At most",
+    "target": "Target",
+    "unit": "Unit",
+    "unitPlaceholder": "unit, e.g. glasses",
+    "perDay": "a day",
+    "atLeastOf": "at least {{target}} {{unit}}",
+    "atMostOf": "at most {{target}} {{unit}}",
+    "when": "When",
+    "schedule": {
+      "daily": "Every day",
+      "days": "Some days",
+      "weekly": "Times a week"
+    },
+    "timesBefore": "",
+    "timesAfter": "times a week",
+    "timesAWeek_one": "once a week",
+    "timesAWeek_other": "{{count}} times a week",
+    "weekdays": {
+      "1": "Mo",
+      "2": "Tu",
+      "3": "We",
+      "4": "Th",
+      "5": "Fr",
+      "6": "Sa",
+      "7": "Su"
+    },
+    "inJournal": "Show in journal",
+    "none": "No habits yet",
+    "noneHint": "Add a habit you want to keep, and check it off here or in your journal each day.",
+    "archived": "Archived {{count}}",
+    "archive": "Archive",
+    "unarchive": "Restore",
+    "delete": "Delete",
+    "confirmDelete": "Delete it?",
+    "moveUp": "Move up",
+    "moveDown": "Move down",
+    "streakDays_one": "{{count}} day streak",
+    "streakDays_other": "{{count}} day streak",
+    "streakWeeks_one": "{{count}} week streak",
+    "streakWeeks_other": "{{count}} week streak",
+    "stats": {
+      "streak": "Current streak",
+      "best": "Best streak",
+      "strength": "Strength",
+      "week": "This week",
+      "total": "Total"
+    },
+    "calendar": "Calendar",
+    "month": "{{month}}",
+    "markDone": "Done",
+    "undo": "Not done",
+    "skip": "Skip this day",
+    "unskip": "Don't skip",
+    "addNote": "Add a note…",
+    "editNote": "Edit note…",
+    "enterAmount": "Enter amount…",
+    "clear": "Clear",
+    "amount": "Amount",
+    "less": "Less",
+    "more": "More",
+    "fill": "Reach {{target}}",
+    "notePlaceholder": "How did it go?",
+    "state": {
+      "done": "Done",
+      "partial": "Short of the goal",
+      "skip": "Skipped",
+      "missed": "Missed",
+      "open": "To do",
+      "off": "Not due"
+    }
   }
 }

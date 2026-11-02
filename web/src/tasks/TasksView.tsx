@@ -9,11 +9,16 @@ import { EmptyState } from "../shell/EmptyState";
 import { useShell } from "../shell/tabs";
 import { groupTasks } from "./group";
 import { TaskCalendar } from "./TaskCalendar";
+import { HabitsView } from "../habits/HabitsView";
 import { replaceRow, TaskItem } from "./TaskItem";
 import "./tasks.css";
 
-type Mode = "open" | "closed" | "calendar";
-const MODES: Mode[] = ["open", "closed", "calendar"];
+type Mode = "open" | "closed" | "calendar" | "habits";
+const MODES: Mode[] = ["open", "closed", "calendar", "habits"];
+/** The view last chosen, kept on this device (someone checking habits
+ *  daily comes back to them). */
+const MODE_SETTING = "tasks.mode";
+let lastMode: Mode = "open";
 
 /** Every task in the library (design/outliner.md "任务"): open ones by when
  *  they are due, the closed ones, or open ones on a calendar. A row opens
@@ -21,10 +26,21 @@ const MODES: Mode[] = ["open", "closed", "calendar"];
 export function TasksView({ active = true }: { active?: boolean }) {
   const { t } = useTranslation();
   const setNotice = useShell((s) => s.setNotice);
-  const [mode, setMode] = useState<Mode>("open");
+  const [mode, setModeState] = useState<Mode>(lastMode);
+  const setMode = (m: Mode) => {
+    setModeState((lastMode = m));
+    void backend.setLocalSetting(MODE_SETTING, m).catch(() => {});
+  };
+  useEffect(() => {
+    void backend.getLocalSetting<string>(MODE_SETTING).then(
+      (m) => m && (MODES as string[]).includes(m) && setModeState((lastMode = m as Mode)),
+      () => {},
+    );
+  }, []);
   const [rows, setRows] = useState<TaskRow[] | null>(null);
 
   const reload = useCallback(() => {
+    if (mode === "habits") return;
     backend.tasks(mode === "closed").then(setRows, (e) => setNotice(t("error.generic", { message: String(e) })));
   }, [mode, setNotice, t]);
 
@@ -56,8 +72,9 @@ export function TasksView({ active = true }: { active?: boolean }) {
           ))}
         </div>
       </header>
+      {mode === "habits" && <HabitsView today={today} />}
       {mode === "calendar" && rows && <TaskCalendar rows={rows} today={today} onChange={(was, now) => change(was)(now)} />}
-      {mode !== "calendar" && rows?.length === 0 && (
+      {(mode === "open" || mode === "closed") && rows?.length === 0 && (
         <EmptyState icon={<SquareCheck size={28} strokeWidth={1.5} />} title={t(mode === "closed" ? "tasks.noneClosed" : "tasks.none")} hint={mode === "closed" ? undefined : t("tasks.noneHint")} />
       )}
       {mode === "closed" && rows && rows.length > 0 && <ul className="task-list">{rows.map(item)}</ul>}

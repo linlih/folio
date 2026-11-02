@@ -915,7 +915,8 @@
     "next": {
       "week": "下一周",
       "month": "下个月"
-    }
+    },
+    "habits": "打卡"
   },
   "table": {
     "bar": "表格操作",
@@ -1097,5 +1098,102 @@
     "aboutQuote": "解释一下这段内容。",
     "removeQuote": "去掉引用",
     "quotePlaceholder": "想问这段什么？直接发送就是让 AI 解释"
+  },
+  "habits": {
+    "title": "打卡",
+    "new": "新建打卡",
+    "edit": "编辑打卡",
+    "formHint": "每天、每周几或每周几次；可以只打勾，也可以记数量。",
+    "name": "名称",
+    "namePlaceholder": "比如：读书 20 分钟",
+    "icon": "图标",
+    "color": "颜色",
+    "colors": {
+      "green": "绿",
+      "blue": "蓝",
+      "orange": "橙",
+      "purple": "紫",
+      "red": "红",
+      "teal": "青",
+      "pink": "粉",
+      "gray": "灰"
+    },
+    "goal": "怎样算完成",
+    "kind": {
+      "check": "打勾",
+      "amount": "记数量"
+    },
+    "limitLabel": "目标方向",
+    "atLeast": "至少",
+    "atMost": "至多",
+    "target": "目标",
+    "unit": "单位",
+    "unitPlaceholder": "单位，如 杯",
+    "perDay": "每天",
+    "atLeastOf": "至少 {{target}} {{unit}}",
+    "atMostOf": "至多 {{target}} {{unit}}",
+    "when": "什么时候",
+    "schedule": {
+      "daily": "每天",
+      "days": "每周几",
+      "weekly": "每周几次"
+    },
+    "timesBefore": "每周",
+    "timesAfter": "次",
+    "weekdays": {
+      "1": "一",
+      "2": "二",
+      "3": "三",
+      "4": "四",
+      "5": "五",
+      "6": "六",
+      "7": "日"
+    },
+    "inJournal": "在日记中显示",
+    "none": "还没有打卡",
+    "noneHint": "建一个想坚持的习惯，每天在这里或日记里打个勾。",
+    "archived": "已归档 {{count}}",
+    "archive": "归档",
+    "unarchive": "恢复",
+    "delete": "删除",
+    "confirmDelete": "确定删除？",
+    "moveUp": "上移",
+    "moveDown": "下移",
+    "stats": {
+      "streak": "当前连续",
+      "best": "最长连续",
+      "strength": "习惯强度",
+      "week": "本周",
+      "total": "累计完成"
+    },
+    "calendar": "打卡日历",
+    "month": "{{month}}月",
+    "markDone": "完成",
+    "undo": "取消完成",
+    "skip": "跳过这天",
+    "unskip": "取消跳过",
+    "addNote": "添加备注…",
+    "editNote": "编辑备注…",
+    "enterAmount": "记录数量…",
+    "clear": "清除",
+    "amount": "数量",
+    "less": "减少",
+    "more": "增加",
+    "fill": "达成 {{target}}",
+    "notePlaceholder": "今天怎么样？",
+    "state": {
+      "done": "已完成",
+      "partial": "未达标",
+      "skip": "已跳过",
+      "missed": "未完成",
+      "open": "待完成",
+      "off": "无需打卡"
+    },
+    "timesAWeek_one": "每周 {{count}} 次",
+    "timesAWeek_other": "每周 {{count}} 次",
+    "streakDays_one": "连续 {{count}} 天",
+    "streakDays_other": "连续 {{count}} 天",
+    "streakWeeks_one": "连续 {{count}} 周",
+    "streakWeeks_other": "连续 {{count}} 周"
   }
 }

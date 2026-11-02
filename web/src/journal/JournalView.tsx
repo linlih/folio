@@ -1,5 +1,6 @@
 import { Menu } from "@base-ui/react/menu";
 import { TodayTasks } from "./TodayTasks";
+import { JournalHabits } from "../habits/JournalHabits";
 import { usePullToSearch } from "../shell/pullSearch";
 import { usePhone } from "../shell/phone";
 import { MoreHorizontal, Search } from "lucide-react";
@@ -211,6 +212,7 @@ export function JournalView() {
               {date === today && <span className="journal-today">{t("journal.today")}</span>}
               <DayMenu date={date} />
             </h2>
+            <JournalHabits date={date} today={today} />
             {live ? (
               <div className="journal-body" onMouseDown={(e) => clickArea(date, e)}>
                 <CardEditor
