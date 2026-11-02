@@ -88,7 +88,12 @@ pub fn fetch(url: &str) -> Result<LinkPreview, ClipError> {
     let host = host(url).ok_or(ClipError::NotALink)?;
     let agent = ureq::AgentBuilder::new().timeout(TIMEOUT).redirects(8).user_agent(USER_AGENT).build();
     let mut p = if known_site(&host) == Some("X") {
-        oembed(&agent, "https://publish.x.com/oembed?omit_script=1&url=", url)?
+        // X's own embed data first: it has a long-form article's title,
+        // which oEmbed leaves out.
+        match x_status_id(url).map(|id| x_embed(&agent, &id)) {
+            Some(Ok(p)) => p,
+            _ => oembed(&agent, "https://publish.x.com/oembed?omit_script=1&url=", url)?,
+        }
     } else if known_site(&host) == Some("Reddit") {
         oembed(&agent, "https://www.reddit.com/oembed?url=", url)?
     } else {
@@ -146,6 +151,115 @@ fn finish(mut p: LinkPreview, host: &str) -> LinkPreview {
         p.title = if p.excerpt.is_empty() { host.to_owned() } else { cut(&p.excerpt, 60) };
     }
     p
+}
+
+/// The post in an X link: "20" in https://x.com/jack/status/20.
+fn x_status_id(url: &str) -> Option<String> {
+    let rest = url.split(['?', '#']).next()?;
+    let mut parts = rest.split('/');
+    parts.find(|p| *p == "status" || *p == "statuses")?;
+    let id = parts.next()?;
+    (!id.is_empty() && id.len() <= 20 && id.bytes().all(|b| b.is_ascii_digit())).then(|| id.to_owned())
+}
+
+/// The token X's embed script sends with a post's id: the id over 10^15
+/// times pi, in base 36 as JavaScript writes it, without zeros and point.
+fn x_embed_token(id: &str) -> String {
+    let n = id.parse::<f64>().unwrap_or(0.0) / 1e15 * std::f64::consts::PI;
+    let digit = |d: u32| std::char::from_digit(d, 36).unwrap_or('0');
+    // The fraction's digits, as V8's DoubleToRadixCString makes them: only
+    // as many as tell this number from its neighbours, rounded.
+    let mut whole = n.trunc() as u64;
+    let mut fraction = n.fract();
+    let mut delta = (0.5 * (f64::from_bits(n.to_bits() + 1) - n)).max(f64::from_bits(1));
+    let mut digits: Vec<u32> = Vec::new();
+    if fraction >= delta {
+        loop {
+            fraction *= 36.0;
+            delta *= 36.0;
+            let d = fraction as u32;
+            digits.push(d);
+            fraction -= d as f64;
+            if (fraction > 0.5 || (fraction == 0.5 && d & 1 == 1)) && fraction + delta > 1.0 {
+                // Round up, carrying into the whole part if need be.
+                loop {
+                    match digits.pop() {
+                        None => {
+                            whole += 1;
+                            break;
+                        }
+                        Some(d) if d + 1 < 36 => {
+                            digits.push(d + 1);
+                            break;
+                        }
+                        Some(_) => {}
+                    }
+                }
+                break;
+            }
+            if fraction < delta {
+                break;
+            }
+        }
+    }
+    let mut int = Vec::new();
+    loop {
+        int.push(digit((whole % 36) as u32));
+        whole /= 36;
+        if whole == 0 {
+            break;
+        }
+    }
+    let out: String = int.into_iter().rev().chain(digits.into_iter().map(digit)).collect();
+    out.replace('0', "")
+}
+
+#[derive(Deserialize, Default)]
+#[serde(default)]
+struct XPost {
+    text: String,
+    display_text_range: Vec<usize>,
+    user: XUser,
+    article: Option<XArticle>,
+}
+
+#[derive(Deserialize, Default)]
+#[serde(default)]
+struct XUser {
+    name: String,
+}
+
+#[derive(Deserialize, Default)]
+#[serde(default)]
+struct XArticle {
+    title: String,
+    preview_text: String,
+}
+
+/// A post as X's embedded posts read it (the data behind
+/// platform.twitter.com/embed): its text, its author, and for a long-form
+/// article its title and opening.
+fn x_embed(agent: &ureq::Agent, id: &str) -> Result<LinkPreview, ClipError> {
+    let url = format!("https://cdn.syndication.twimg.com/tweet-result?id={id}&lang=en&token={}", x_embed_token(id));
+    let resp = agent.get(&url).call().map_err(|e| ClipError::Fetch(e.to_string()))?;
+    let post: XPost = resp.into_json().map_err(|e| ClipError::Fetch(e.to_string()))?;
+    Ok(from_x_post(post))
+}
+
+fn from_x_post(post: XPost) -> LinkPreview {
+    let (title, excerpt) = match post.article {
+        Some(a) if !a.title.trim().is_empty() => (a.title, a.preview_text),
+        _ => {
+            // The words of the post, without the links to its media after them.
+            let text = match post.display_text_range[..] {
+                [from, to] => post.text.chars().skip(from).take(to.saturating_sub(from)).collect(),
+                _ => post.text,
+            };
+            let words = text.split_whitespace().any(|w| !w.starts_with("http://") && !w.starts_with("https://"));
+            (String::new(), if words { decode_entities(&text) } else { String::new() })
+        }
+    };
+    LinkPreview { url: String::new(), title, site: "X".into(), excerpt, author: post.user.name }
 }
 
 /// The account in an X link: "jack" in https://x.com/jack/status/20.

@@ -73,6 +73,29 @@ fn x_articles_and_unreachable_posts_take_their_author() {
 }
 
 #[test]
+fn x_embed_gives_an_articles_title() {
+    assert_eq!(x_status_id("https://x.com/LexnLin/status/2116662591363690999?a=L_Jt4&s=09").as_deref(), Some("2116662591363690999"));
+    assert_eq!(x_status_id("https://twitter.com/jack/statuses/20").as_deref(), Some("20"));
+    assert_eq!(x_status_id("https://x.com/LexnLin"), None);
+    // As X's embed script computes it.
+    assert_eq!(x_embed_token("2116662591363690999"), "54powdhmpx");
+    assert_eq!(x_embed_token("20"), "6dq1a2xwd93");
+    assert_eq!(x_embed_token("1585341984679469056"), "3uchycv2wqc");
+
+    let article: XPost = serde_json::from_str(r#"{"text":"https://t.co/eP5cedefS0","display_text_range":[0,23],"user":{"name":"Leon Lin"},
+        "article":{"title":"How I prompt AI to build good looking demos","preview_text":"Under every demo people ask me for the prompt."}}"#).unwrap();
+    let p = finish(from_x_post(article), "x.com");
+    assert_eq!(p.title, "How I prompt AI to build good looking demos");
+    assert_eq!(p.excerpt, "Under every demo people ask me for the prompt.");
+    assert_eq!((p.site.as_str(), p.author.as_str()), ("X", "Leon Lin"));
+
+    // A post: its words, not the link to its picture after them.
+    let post: XPost = serde_json::from_str(r#"{"text":"看这张图 &amp; 说明 https://t.co/abc","display_text_range":[0,13],"user":{"name":"某人"}}"#).unwrap();
+    let p = finish(from_x_post(post), "x.com");
+    assert_eq!((p.title.as_str(), p.excerpt.as_str()), ("看这张图 & 说明", "看这张图 & 说明"));
+}
+
+#[test]
 fn long_summaries_are_cut() {
     let long = "字".repeat(EXCERPT_CHARS + 50);
     let p = finish(LinkPreview { title: "t".into(), excerpt: long, ..Default::default() }, "a.com");
@@ -108,6 +131,8 @@ fn live_pages() {
     assert!(!p.excerpt.is_empty());
     let p = fetch("https://x.com/jack/status/20").unwrap();
     assert_eq!(p.excerpt, "just setting up my twttr", "{p:?}");
+    let p = fetch("https://x.com/LexnLin/status/2116662591363690999?a=L_Jt4-UMmx9a573hybE&s=09").unwrap();
+    assert_eq!(p.title, "How I prompt AI to build good looking demos", "{p:?}");
     let p = fetch("https://www.reddit.com/r/rust/comments/1d2l8k2/").unwrap();
     assert!(!p.title.is_empty() && p.site == "Reddit", "{p:?}");
 }
