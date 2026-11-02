@@ -49,6 +49,13 @@ const STORE_MIGRATIONS: &[&str] = &[
     // `purged` map: their updates are refused from then on. `sent` once the
     // sync server was told to delete its copy.
     "CREATE TABLE purged (doc_id TEXT PRIMARY KEY, at INTEGER NOT NULL, sent INTEGER NOT NULL DEFAULT 0);",
+    // 5: updates from the sync server this device's copy of a document
+    // refused (Loro could not import them), kept to try again rather than
+    // stopping every later one; and to look into.
+    "CREATE TABLE held_updates (
+       id INTEGER PRIMARY KEY AUTOINCREMENT, doc_id TEXT NOT NULL, kind TEXT NOT NULL,
+       bytes BLOB NOT NULL, error TEXT NOT NULL, at INTEGER NOT NULL
+     );",
 ];
 
 /// Whether `store.db` has steps to run (and is not new).

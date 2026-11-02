@@ -12,7 +12,7 @@
 use std::sync::Mutex;
 
 use folio_core::{DocId, DocKind};
-use folio_store::Store;
+use folio_store::{Store, StoreError};
 
 use crate::crypto::{b64, unb64, Keys};
 use crate::protocol::{Round, AcksResponse, BlobsResponse, DeviceInfo, HeavyDoc, PullResponse, PushItem, MAX_PURGE_IDS};
@@ -252,7 +252,9 @@ impl Engine {
 
     /// Applies everything pushed after the cursor. A blob that cannot be
     /// opened stops the pull without moving the cursor (wrong key, damaged
-    /// data): nothing is skipped silently.
+    /// data): nothing is skipped silently. An update that opens but that
+    /// this copy of its document refuses is kept aside (`held_updates`) and
+    /// tried again after each pull, so it does not stop the ones after it.
     pub fn pull(&self, store: &Mutex<Store>, t: &dyn Transport) -> Result<(usize, Vec<Applied>)> {
         let mut pulled = 0;
         let mut applied = Vec::new();
@@ -275,21 +277,59 @@ impl Engine {
                 let mut s = lock(store);
                 for plain in &opened {
                     let (kind, doc, bytes) = open_envelope(plain)?;
-                    if s.apply_remote(&doc, kind, bytes, now_ms())? {
-                        applied.push(Applied { doc, bytes: bytes.to_vec() });
-                    } else if s.is_purged(&doc)? {
-                        // The server still has a document deleted for good
-                        // (it went back to an older copy): tell it again.
-                        s.set_purges_sent(std::slice::from_ref(&doc), false)?;
+                    match s.apply_remote(&doc, kind, bytes, now_ms()) {
+                        Ok(true) => applied.push(Applied { doc, bytes: bytes.to_vec() }),
+                        Ok(false) => {
+                            if s.is_purged(&doc)? {
+                                // The server still has a document deleted for
+                                // good (it went back to an older copy): tell
+                                // it again.
+                                s.set_purges_sent(std::slice::from_ref(&doc), false)?;
+                            }
+                        }
+                        // One update this copy of the document refuses must
+                        // not stop all the others: keep it aside and go on.
+                        Err(StoreError::Loro(e)) => {
+                            tracing::warn!(doc = %doc, error = %e, "could not apply an update; keeping it to try again");
+                            s.hold_remote(&doc, kind, bytes, &e, now_ms())?;
+                        }
+                        Err(e) => return Err(e.into()),
                     }
                 }
                 s.set_sync_value(CURSOR, &last.to_le_bytes())?;
             }
             pulled += resp.updates.len();
             if last >= resp.head {
+                applied.extend(self.retry_held(store)?);
                 return Ok((pulled, applied));
             }
         }
+    }
+
+    /// Tries the updates kept aside by `pull` again: what came since may be
+    /// what they were missing. Returns those that went in.
+    fn retry_held(&self, store: &Mutex<Store>) -> Result<Vec<Applied>> {
+        let mut s = lock(store);
+        let mut applied = Vec::new();
+        for h in s.held_updates()? {
+            match s.apply_remote(&h.doc, h.kind, &h.bytes, now_ms()) {
+                Ok(went_in) => {
+                    s.release_held(h.n)?;
+                    if went_in {
+                        tracing::info!(doc = %h.doc, "applied an update kept aside");
+                        applied.push(Applied { doc: h.doc, bytes: h.bytes });
+                    }
+                }
+                Err(StoreError::Loro(_)) => {}
+                Err(e) => return Err(e.into()),
+            }
+        }
+        Ok(applied)
+    }
+
+    /// How many updates from the server are kept aside, not applied.
+    pub fn held(store: &Mutex<Store>) -> Result<usize> {
+        Ok(lock(store).held_updates()?.len())
     }
 
     /// Reports the version this device has of each document written since

@@ -57,6 +57,15 @@ fn loro_err(e: impl std::fmt::Display) -> StoreError {
     StoreError::Loro(e.to_string())
 }
 
+/// An update from the sync server kept because it could not be applied.
+#[derive(Clone, Debug)]
+pub struct Held {
+    pub n: i64,
+    pub doc: DocId,
+    pub kind: DocKind,
+    pub bytes: Vec<u8>,
+}
+
 /// Where an update came from; recorded with it for audits and sync.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Origin {
@@ -529,7 +538,15 @@ impl Store {
         if self.kind_of(id)?.is_some() {
             let doc = self.doc_mut(id, kind)?;
             let before = doc.oplog_vv();
-            let status = doc.import(bytes).map_err(loro_err)?;
+            let status = match doc.import(bytes) {
+                Ok(status) => status,
+                Err(e) => {
+                    // Read it again from disk next time, in case the failed
+                    // import left anything behind in memory.
+                    self.docs.remove(id);
+                    return Err(loro_err(e));
+                }
+            };
             // An update waiting for one it depends on is kept too: Loro holds
             // it in memory only, and it must survive a restart.
             if doc.oplog_vv() == before && status.pending.is_none() {
@@ -538,6 +555,35 @@ impl Store {
         }
         self.apply_update(id, kind, bytes, Origin::Remote, now_ms)?;
         Ok(true)
+    }
+
+    /// Keeps an update from the sync server that could not be applied
+    /// (`apply_remote` failed with a Loro error), to try again later.
+    pub fn hold_remote(&mut self, id: &DocId, kind: DocKind, bytes: &[u8], error: &str, now_ms: i64) -> Result<()> {
+        self.conn.execute(
+            "INSERT INTO held_updates(doc_id, kind, bytes, error, at) VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![id.as_str(), kind.as_str(), bytes, error, now_ms],
+        )?;
+        Ok(())
+    }
+
+    /// The updates kept by `hold_remote`, oldest first.
+    pub fn held_updates(&self) -> Result<Vec<Held>> {
+        let mut stmt = self.conn.prepare_cached("SELECT id, doc_id, kind, bytes FROM held_updates ORDER BY id")?;
+        let rows = stmt.query_map([], |r| Ok((r.get::<_, i64>(0)?, r.get::<_, String>(1)?, r.get::<_, String>(2)?, r.get::<_, Vec<u8>>(3)?)))?;
+        let mut out = Vec::new();
+        for row in rows {
+            let (n, id, kind, bytes) = row?;
+            let (Ok(doc), Some(kind)) = (DocId::parse(&id), DocKind::parse(&kind)) else { continue };
+            out.push(Held { n, doc, kind, bytes });
+        }
+        Ok(out)
+    }
+
+    /// Forgets a held update: it went in, or is no longer needed.
+    pub fn release_held(&mut self, n: i64) -> Result<()> {
+        self.conn.execute("DELETE FROM held_updates WHERE id = ?1", [n])?;
+        Ok(())
     }
 
     /// Creates a card on this device and returns its id.
@@ -1526,7 +1572,7 @@ mod tests {
             s.conn
                 .execute_batch(
                     "DROP INDEX docs_by_changed; ALTER TABLE docs DROP COLUMN changed;
-                     ALTER TABLE assets DROP COLUMN orphan_since; DROP TABLE purged;
+                     ALTER TABLE assets DROP COLUMN orphan_since; DROP TABLE purged; DROP TABLE held_updates;
                      INSERT INTO assets(sha256, mime, size, local) VALUES ('kept', 'image/png', 3, 1);
                      PRAGMA user_version = 1;",
                 )
