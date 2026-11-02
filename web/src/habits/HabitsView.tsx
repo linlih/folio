@@ -4,7 +4,7 @@
 import { Archive, ArchiveRestore, ArrowDown, ArrowUp, ChevronRight, Flame, Pencil, Plus, Repeat, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { habitStats, weekStart, type Habit } from "../docs/habits";
+import { habitsForDay, habitStats, meets, weekStart, type Habit } from "../docs/habits";
 import { addDays } from "../docs/ids";
 import { EmptyState } from "../shell/EmptyState";
 import { HabitDay } from "./HabitDay";
@@ -44,13 +44,14 @@ export function HabitsView({ today }: { today: string }) {
   return (
     <div className="habits">
       <div className="habits-bar">
-        <button className="button" onClick={() => setEditing("new")}>
-          <Plus size={14} /> {t("habits.new")}
-        </button>
+        {active.length > 0 && <TodaySummary habits={active} today={today} />}
         <label className="habits-journal">
-          <input type="checkbox" checked={inJournal} onChange={(e) => void setInJournal(e.target.checked)} />
+          <input type="checkbox" role="switch" className="switch" checked={inJournal} onChange={(e) => void setInJournal(e.target.checked)} />
           {t("habits.inJournal")}
         </label>
+        <button className="button primary habits-new" onClick={() => setEditing("new")}>
+          <Plus size={14} /> {t("habits.new")}
+        </button>
       </div>
       {loaded && active.length === 0 && archived.length === 0 && (
         <EmptyState icon={<Repeat size={28} strokeWidth={1.5} />} title={t("habits.none")} hint={t("habits.noneHint")} />
@@ -62,7 +63,7 @@ export function HabitsView({ today }: { today: string }) {
             {days.map((d) => (
               <span key={d} role="columnheader" className="habit-head-day" data-today={d === today || undefined}>
                 <small>{t(`habits.weekdays.${weekdayOf(d)}`)}</small>
-                {Number(d.slice(8))}
+                <b>{Number(d.slice(8))}</b>
               </span>
             ))}
           </div>
@@ -113,9 +114,7 @@ function HabitRow({
     <div className="habit-row" role="rowgroup" data-open={open || undefined} data-archived={habit.archivedAt !== null || undefined}>
       <div className="habit-line" role="row">
         <button className="habit-name" role="rowheader" aria-expanded={open} onClick={onToggle}>
-          <span className="habit-icon" data-color={habit.color}>
-            {habit.icon || habit.name.slice(0, 1)}
-          </span>
+          <HabitBadge habit={habit} progress={stats.week.goal ? Math.min(1, stats.week.done / stats.week.goal) : 0} />
           <span className="habit-title">
             <span className="habit-title-text">{habit.name}</span>
             <span className="habit-meta">
@@ -131,15 +130,21 @@ function HabitRow({
         {habit.archivedAt === null && days.map((d) => <HabitDay key={d} habit={habit} date={d} today={today} />)}
       </div>
       {open && (
-        <div className="habit-detail">
+        <div className="habit-detail" data-color={habit.color}>
           <div className="habit-stats">
-            <Stat label={t("habits.stats.streak")} value={t(weekly ? "habits.streakWeeks" : "habits.streakDays", { count: stats.streak })} />
-            <Stat label={t("habits.stats.best")} value={t(weekly ? "habits.streakWeeks" : "habits.streakDays", { count: stats.best })} />
+            <Stat label={t("habits.stats.streak")} value={String(stats.streak)} unit={t(weekly ? "habits.weeksUnit" : "habits.daysUnit", { count: stats.streak })} />
+            <Stat label={t("habits.stats.best")} value={String(stats.best)} unit={t(weekly ? "habits.weeksUnit" : "habits.daysUnit", { count: stats.best })} />
             <Stat label={t("habits.stats.strength")} value={`${Math.round(stats.strength * 100)}%`} bar={stats.strength} color={habit.color} />
             <Stat label={t("habits.stats.week")} value={`${stats.week.done}/${stats.week.goal}`} />
             <Stat label={t("habits.stats.total")} value={String(stats.total)} />
           </div>
           <Calendar habit={habit} today={today} />
+          <div className="habit-legend" data-color={habit.color} aria-hidden>
+            <span><i data-state="done" />{t("habits.state.done")}</span>
+            <span><i data-state="partial" />{t("habits.state.partial")}</span>
+            <span><i data-state="skip" />{t("habits.state.skip")}</span>
+            <span><i data-state="missed" />{t("habits.state.missed")}</span>
+          </div>
           <Notes habit={habit} />
           <div className="habit-actions">
             <button className="button" onClick={onEdit}>
@@ -167,6 +172,37 @@ function HabitRow({
   );
 }
 
+/** Today: how many of the habits due are done, as a bar. */
+function TodaySummary({ habits, today }: { habits: Habit[]; today: string }) {
+  const { t } = useTranslation();
+  const due = habitsForDay(habits, today, habitStart);
+  const done = due.filter((h) => meets(h, h.log[today])).length;
+  if (due.length === 0) return <div className="habits-today">{t("habits.todayNone")}</div>;
+  return (
+    <div className="habits-today" data-all={done === due.length || undefined}>
+      <span className="habits-today-text">{done === due.length ? t("habits.todayAll") : t("habits.todayProgress", { done, total: due.length })}</span>
+      <span className="habits-today-bar">
+        <span style={{ width: `${(done / due.length) * 100}%` }} />
+      </span>
+    </div>
+  );
+}
+
+/** The habit's mark in a ring that fills as this week's goal is met. */
+function HabitBadge({ habit, progress }: { habit: Habit; progress: number }) {
+  const r = 16;
+  const c = 2 * Math.PI * r;
+  return (
+    <span className="habit-badge" data-color={habit.color}>
+      <svg viewBox="0 0 36 36" aria-hidden>
+        <circle cx="18" cy="18" r={r} className="habit-badge-track" />
+        <circle cx="18" cy="18" r={r} className="habit-badge-fill" strokeDasharray={`${progress * c} ${c}`} />
+      </svg>
+      {habit.icon ? <span className="habit-badge-icon">{habit.icon}</span> : <span className="habit-badge-dot" />}
+    </span>
+  );
+}
+
 function scheduleText(t: (k: string, o?: Record<string, unknown>) => string, h: Habit): string {
   const when =
     h.schedule.kind === "daily"
@@ -178,10 +214,13 @@ function scheduleText(t: (k: string, o?: Record<string, unknown>) => string, h: 
   return `${when} · ${t(h.limit === "atMost" ? "habits.atMostOf" : "habits.atLeastOf", { target: h.target, unit: h.unit })}`;
 }
 
-function Stat({ label, value, bar, color }: { label: string; value: string; bar?: number; color?: string }) {
+function Stat({ label, value, unit, bar, color }: { label: string; value: string; unit?: string; bar?: number; color?: string }) {
   return (
     <div className="habit-stat">
-      <span className="habit-stat-value">{value}</span>
+      <span className="habit-stat-value">
+        {value}
+        {unit && <small>{unit}</small>}
+      </span>
       <span className="habit-stat-label">{label}</span>
       {bar !== undefined && (
         <span className="habit-stat-bar" data-color={color}>

@@ -3,7 +3,7 @@
 
 import { Popover } from "@base-ui/react/popover";
 import { Check, Minus, Plus, StickyNote } from "lucide-react";
-import { useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { dayState, meets, type Habit } from "../docs/habits";
 import { chooseFrom } from "../editor/outliner/popover";
@@ -71,6 +71,7 @@ export function HabitDay({
         data-state={state}
         data-color={habit.color}
         data-date={date}
+        style={state === "partial" && habit.target ? ({ "--p": `${Math.min(100, (amount / habit.target) * 100)}%` } as CSSProperties) : undefined}
         disabled={future}
         aria-label={label}
         aria-pressed={state === "done"}
@@ -145,10 +146,10 @@ function AmountForm({ habit, initial, onDone }: { habit: Habit; initial: number;
           <Minus size={14} />
         </button>
         <input autoFocus inputMode="decimal" value={text} placeholder="0" onChange={(e) => setText(e.target.value.replace(/[^\d.]/g, ""))} onKeyDown={onEnter(save)} aria-label={t("habits.amount")} />
-        <span className="habit-amount-unit">{habit.unit}</span>
         <button type="button" className="icon-button" aria-label={t("habits.more")} onClick={() => step(1)}>
           <Plus size={14} />
         </button>
+        {habit.unit && <span className="habit-amount-unit">{habit.unit}</span>}
       </div>
       <div className="habit-pop-actions">
         {habit.limit === "atLeast" && (

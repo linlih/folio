@@ -143,8 +143,10 @@ describe("habits", () => {
     const s = habitStats(h, "2026-11-04", start(h));
     expect(s.streak).toBe(2);
     expect(s.week).toEqual({ done: 1, goal: 2 });
-    // Done twice that week: its other days are not missed.
-    expect(dayState(h, "2026-10-21", "2026-11-04", start(h))).toBe("open");
+    // Done twice that week: its other days are not missed, nor to do.
+    expect(dayState(h, "2026-10-21", "2026-11-04", start(h))).toBe("off");
+    expect(dayState(h, "2026-11-02", "2026-11-04", start(h))).toBe("off");
+    expect(dayState(h, "2026-11-04", "2026-11-04", start(h))).toBe("open");
     // A week short of the goal breaks it.
     const short = habitWith({ schedule: { kind: "weekly", times: 2 } }, "2026-10-19", { "2026-10-20": 1, "2026-10-27": 1, "2026-10-28": 1 });
     expect(habitStats(short, "2026-11-04", start(short)).streak).toBe(1);

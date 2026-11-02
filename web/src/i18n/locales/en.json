@@ -1194,6 +1194,13 @@
       "missed": "Missed",
       "open": "To do",
       "off": "Not due"
-    }
+    },
+    "todayProgress": "Today {{done}}/{{total}}",
+    "todayAll": "All done today",
+    "todayNone": "Nothing due today",
+    "daysUnit_one": "day",
+    "daysUnit_other": "days",
+    "weeksUnit_one": "week",
+    "weeksUnit_other": "weeks"
   }
 }

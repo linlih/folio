@@ -262,10 +262,11 @@ export function dayState(h: Habit, date: string, today: string, start: string): 
   if (date > today || date < start) return "off";
   if (!isDue(h, date)) return "off";
   if (h.schedule.kind === "weekly") {
-    // Done enough that week already: the other days are not missed.
-    const done = weekDone(h, weekStart(date));
-    if (done >= h.schedule.times || date === today) return "open";
-    return weekStart(date) === weekStart(today) ? "open" : "missed";
+    // Any day of the week will do: only today is to do; a past day is
+    // missed only in a past week short of the goal.
+    if (date === today) return "open";
+    const monday = weekStart(date);
+    return monday !== weekStart(today) && weekDone(h, monday) < h.schedule.times ? "missed" : "off";
   }
   return date === today ? "open" : "missed";
 }

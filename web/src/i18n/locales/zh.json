@@ -1194,6 +1194,13 @@
     "streakDays_one": "连续 {{count}} 天",
     "streakDays_other": "连续 {{count}} 天",
     "streakWeeks_one": "连续 {{count}} 周",
-    "streakWeeks_other": "连续 {{count}} 周"
+    "streakWeeks_other": "连续 {{count}} 周",
+    "todayProgress": "今天 {{done}}/{{total}}",
+    "todayAll": "今天都完成了",
+    "todayNone": "今天没有要打的卡",
+    "daysUnit_one": "天",
+    "daysUnit_other": "天",
+    "weeksUnit_one": "周",
+    "weeksUnit_other": "周"
   }
 }
