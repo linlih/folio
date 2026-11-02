@@ -1128,8 +1128,7 @@
     "atMost": "At most",
     "target": "Target",
     "unit": "Unit",
-    "unitPlaceholder": "unit, e.g. glasses",
-    "perDay": "a day",
+    "unitPlaceholder": "unit",
     "atLeastOf": "at least {{target}} {{unit}}",
     "atMostOf": "at most {{target}} {{unit}}",
     "when": "When",
@@ -1138,7 +1137,6 @@
       "days": "Some days",
       "weekly": "Times a week"
     },
-    "timesBefore": "",
     "timesAfter": "times a week",
     "timesAWeek_one": "once a week",
     "timesAWeek_other": "{{count}} times a week",
@@ -1201,6 +1199,8 @@
     "daysUnit_one": "day",
     "daysUnit_other": "days",
     "weeksUnit_one": "week",
-    "weeksUnit_other": "weeks"
+    "weeksUnit_other": "weeks",
+    "noIcon": "None",
+    "create": "Create"
   }
 }

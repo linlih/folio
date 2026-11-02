@@ -114,7 +114,7 @@ function HabitRow({
     <div className="habit-row" role="rowgroup" data-open={open || undefined} data-archived={habit.archivedAt !== null || undefined}>
       <div className="habit-line" role="row">
         <button className="habit-name" role="rowheader" aria-expanded={open} onClick={onToggle}>
-          <HabitBadge habit={habit} progress={stats.week.goal ? Math.min(1, stats.week.done / stats.week.goal) : 0} />
+          <HabitBadge habit={habit} />
           <span className="habit-title">
             <span className="habit-title-text">{habit.name}</span>
             <span className="habit-meta">
@@ -188,16 +188,10 @@ function TodaySummary({ habits, today }: { habits: Habit[]; today: string }) {
   );
 }
 
-/** The habit's mark in a ring that fills as this week's goal is met. */
-function HabitBadge({ habit, progress }: { habit: Habit; progress: number }) {
-  const r = 16;
-  const c = 2 * Math.PI * r;
+/** The habit's mark: its emoji, or its colour, on a tint of its colour. */
+function HabitBadge({ habit }: { habit: Habit }) {
   return (
-    <span className="habit-badge" data-color={habit.color}>
-      <svg viewBox="0 0 36 36" aria-hidden>
-        <circle cx="18" cy="18" r={r} className="habit-badge-track" />
-        <circle cx="18" cy="18" r={r} className="habit-badge-fill" strokeDasharray={`${progress * c} ${c}`} />
-      </svg>
+    <span className="habit-badge" data-color={habit.color} aria-hidden>
       {habit.icon ? <span className="habit-badge-icon">{habit.icon}</span> : <span className="habit-badge-dot" />}
     </span>
   );

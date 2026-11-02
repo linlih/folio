@@ -3,7 +3,7 @@
 
 import { Popover } from "@base-ui/react/popover";
 import { Check, Minus, Plus, StickyNote } from "lucide-react";
-import { useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from "react";
+import { useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { dayState, meets, type Habit } from "../docs/habits";
 import { chooseFrom } from "../editor/outliner/popover";
@@ -71,7 +71,6 @@ export function HabitDay({
         data-state={state}
         data-color={habit.color}
         data-date={date}
-        style={state === "partial" && habit.target ? ({ "--p": `${Math.min(100, (amount / habit.target) * 100)}%` } as CSSProperties) : undefined}
         disabled={future}
         aria-label={label}
         aria-pressed={state === "done"}
