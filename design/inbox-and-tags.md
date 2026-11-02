@@ -32,7 +32,7 @@
 **读取标题和摘要**（`crates/folio-clip`）：在本机直接向网站请求，不经过同步服务器，内容照常加密同步。
 - 普通网页：读 `<head>` 里的 Open Graph、Twitter card、`description` 和 `<title>`，最多读 2 MB，12 秒超时。
 - 微信公众号文章：同上，另从页面脚本里读公众号名作作者。
-- X、Reddit：网页不给程序看，改用它们的 oEmbed 接口（`publish.twitter.com/oembed`、`reddit.com/oembed`），拿到推文正文、帖子标题和作者。
+- X、Reddit：网页不给程序看，改用它们的 oEmbed 接口（`publish.x.com/oembed`、`reddit.com/oembed`），拿到推文正文、帖子标题和作者。X 的长文（Article）在 oEmbed 里只有一个 t.co 链接，没有标题，这时标题用作者（"Leon Lin (@LexnLin)"）；连不上 X 时用链接里的账号（"@LexnLin"），不用 "x.com"。
 - GitHub：去掉标题前的「GitHub - 」。
 - 读不到（网站拦截、网络不通、浏览器模式下的跨域限制）时只存链接，分享文字里的其他字作标题，提示用户可以自己补。
 

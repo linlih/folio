@@ -88,7 +88,7 @@ pub fn fetch(url: &str) -> Result<LinkPreview, ClipError> {
     let host = host(url).ok_or(ClipError::NotALink)?;
     let agent = ureq::AgentBuilder::new().timeout(TIMEOUT).redirects(8).user_agent(USER_AGENT).build();
     let mut p = if known_site(&host) == Some("X") {
-        oembed(&agent, "https://publish.twitter.com/oembed?omit_script=1&url=", url)?
+        oembed(&agent, "https://publish.x.com/oembed?omit_script=1&url=", url)?
     } else if known_site(&host) == Some("Reddit") {
         oembed(&agent, "https://www.reddit.com/oembed?url=", url)?
     } else {
@@ -127,10 +127,34 @@ fn finish(mut p: LinkPreview, host: &str) -> LinkPreview {
     p.author = squash(&p.author);
     let excerpt = squash(&p.excerpt);
     p.excerpt = if excerpt == p.title { String::new() } else { cut(&excerpt, EXCERPT_CHARS) };
+    // An X post with no words of its own (a long-form article is only its
+    // link in the embed), or one that could not be read: its author, from
+    // the embed or the link, is a better title than the site.
+    if p.site == "X" && p.title.is_empty() && p.excerpt.is_empty() {
+        let handle = x_handle(&p.url);
+        p.title = match (&handle, p.author.is_empty()) {
+            (Some(h), false) => format!("{} (@{h})", p.author),
+            (None, false) => p.author.clone(),
+            (Some(h), true) => format!("@{h}"),
+            (None, true) => String::new(),
+        };
+        if p.author.is_empty() {
+            p.author = handle.map(|h| format!("@{h}")).unwrap_or_default();
+        }
+    }
     if p.title.is_empty() {
         p.title = if p.excerpt.is_empty() { host.to_owned() } else { cut(&p.excerpt, 60) };
     }
     p
+}
+
+/// The account in an X link: "jack" in https://x.com/jack/status/20.
+fn x_handle(url: &str) -> Option<String> {
+    let rest = url.split_once("://")?.1;
+    let path = rest.split_once('/')?.1;
+    let first = path.split(['/', '?', '#']).next()?;
+    let reserved = ["i", "home", "search", "explore", "hashtag", "intent", "share", "settings", "messages", "notifications"];
+    (!first.is_empty() && !reserved.contains(&first) && first.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')).then(|| first.to_owned())
 }
 
 /// One line, single spaces.
@@ -174,6 +198,8 @@ fn from_oembed(o: OEmbed) -> LinkPreview {
         let close = rest.find("</p>")?;
         (open <= close).then(|| decode_entities(&strip_tags(&rest[open..close].replace("<br>", " "))))
     });
+    // Only links (an article, a bare shared link): no words to show.
+    let text = text.filter(|t| t.split_whitespace().any(|w| !w.starts_with("http://") && !w.starts_with("https://")));
     let (title, excerpt) = match (o.title.trim().is_empty(), text) {
         (false, t) => (o.title, t.unwrap_or_default()),
         (true, Some(t)) => (String::new(), t),

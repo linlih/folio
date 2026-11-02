@@ -52,6 +52,27 @@ fn x_posts_come_from_the_embed_paragraph() {
 }
 
 #[test]
+fn x_articles_and_unreachable_posts_take_their_author() {
+    // A long-form article: the embed's text is only its t.co link.
+    let o = OEmbed {
+        title: String::new(),
+        author_name: "Leon Lin".into(),
+        html: "<blockquote class=\"twitter-tweet\"><p lang=\"zxx\" dir=\"ltr\"><a href=\"https://t.co/eP5cedefS0\">https://t.co/eP5cedefS0</a></p>&mdash; Leon Lin (@LexnLin)</blockquote>".into(),
+        provider_name: "X".into(),
+    };
+    let mut p = from_oembed(o);
+    p.url = "https://x.com/LexnLin/status/2116662591363690999?a=L_Jt4&s=09".into();
+    let p = finish(p, "x.com");
+    assert_eq!((p.title.as_str(), p.excerpt.as_str(), p.author.as_str()), ("Leon Lin (@LexnLin)", "", "Leon Lin"));
+    // X not reachable from this device: the account in the link.
+    let p = fallback("https://x.com/LexnLin/status/2116662591363690999?s=09");
+    assert_eq!((p.title.as_str(), p.site.as_str(), p.author.as_str()), ("@LexnLin", "X", "@LexnLin"));
+    assert_eq!(fallback("https://twitter.com/jack/status/20").title, "@jack");
+    // A link with no account keeps the host.
+    assert_eq!(fallback("https://x.com/i/article/2116604278412394496").title, "x.com");
+}
+
+#[test]
 fn long_summaries_are_cut() {
     let long = "字".repeat(EXCERPT_CHARS + 50);
     let p = finish(LinkPreview { title: "t".into(), excerpt: long, ..Default::default() }, "a.com");
