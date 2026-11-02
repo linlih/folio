@@ -245,6 +245,5 @@
   .habit-field-label { padding-top: 0; }
   .dialog.habit-form { top: 6vh; max-height: 88vh; }
 }
-}
 
 .habit-form .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
