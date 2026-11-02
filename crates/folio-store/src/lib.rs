@@ -367,7 +367,10 @@ impl Store {
             return Ok(());
         }
         let doc = self.doc_mut(id, kind)?;
-        doc.import(bytes).map_err(loro_err)?;
+        if let Err(e) = doc.import(bytes) {
+            tracing::warn!(doc = %id, origin = origin.as_str(), error = %e, "rejected an update");
+            return Err(loro_err(e));
+        }
         let tx = self.conn.unchecked_transaction()?;
         tx.execute(
             "INSERT INTO docs(doc_id, kind, snapshot, updated_at, changed)

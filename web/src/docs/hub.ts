@@ -33,6 +33,8 @@ interface Entry {
  *  a split view); they share its undo history. */
 export class DocHub {
   private readonly entries = new Map<string, Entry>();
+  /** Replicas closed but still writing their last changes (or trying to). */
+  private readonly closing = new Map<string, Promise<DocHandle>>();
 
   constructor(
     private readonly backend: Backend,
@@ -78,9 +80,18 @@ export class DocHub {
   private async close(id: string, entry: Entry) {
     if (this.entries.get(id) !== entry || entry.refs > 0) return;
     this.entries.delete(id);
-    const handle = await entry.handle;
-    handle.undo.free();
-    await handle.persistence.dispose();
+    const done = entry.handle.then(async (handle) => {
+      handle.undo.free();
+      await handle.persistence.dispose();
+      return handle;
+    });
+    // Opened again meanwhile, the new replica waits for this one (load),
+    // or takes over its changes when they could not be written: until
+    // then it stays here, trying again.
+    this.closing.set(id, done);
+    const forget = () => this.closing.get(id) === done && this.closing.delete(id);
+    done.then((h) => !h.persistence.dirty && forget(), forget);
+    await done;
   }
 
   /** Saves every open document now (window hidden or closing). */
@@ -114,6 +125,18 @@ export class DocHub {
     doc.setPeerId(BigInt(this.peer));
     // Dated edits, for the card's history (docs/history.ts).
     recordTimes(doc);
+    // A replica of this document still writing its last changes is waited
+    // for: started from the host's older copy, this one would reuse the
+    // ids of the edits not yet there (same peer), and the host would reject
+    // both. What it could not write, this one takes over.
+    const closing = this.closing.get(id);
+    const prior = await closing?.catch(() => null);
+    if (closing && this.closing.get(id) === closing) this.closing.delete(id);
+    const handoff = prior?.persistence.dirty ? prior : null;
+    if (handoff) {
+      handoff.persistence.stop();
+      doc.import(handoff.doc.export({ mode: "snapshot" }));
+    }
     const snapshot = await this.backend.docSnapshot(id);
     const workspace = id === WORKSPACE_ID;
     const board = isBoardId(id);
@@ -126,7 +149,9 @@ export class DocHub {
       born = false;
     } else if (isJournalId(id)) {
       // Started here; written to disk only once it has content (§5.2a).
-      initCard(doc, "journal", "", this.now());
+      if (!handoff) initCard(doc, "journal", "", this.now());
+      born = false;
+    } else if (handoff) {
       born = false;
     } else {
       throw new Error(`unknown document ${id}`);
@@ -137,7 +162,8 @@ export class DocHub {
     undo.addExcludeOriginPrefix(META_ORIGIN);
     undo.addExcludeOriginPrefix(TAG_RENAME_ORIGIN);
     const persistence = new Persistence(id, doc, this.backend, {
-      born,
+      born: born || !!handoff?.persistence.isBorn,
+      ...(handoff ? { saved: handoff.persistence.savedVersion } : {}),
       onError: this.onError,
       // Written once it lists anything: a topic, a whiteboard, a template, a chat.
       ...(workspace ? { kind: "workspace" as const, hasContent: (d: LoroDoc) => ["topics", "boards", "templates", "chats", "ai"].some((k) => d.getMap(k).size > 0) } : {}),

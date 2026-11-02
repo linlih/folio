@@ -32,6 +32,70 @@ describe("DocHub", () => {
     expect(hub.isOpen(id)).toBe(false);
   });
 
+  it("a document opened again while its last write is under way continues from it, not from the host's older copy", async () => {
+    const backend = memoryBackend();
+    const id = await backend.createCard("t");
+    const errors: unknown[] = [];
+    const hub = new DocHub(backend, MEMORY_FRONTEND_PEER, (e) => errors.push(e));
+    const a = await hub.open(id);
+    const text = a.doc.getText("body");
+    text.insert(0, "hello!");
+    a.doc.commit();
+    await a.persistence.flush();
+    text.delete(4, 2);
+    a.doc.commit();
+    // Closed (the last write not yet on the host) and at once opened again.
+    const closing = hub.release(id);
+    const b = await hub.open(id);
+    expect(b.doc.getText("body").toString()).toBe("hell");
+    b.doc.getText("body").insert(4, " world");
+    b.doc.commit();
+    await closing;
+    await b.persistence.flush();
+    expect(errors.map(String)).toEqual([]);
+    const host = new LoroDoc();
+    host.import((await backend.docSnapshot(id))!);
+    expect(host.getText("body").toString()).toBe("hell world");
+    await hub.release(id);
+  });
+
+  it("takes over what a closed replica could not write, and that replica stops trying", async () => {
+    const backend = memoryBackend();
+    const id = await backend.createCard("t");
+    let fail = false;
+    let writes = 0;
+    const flaky = {
+      ...backend,
+      applyUpdate: async (...args: Parameters<typeof backend.applyUpdate>) => {
+        writes++;
+        if (fail) throw new Error("disk full");
+        return backend.applyUpdate(...args);
+      },
+    };
+    const errors: unknown[] = [];
+    const hub = new DocHub(flaky, MEMORY_FRONTEND_PEER, (e) => errors.push(e));
+    const a = await hub.open(id);
+    a.doc.getText("body").insert(0, "unsaved");
+    a.doc.commit();
+    fail = true;
+    await hub.release(id);
+    expect(errors).toHaveLength(1);
+    fail = false;
+    const b = await hub.open(id);
+    expect(b.doc.getText("body").toString()).toBe("unsaved");
+    b.doc.getText("body").insert(7, "!");
+    b.doc.commit();
+    await b.persistence.flush();
+    const host = new LoroDoc();
+    host.import((await backend.docSnapshot(id))!);
+    expect(host.getText("body").toString()).toBe("unsaved!");
+    // The first replica's retry never comes.
+    const before = writes;
+    await new Promise((r) => setTimeout(r, 2100));
+    expect(writes).toBe(before);
+    await hub.release(id);
+  });
+
   it("starts an unwritten journal day but refuses unknown cards", async () => {
     const backend = memoryBackend();
     const hub = new DocHub(backend, MEMORY_FRONTEND_PEER);

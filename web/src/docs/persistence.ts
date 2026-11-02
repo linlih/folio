@@ -13,10 +13,16 @@ export interface PersistenceOptions {
   kind?: DocKind;
   /** When an unborn document has enough to write (a card: body content). */
   hasContent?: (doc: LoroDoc) => boolean;
+  /** What the host already has, when that is not the document's whole
+   *  version (a replica taking over another's unsaved changes). */
+  saved?: VersionVector;
+  /** Called on the first failed write after a successful one. */
   onError?: (e: unknown) => void;
 }
 
+/** A failed write is tried again after this long, doubling up to the cap. */
 const RETRY_MS = 2000;
+const RETRY_MAX_MS = 60_000;
 
 /** Fired on window after a document's changes reached the host. */
 export const DOC_SAVED = "folio:doc-saved";
@@ -31,6 +37,8 @@ export class Persistence {
   private chain: Promise<void> = Promise.resolve();
   private readonly unsubscribe: () => void;
   private readonly delay: number;
+  private failures = 0;
+  private stopped = false;
 
   constructor(
     private readonly id: string,
@@ -41,13 +49,18 @@ export class Persistence {
     this.delay = opts.delay ?? 300;
     this.born = opts.born ?? true;
     // A document the host has never seen is written from the beginning.
-    this.saved = this.born ? doc.oplogVersion() : new LoroDoc().oplogVersion();
+    this.saved = opts.saved ?? (this.born ? doc.oplogVersion() : new LoroDoc().oplogVersion());
     this.unsubscribe = doc.subscribeLocalUpdates(() => this.schedule(this.delay));
   }
 
   /** Everything the host has confirmed. */
   get savedVersion(): VersionVector {
     return this.saved;
+  }
+
+  /** False while the host has never had the document (an empty journal day). */
+  get isBorn(): boolean {
+    return this.born;
   }
 
   /** True while there are local changes the host has not confirmed. */
@@ -81,6 +94,14 @@ export class Persistence {
     return this.flush();
   }
 
+  /** Writes nothing more: another replica took over what is unsaved. */
+  stop() {
+    this.unsubscribe();
+    this.stopped = true;
+    if (this.timer) clearTimeout(this.timer);
+    this.timer = null;
+  }
+
   private schedule(ms: number) {
     if (this.timer) return;
     this.timer = setTimeout(() => {
@@ -90,6 +111,7 @@ export class Persistence {
   }
 
   private async write() {
+    if (this.stopped) return;
     if (!this.born) {
       if (!(this.opts.hasContent ?? hasContent)(this.doc)) return;
       this.born = true;
@@ -100,12 +122,14 @@ export class Persistence {
     try {
       await this.backend.applyUpdate(this.id, this.opts.kind ?? "card", bytes);
       this.saved = to;
+      this.failures = 0;
       // The host re-indexed the card: titles, block texts and backlinks
       // shown elsewhere may have changed.
       if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent(DOC_SAVED, { detail: { id: this.id } }));
     } catch (e) {
-      this.opts.onError?.(e);
-      this.schedule(RETRY_MS);
+      // Said once, not on every try.
+      if (this.failures++ === 0) this.opts.onError?.(e);
+      this.schedule(Math.min(RETRY_MS * 2 ** (this.failures - 1), RETRY_MAX_MS));
     }
   }
 }
