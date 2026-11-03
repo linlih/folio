@@ -75,7 +75,7 @@ export function BackupsPanel() {
             <li key={b.name} className="backup-row">
               <span className="backup-when">
                 {when(b.createdAt)}
-                {b.safety && <span className="backup-tag">{t(b.reason === "upgrade" ? "backup.upgrade" : "backup.safety")}</span>}
+                {b.safety && <span className="backup-tag">{t(b.reason === "upgrade" ? "backup.upgrade" : b.reason === "repair" ? "backup.repair" : "backup.safety")}</span>}
               </span>
               <span className="backup-size">{b.size > 0 ? size(b.size) : ""}</span>
               {confirm !== b.name && (

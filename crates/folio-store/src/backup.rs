@@ -27,6 +27,8 @@ const PREFIX: &str = "store-";
 const SAFETY_SUFFIX: &str = "-before-restore";
 /// Made before the store migrates the library to a new layout.
 const UPGRADE_SUFFIX: &str = "-before-upgrade";
+/// Made before the store repairs a document it cannot read (repair.rs).
+const REPAIR_SUFFIX: &str = "-before-repair";
 /// Names the backup to restore at the next start.
 const PENDING: &str = "restore-pending";
 
@@ -40,7 +42,7 @@ pub struct BackupInfo {
     /// Made automatically before something replaced or rewrote the library,
     /// of what was there: never pruned.
     pub safety: bool,
-    /// Why a safety backup was made: "restore" or "upgrade".
+    /// Why a safety backup was made: "restore", "upgrade" or "repair".
     pub reason: Option<String>,
 }
 
@@ -66,6 +68,8 @@ fn parse_name(name: &str) -> Option<(i64, Option<&'static str>)> {
         (ms, Some("restore"))
     } else if let Some(ms) = stem.strip_suffix(UPGRADE_SUFFIX) {
         (ms, Some("upgrade"))
+    } else if let Some(ms) = stem.strip_suffix(REPAIR_SUFFIX) {
+        (ms, Some("repair"))
     } else {
         (stem, None)
     };
@@ -136,6 +140,11 @@ impl Store {
     /// A safety backup before the store migrates the library's layout.
     pub(crate) fn backup_before_upgrade(&self, dir: &Path, now_ms: i64) -> Result<()> {
         self.backup_named(dir, &format!("{PREFIX}{now_ms}{UPGRADE_SUFFIX}.db"))
+    }
+
+    /// A safety backup before the store repairs a document.
+    pub(crate) fn backup_before_repair(&self, dir: &Path, now_ms: i64) -> Result<()> {
+        self.backup_named(dir, &format!("{PREFIX}{now_ms}{REPAIR_SUFFIX}.db"))
     }
 
     fn backup_named(&self, dir: &Path, name: &str) -> Result<()> {

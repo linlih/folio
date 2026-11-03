@@ -294,7 +294,8 @@
     "restoreAllNow": "恢复",
     "confirmWord": "恢复",
     "typeToConfirm": "输入“{{word}}”确认",
-    "upgrade": "升级前的备份"
+    "upgrade": "升级前的备份",
+    "repair": "修复前的备份"
   },
   "dialog": {
     "done": "完成",

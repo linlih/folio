@@ -294,7 +294,8 @@
     "restoreAllNow": "Restore",
     "confirmWord": "restore",
     "typeToConfirm": "Type “{{word}}” to confirm",
-    "upgrade": "Before upgrade"
+    "upgrade": "Before upgrade",
+    "repair": "Before repair"
   },
   "dialog": {
     "done": "Done",

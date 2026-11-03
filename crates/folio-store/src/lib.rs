@@ -12,6 +12,7 @@
 pub mod assets;
 pub mod backup;
 mod compact;
+mod repair;
 mod schema;
 
 use std::collections::HashMap;
@@ -1321,20 +1322,40 @@ impl Store {
             doc.set_peer_id(self.peer).map_err(loro_err)?;
             // Dated edits, for a card's history (web/src/docs/history.ts).
             doc.set_record_timestamp(true);
-            let snapshot: Option<Option<Vec<u8>>> =
-                self.conn.query_row("SELECT snapshot FROM docs WHERE doc_id = ?1", [id.as_str()], |r| r.get(0)).optional()?;
-            if let Some(Some(s)) = snapshot {
-                doc.import(&s).map_err(loro_err)?;
-            }
-            let mut stmt = self.conn.prepare_cached("SELECT bytes FROM doc_updates WHERE doc_id = ?1 ORDER BY id")?;
-            let updates = stmt.query_map([id.as_str()], |r| r.get::<_, Vec<u8>>(0))?;
-            for u in updates {
-                doc.import(&u?).map_err(loro_err)?;
-            }
+            let doc = match self.load_doc(id, doc) {
+                Ok(doc) => doc,
+                // A log that cannot be read in order: a peer wrote two
+                // histories under the same ids (repair.rs).
+                Err(StoreError::Loro(e)) => {
+                    tracing::warn!(doc = %id, error = %e, "cannot read the document; repairing it");
+                    let (repaired, _) = self.repair_doc(id, kind)?;
+                    let doc = LoroDoc::new();
+                    doc.set_peer_id(self.peer).map_err(loro_err)?;
+                    doc.set_record_timestamp(true);
+                    doc.import(&repaired.export(loro::ExportMode::Snapshot).map_err(loro_err)?).map_err(loro_err)?;
+                    doc
+                }
+                Err(e) => return Err(e),
+            };
             tracing::debug!(doc = %id, kind = kind.as_str(), "loaded document");
             self.docs.insert(id.clone(), doc);
         }
         Ok(self.docs.get_mut(id).expect("inserted above"))
+    }
+
+    /// Reads the stored snapshot and update log into `doc`.
+    fn load_doc(&self, id: &DocId, doc: LoroDoc) -> Result<LoroDoc> {
+        let snapshot: Option<Option<Vec<u8>>> =
+            self.conn.query_row("SELECT snapshot FROM docs WHERE doc_id = ?1", [id.as_str()], |r| r.get(0)).optional()?;
+        if let Some(Some(s)) = snapshot {
+            doc.import(&s).map_err(loro_err)?;
+        }
+        let mut stmt = self.conn.prepare_cached("SELECT bytes FROM doc_updates WHERE doc_id = ?1 ORDER BY id")?;
+        let updates = stmt.query_map([id.as_str()], |r| r.get::<_, Vec<u8>>(0))?;
+        for u in updates {
+            doc.import(&u?).map_err(loro_err)?;
+        }
+        Ok(doc)
     }
 
     fn reindex_card(&mut self, id: &DocId, updated_at: i64) -> Result<()> {

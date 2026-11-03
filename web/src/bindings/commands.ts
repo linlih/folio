@@ -183,7 +183,7 @@ export interface BackupInfo {
   size: number;
   /** Made automatically before the library was replaced or rewritten. */
   safety: boolean;
-  /** Why: "restore" or "upgrade" (a new storage layout). */
+  /** Why: "restore", "upgrade" (a new storage layout) or "repair" (a document that could not be read). */
   reason: string | null;
 }
 
