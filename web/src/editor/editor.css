@@ -52,6 +52,19 @@
 .code-block.is-diagram:not(.diagram-editing):not([data-error]) .code-language { display: none; }
 .code-block.is-diagram.diagram-editing .diagram-drawing { margin-top: 6px; border-color: var(--border); border-style: dashed; }
 .diagram-drawing svg { max-width: 100%; height: auto; }
+/* Pele's colours from the app's, so a diagram follows light and dark. */
+.diagram-drawing {
+  --pele-bg: transparent;
+  --pele-fg: var(--text);
+  --pele-muted: var(--muted);
+  --pele-line: var(--secondary);
+  --pele-surface: var(--surface);
+  --pele-surface-alt: color-mix(in srgb, var(--ink) 7%, var(--paper));
+  --pele-border: color-mix(in srgb, var(--ink) 22%, var(--paper));
+  --pele-accent: var(--accent);
+  --pele-font: var(--font-ui);
+  --pele-radius: var(--radius);
+}
 .diagram-error { margin: 0; font: 12px/1.5 var(--font-mono); color: #b5523f; white-space: pre-wrap; }
 /* Highlighting colours: one set per theme, from the palette's tones. */
 :root {

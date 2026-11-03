@@ -1,42 +1,22 @@
-// Drawing a diagram from its Mermaid source (a code block in "mermaid").
-// Mermaid is large, so it is loaded the first time a diagram is shown.
+// Drawing a diagram from its Mermaid source (a code block in "mermaid"),
+// with Pele (Obsidian's Mermaid renderer: small, no code run from the
+// source, colours from CSS). Each kind of diagram is loaded the first time
+// one is shown.
 
-type Mermaid = typeof import("mermaid").default;
-
-let loading: Promise<Mermaid> | null = null;
-let theme = "";
-let n = 0;
-
-const dark = () => {
-  const set = document.documentElement.dataset.theme;
-  return set ? set === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
-};
-
-async function mermaid(): Promise<Mermaid> {
-  loading ??= import("mermaid").then((m) => m.default);
-  const m = await loading;
-  const want = dark() ? "dark" : "neutral";
-  if (want !== theme) {
-    theme = want;
-    // Strict: no scripts, links or HTML from the source (it may come from
-    // a paste or another device).
-    m.initialize({ startOnLoad: false, securityLevel: "strict", theme: want, fontFamily: "inherit" });
-  }
-  return m;
-}
+/** The font diagrams are measured and drawn in: the app's own. */
+const font = () => getComputedStyle(document.documentElement).getPropertyValue("--font-ui").trim() || "sans-serif";
 
 /** The diagram as SVG markup, or why it cannot be drawn. */
 export async function drawDiagram(source: string): Promise<{ svg: string } | { error: string }> {
   try {
-    const m = await mermaid();
-    // Checked first: drawing a wrong source gives a picture of the error.
-    await m.parse(source);
-    const { svg } = await m.render(`folio-diagram-${++n}`, source);
+    const { renderAsync } = await import("pele/lazy");
+    // No links or pictures from the source: it may come from a paste or
+    // another device, and a picture would be fetched from the web.
+    const { svg } = await renderAsync(source, { fontFamily: font(), links: false, images: false });
     return { svg };
   } catch (e) {
-    // Mermaid leaves its scratch element behind when the source is wrong.
-    document.getElementById(`dfolio-diagram-${n}`)?.remove();
+    const where = e && typeof e === "object" && "line" in e && typeof e.line === "number" && e.line > 0 ? ` (line ${e.line})` : "";
     const message = e instanceof Error ? e.message : String(e);
-    return { error: message.split("\n").slice(0, 3).join("\n") };
+    return { error: message.split("\n").slice(0, 3).join("\n") + where };
   }
 }

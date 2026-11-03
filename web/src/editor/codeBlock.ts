@@ -1,8 +1,8 @@
 // Code blocks with a language and syntax highlighting (TipTap's lowlight
 // code block). The language is the node's `language` attribute, so it is
 // stored, synced and exported (```go) like any other attribute. A block in
-// "mermaid" is a diagram: drawn from its source, which shows while the
-// cursor is in it (as in Obsidian and Typora).
+// "mermaid" is a diagram (diagram.ts): drawn from its source, which shows
+// while the cursor is in it (as in Obsidian and Typora).
 
 import { Extension } from "@tiptap/core";
 import CodeBlockLowlight from "@tiptap/extension-code-block-lowlight";
@@ -199,7 +199,7 @@ export const CodeBlock = CodeBlockLowlight.configure({ lowlight, defaultLanguage
             drawing.replaceChildren(p);
             dom.dataset.error = "";
           }
-        }, first ? 0 : 400);
+        }, first ? 0 : 150);
       };
       draw();
       return {
