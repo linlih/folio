@@ -631,7 +631,8 @@
   },
   "code": {
     "language": "Code language",
-    "plain": "Plain text"
+    "plain": "Plain text",
+    "deleteDiagram": "Delete diagram"
   },
   "board": {
     "newCard": "New card (or double-click the canvas)",

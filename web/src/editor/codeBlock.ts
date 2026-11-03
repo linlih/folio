@@ -6,11 +6,13 @@
 
 import { Extension } from "@tiptap/core";
 import CodeBlockLowlight from "@tiptap/extension-code-block-lowlight";
-import { Plugin, PluginKey, TextSelection } from "@tiptap/pm/state";
+import type { Node as PMNode, ResolvedPos } from "@tiptap/pm/model";
+import { NodeSelection, Plugin, PluginKey, TextSelection } from "@tiptap/pm/state";
 import { Decoration, DecorationSet } from "@tiptap/pm/view";
 import dockerfile from "highlight.js/lib/languages/dockerfile";
 import { common, createLowlight } from "lowlight";
 import i18n from "../i18n";
+import { ITEM_TYPES } from "./outliner/tree";
 
 const lowlight = createLowlight(common);
 lowlight.register({ dockerfile });
@@ -83,9 +85,48 @@ export const CodeBlockKeys = Extension.create({
 
 const editingKey = new PluginKey("diagramEditing");
 
-/** Marks the diagram the cursor is in, which then shows its source. */
+const isDiagramNode = (n: PMNode | null | undefined) => !!n && n.type.name === "codeBlock" && isDiagram(n.attrs.language);
+
+/** The diagram right before the textblock at `$pos`, in reading order (the
+ *  end of the previous row, in an outline), with its position. */
+function diagramBefore($pos: ResolvedPos): number | null {
+  for (let d = $pos.depth; d > 0; d--) {
+    if ($pos.index(d - 1) === 0) continue;
+    let at = $pos.before(d);
+    let node = $pos.node(d - 1).child($pos.index(d - 1) - 1);
+    at -= node.nodeSize;
+    while (!isDiagramNode(node) && !node.isTextblock && node.lastChild) {
+      at += node.nodeSize - 1 - node.lastChild.nodeSize;
+      node = node.lastChild;
+    }
+    return isDiagramNode(node) ? at : null;
+  }
+  return null;
+}
+
+/** Marks the diagram the cursor is in, which then shows its source. In an
+ *  outline, a row's line left empty above its diagram is hidden until the
+ *  cursor is in it (the row starts with a line; the diagram sits below). */
 export const DiagramEditing = Extension.create({
   name: "diagramEditing",
+  // Before the outline's own Backspace (which joins rows).
+  priority: 1000,
+  addKeyboardShortcuts() {
+    return {
+      // At the start of a line after a diagram: selects the diagram, so the
+      // next Backspace deletes it (joining the line into its hidden source
+      // would be invisible). An empty line is just deleted, as usual.
+      Backspace: ({ editor }) => {
+        const { selection, doc } = editor.state;
+        const { $from } = selection;
+        if (!selection.empty || $from.parentOffset !== 0 || !$from.parent.isTextblock || $from.parent.content.size === 0) return false;
+        const at = diagramBefore($from);
+        if (at === null) return false;
+        editor.view.dispatch(editor.state.tr.setSelection(NodeSelection.create(doc, at)).scrollIntoView());
+        return true;
+      },
+    };
+  },
   addProseMirrorPlugins() {
     return [
       new Plugin({
@@ -93,14 +134,25 @@ export const DiagramEditing = Extension.create({
         props: {
           decorations(state) {
             const { $head } = state.selection;
+            const marks: Decoration[] = [];
             for (let d = $head.depth; d > 0; d--) {
               const node = $head.node(d);
               if (node.type.name !== "codeBlock") continue;
-              if (!isDiagram(node.attrs.language)) return null;
-              const at = $head.before(d);
-              return DecorationSet.create(state.doc, [Decoration.node(at, at + node.nodeSize, { class: "diagram-editing" })]);
+              if (isDiagram(node.attrs.language)) {
+                const at = $head.before(d);
+                marks.push(Decoration.node(at, at + node.nodeSize, { class: "diagram-editing" }));
+              }
+              break;
             }
-            return null;
+            state.doc.descendants((node, pos) => {
+              if (node.isTextblock || node.isAtom) return false;
+              const line = node.firstChild;
+              if (!ITEM_TYPES.has(node.type.name) || !line || line.content.size > 0 || !isDiagramNode(node.maybeChild(1))) return;
+              const from = pos + 1;
+              const inLine = $head.pos >= from && $head.pos <= from + line.nodeSize;
+              if (!inLine) marks.push(Decoration.node(from, from + line.nodeSize, { class: "line-above-diagram" }));
+            });
+            return marks.length ? DecorationSet.create(state.doc, marks) : null;
           },
         },
       }),
@@ -160,7 +212,24 @@ export const CodeBlock = CodeBlockLowlight.configure({ lowlight, defaultLanguage
         editor.view.dispatch(editor.state.tr.setSelection(TextSelection.create(editor.state.doc, end)));
         editor.view.focus();
       });
-      dom.append(picker, pre, drawing);
+      // Deletes the diagram: on a phone, the only easy way.
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.className = "diagram-delete";
+      remove.contentEditable = "false";
+      remove.textContent = i18n.t("code.deleteDiagram");
+      remove.addEventListener("mousedown", (e) => e.preventDefault());
+      remove.addEventListener("click", () => {
+        const pos = getPos();
+        if (typeof pos !== "number" || !editor.isEditable) return;
+        const at = editor.state.doc.nodeAt(pos);
+        if (!at) return;
+        const tr = editor.state.tr.delete(pos, pos + at.nodeSize);
+        const $at = tr.doc.resolve(Math.min(pos, tr.doc.content.size));
+        editor.view.dispatch(tr.setSelection(TextSelection.near($at, -1)).scrollIntoView());
+        editor.view.focus();
+      });
+      dom.append(picker, pre, drawing, remove);
       let drawn: string | null = null;
       let timer: ReturnType<typeof setTimeout> | undefined;
       let round = 0;
@@ -217,10 +286,11 @@ export const CodeBlock = CodeBlockLowlight.configure({ lowlight, defaultLanguage
           clearTimeout(timer);
           round++;
         },
-        stopEvent: (e) => picker.contains(e.target as Node) || drawing.contains(e.target as Node),
+        stopEvent: (e) => picker.contains(e.target as Node) || drawing.contains(e.target as Node) || remove.contains(e.target as Node),
         // The drawing's own marks on the block (is-diagram, data-error)
         // are not edits.
-        ignoreMutation: (m) => picker.contains(m.target) || drawing.contains(m.target) || (m.type === "attributes" && m.target === dom),
+        ignoreMutation: (m) =>
+          picker.contains(m.target) || drawing.contains(m.target) || remove.contains(m.target) || (m.type === "attributes" && m.target === dom),
       };
     };
   },

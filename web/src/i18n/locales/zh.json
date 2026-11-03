@@ -631,7 +631,8 @@
   },
   "code": {
     "language": "代码语言",
-    "plain": "纯文本"
+    "plain": "纯文本",
+    "deleteDiagram": "删除图表"
   },
   "board": {
     "newCard": "新建卡片（双击空白处也可以）",

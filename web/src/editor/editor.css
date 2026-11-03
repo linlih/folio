@@ -52,6 +52,16 @@
 .code-block.is-diagram:not(.diagram-editing):not([data-error]) .code-language { display: none; }
 .code-block.is-diagram.diagram-editing .diagram-drawing { margin-top: 6px; border-color: var(--border); border-style: dashed; }
 .diagram-drawing svg { max-width: 100%; height: auto; }
+.code-block.ProseMirror-selectednode .diagram-drawing { border-color: var(--accent); border-style: solid; }
+.diagram-delete { display: none; }
+.code-block.is-diagram.diagram-editing .diagram-delete {
+  display: block; margin: 4px 0 0 auto; padding: 4px 10px;
+  border: 1px solid var(--border); border-radius: 4px; background: var(--surface);
+  color: var(--secondary); font: 12px var(--font-ui); cursor: pointer;
+}
+.diagram-delete:hover { color: #b5523f; border-color: currentColor; }
+/* An outline row's empty line above its diagram (codeBlock.ts). */
+.card-body .line-above-diagram { display: none; }
 /* Pele's colours from the app's, so a diagram follows light and dark. */
 .diagram-drawing {
   --pele-bg: transparent;
