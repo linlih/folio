@@ -189,6 +189,7 @@
     "imageAsk": "Image address",
     "underline": "Underline",
     "code": "Code block",
+    "diagram": "Diagram (Mermaid)",
     "quote": "Quote",
     "math": "Math block",
     "mathEdit": "Formula (LaTeX), ⌘↩ to confirm",

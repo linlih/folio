@@ -5,6 +5,7 @@
 import { insertTemplate, useTemplates } from "../../card/templates";
 import { useShell } from "../../shell/tabs";
 import { insertNewTable } from "../table";
+import { DIAGRAM, DIAGRAM_START } from "../codeBlock";
 import { computePosition, flip, offset, shift } from "@floating-ui/dom";
 import { Extension, type Editor, type Range } from "@tiptap/core";
 import type { Node as PMNode, ResolvedPos } from "@tiptap/pm/model";
@@ -247,6 +248,7 @@ const ICON = {
   table: svg(`<rect x="3" y="4" width="14" height="12" rx="2"/><path d="M3 8h14M3 12h14M8 4v12"/>`),
   quote: svg(`<path d="M5 6h4v4c0 2-1 3-3 4M11 6h4v4c0 2-1 3-3 4"/>`),
   math: svg(`<path d="M15 5H6l4 5-4 5h9"/>`),
+  diagram: svg(`<rect x="3" y="3.5" width="5" height="4" rx="1"/><rect x="12" y="3.5" width="5" height="4" rx="1"/><rect x="7.5" y="12.5" width="5" height="4" rx="1"/><path d="M8 5.5h4M5.5 7.5v2.5h4.5v2.5"/>`),
   text: svg(`<path d="M5 5h10M10 5v10"/>`),
   heading: (n: number) => svg(`<path d="M3.5 5v10M9.5 5v10M3.5 10h6"/><text x="12" y="15.5" font-size="8" fill="currentColor" stroke="none">${n}</text>`),
   calendar: svg(`<rect x="3.5" y="4.5" width="13" height="12" rx="2"/><path d="M3.5 8.5h13M7 3v3M13 3v3"/>`),
@@ -316,6 +318,10 @@ function slashChoices(): Choice[] {
     {
       id: "code", group: g("format"), label: t("slash.code"), hint: "```", icon: ICON.code, keywords: "code block",
       run: (editor, range) => insertBlock(editor, range, editor.schema.nodes.codeBlock.create(), true),
+    },
+    {
+      id: "diagram", group: g("format"), label: t("slash.diagram"), icon: ICON.diagram, keywords: "diagram mermaid flowchart chart graph sequence tubiao liuchengtu",
+      run: (editor, range) => insertBlock(editor, range, editor.schema.nodes.codeBlock.create({ language: DIAGRAM }, editor.schema.text(DIAGRAM_START)), true),
     },
     {
       id: "table", group: g("format"), label: t("slash.table"), hint: "| |", icon: ICON.table, keywords: "table grid sheet biaoge",

@@ -43,6 +43,16 @@
 }
 .code-block:hover .code-language, .code-block:focus-within .code-language, .code-language:focus { opacity: 1; border-color: var(--border); }
 .code-language:focus { outline: 2px solid color-mix(in srgb, var(--accent) 45%, transparent); }
+/* Diagrams (a code block in "mermaid"): the drawing, and the source only
+   while the cursor is in it or when it cannot be drawn. */
+.diagram-drawing { display: none; }
+.code-block.is-diagram .diagram-drawing { display: flex; justify-content: center; padding: 12px; border: 1px solid transparent; border-radius: var(--radius); overflow-x: auto; cursor: text; }
+.code-block.is-diagram:hover .diagram-drawing { border-color: var(--border); }
+.code-block.is-diagram:not(.diagram-editing):not([data-error]) pre,
+.code-block.is-diagram:not(.diagram-editing):not([data-error]) .code-language { display: none; }
+.code-block.is-diagram.diagram-editing .diagram-drawing { margin-top: 6px; border-color: var(--border); border-style: dashed; }
+.diagram-drawing svg { max-width: 100%; height: auto; }
+.diagram-error { margin: 0; font: 12px/1.5 var(--font-mono); color: #b5523f; white-space: pre-wrap; }
 /* Highlighting colours: one set per theme, from the palette's tones. */
 :root {
   --code-keyword: #8a3ab9;

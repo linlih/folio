@@ -189,6 +189,7 @@
     "imageAsk": "图片地址",
     "underline": "下划线",
     "code": "代码块",
+    "diagram": "图表（Mermaid）",
     "quote": "引用块",
     "math": "数学块",
     "mathEdit": "公式（LaTeX），⌘↩ 确定",

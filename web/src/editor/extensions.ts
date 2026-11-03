@@ -5,7 +5,7 @@ import StarterKit from "@tiptap/starter-kit";
 import { CardImage, FileBlock, FileInput } from "./assets";
 import { BlockId, type RemoteTxPredicate } from "./blockId";
 import { CardLink } from "./cardLink";
-import { CodeBlock, CodeBlockKeys } from "./codeBlock";
+import { CodeBlock, CodeBlockKeys, DiagramEditing } from "./codeBlock";
 import { BlockRef } from "./refs";
 import { BlockEmbed } from "./embed";
 import { Tag } from "./tag";
@@ -68,6 +68,7 @@ export function baseExtensions(isRemote: RemoteTxPredicate, placeholder = "", mo
     // Code with a language and syntax highlighting.
     CodeBlock,
     CodeBlockKeys,
+    DiagramEditing,
     // Images and attachments (design/attachments.md).
     CardImage,
     FileBlock,
