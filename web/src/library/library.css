@@ -144,6 +144,12 @@
 @container (max-width: 640px) {
   .library-select > span { display: none; }
 }
+/* One tile per row (a phone): as tall as its text, up to three lines, so a
+   short card is not a mostly empty box. */
+@container (max-width: 440px) {
+  .library-tile { height: auto; }
+  .library-tile-text { -webkit-line-clamp: 3; max-height: calc(1.55em * 3); }
+}
 
 /* Topics in the library (library/TopicGrid.tsx, §4.7). */
 .library-section { margin: 4px 0 10px; font: 600 13px var(--font-ui); color: var(--secondary); }
@@ -203,6 +209,10 @@
 .topic-tile.new .topic-tile-open { align-items: center; justify-content: center; flex-direction: row; gap: 6px; color: var(--muted); }
 .topic-tile.new .topic-tile-open:hover { color: var(--text); }
 .topic-tile.new .topic-name-input { margin: 48px 12px; width: calc(100% - 24px); }
+/* No topics yet: the "new topic" tile is one low row, not a tall empty box
+   above the cards. */
+.topic-tile.new:only-child .topic-tile-open { min-height: 40px; padding: 8px 14px; }
+.topic-tile.new:only-child .topic-name-input { margin: 8px 12px; }
 .topic-name-input { padding: 4px 8px; border: 1px solid var(--accent); border-radius: 6px; background: var(--paper); color: var(--text); font: 13px var(--font-ui); outline: none; }
 .topic-name-input.big { width: 12em; font: var(--page-title-weight) 22px var(--font-body); }
 .library-crumbs { display: flex; align-items: center; gap: 4px; min-width: 0; }
