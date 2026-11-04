@@ -86,6 +86,25 @@ jobs:
       - name: Fonts
         shell: bash
         run: ./scripts/fetch-fonts.sh
+      # The Mac app signed with Folio's own certificate (scripts/macos-signing.sh),
+      # so macOS knows each version as the same app and does not ask again
+      # for the library folder and the keychain. Without the secret it is
+      # signed as before (each build its own).
+      - name: macOS signing certificate
+        if: runner.os == 'macOS'
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+        run: |
+          if [ -z "$APPLE_CERTIFICATE" ]; then
+            echo "::warning::No APPLE_CERTIFICATE secret; the Mac app is not signed with Folio's certificate."
+            exit 0
+          fi
+          {
+            echo "APPLE_CERTIFICATE=$APPLE_CERTIFICATE"
+            echo "APPLE_CERTIFICATE_PASSWORD=$APPLE_CERTIFICATE_PASSWORD"
+            echo "APPLE_SIGNING_IDENTITY=Folio Code Signing"
+          } >> "$GITHUB_ENV"
       # Signs the update packages (the apps check that signature before
       # installing) and, for a tag, adds them to the release. latest.json is
       # written once all three are there (updater, below): three builds
