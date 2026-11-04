@@ -100,6 +100,9 @@ body.phone-typing:has(.keyboard-bar) .shell { padding-bottom: 44px; }
 @media (max-width: 720px), (max-height: 500px) and (hover: none) and (pointer: coarse) {
   /* Room at the end of a page for the capture button. */
   :root .page { padding-bottom: 96px; }
+  /* The page's margin is narrow here: room for a top-level item's collapse
+     arrow, which otherwise sat half off the screen's edge. */
+  :root .card-body.mode-outline > ul, :root .card-body.mode-outline > ol { padding-left: 1.7em; }
   :root .page-header h1 { white-space: nowrap; }
 
   /* Card library: the header wraps instead of squeezing its words; the
