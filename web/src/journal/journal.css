@@ -34,6 +34,19 @@
   color: var(--muted);
 }
 .journal-empty { margin: 0; color: var(--muted); font-size: 14px; }
+/* A past day with nothing written (and no habits due) takes one quiet row,
+   so the days with notes are what the eye finds when scrolling back; a
+   click on it still starts writing there. */
+.journal-day.blank:not(:has(.journal-habits)) { padding-bottom: 12px; }
+.journal-day.blank:not(:has(.journal-habits)) + .journal-day { padding-top: 20px; }
+.journal-day + .journal-day.blank:not(:has(.journal-habits)) { padding-top: 12px; }
+.journal-day.blank:not(:has(.journal-habits)) .journal-date { margin-bottom: 0; font-size: calc(var(--page-title-size) * 0.6); color: var(--muted); }
+/* The row itself is the "write here" area; an empty day has nothing to
+   copy or export, so no "⋯" either. */
+.journal-day.blank:not(:has(.journal-habits)) { position: relative; }
+.journal-day.blank:not(:has(.journal-habits)) .journal-static { position: absolute; inset: 4px -8px; min-height: 0; }
+.journal-day.blank:not(:has(.journal-habits)) .journal-day-menu { display: none; }
+.journal-day.blank:not(:has(.journal-habits)) .journal-empty { display: none; }
 .journal-more { height: 1px; }
 /* A far-away day: only its height, so scrolling stays put (§5.2a). */
 .journal-day.placeholder { box-sizing: border-box; }

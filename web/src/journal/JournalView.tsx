@@ -206,7 +206,12 @@ export function JournalView() {
           );
         }
         return (
-          <section key={date} ref={sectionRef(date)} data-date={date} className={`journal-day${date === today ? " today" : ""}`}>
+          <section
+            key={date}
+            ref={sectionRef(date)}
+            data-date={date}
+            className={`journal-day${date === today ? " today" : ""}${!live && date < today && !dayHasLines(text) ? " blank" : ""}`}
+          >
             <h2 className="journal-date">
               {heading(date)}
               {date === today && <span className="journal-today">{t("journal.today")}</span>}
@@ -241,6 +246,9 @@ export function JournalView() {
     </div>
   );
 }
+
+/** Whether a day's index has any written line. */
+const dayHasLines = (day?: JournalDay) => !!(day?.lines?.length || day?.text?.trim());
 
 /** A day's actions, behind "⋯" on its date (shown on hover). */
 function DayMenu({ date }: { date: string }) {
