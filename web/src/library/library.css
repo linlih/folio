@@ -9,8 +9,10 @@
 .page-header .library-header-actions .button { margin-left: 0; }
 
 .library-toolbar, .library-selection { min-height: 44px; margin-bottom: 12px; }
-/* One line, so it has the selection bar's height and nothing jumps. */
-.library-toolbar { display: flex; align-items: center; gap: 8px; }
+/* One line when there is room, so it has the selection bar's height and
+   nothing jumps; in a narrow window or side pane it wraps rather than
+   cutting off the view and sort controls. */
+.library-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .library-search {
   flex: 1;
   min-width: 120px;
@@ -73,6 +75,7 @@
   overflow: hidden;
   color: var(--secondary);
   line-height: 1.5;
+  max-height: 3em;
 }
 .library-dates { display: grid; justify-items: end; gap: 2px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .library-dates .created { font-size: 12px; opacity: 0.85; }
@@ -121,6 +124,10 @@
   -webkit-line-clamp: 5;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  /* WebKit stops the text at five lines but still paints what follows when
+     the box is taller (the grid row is): cap the box at five lines too. */
+  align-self: start;
+  max-height: calc(1.55em * 5);
   font: 13.5px/1.55 var(--font-body);
   color: var(--secondary);
 }
@@ -131,6 +138,9 @@
 /* Narrow library (side pane, small window): the dropdowns speak for
    themselves, the search field keeps the room. */
 .library { container-type: inline-size; }
+@container (max-width: 860px) {
+  .library-search { flex-basis: 100%; }
+}
 @container (max-width: 640px) {
   .library-select > span { display: none; }
 }
