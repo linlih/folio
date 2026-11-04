@@ -12,7 +12,7 @@ import type { Editor } from "@tiptap/core";
 import { CardEditor } from "../editor/CardEditor";
 import { belowText, continueAtEnd } from "../editor/outliner/feel";
 import { extractExtension } from "../editor/extract";
-import { openTag, TAG_STOP } from "../editor/tag";
+import { openTag, TAG_AFTER, TAG_STOP } from "../editor/tag";
 import { toSide, useShell } from "../shell/tabs";
 import { backend } from "../platform";
 import type { DayLine, JournalDay } from "../bindings/commands";
@@ -380,7 +380,7 @@ function LineParts({ line, onOpenCard }: { line: DayLine; onOpenCard: (id: strin
 }
 
 /** Tags in text-only lines (`#name`) look and open as in the editor. */
-const TAG_IN_TEXT = new RegExp(`(^|\\s)#([^${TAG_STOP}]+)`, "g");
+const TAG_IN_TEXT = new RegExp(`(^|[\\s${TAG_AFTER}])#([^${TAG_STOP}]+)`, "g");
 
 function LineText({ text }: { text: string }) {
   const parts: React.ReactNode[] = [];

@@ -21,7 +21,7 @@ import { askText, caretAnchor } from "./popover";
 import { PRIORITIES, PRIORITY_ICON, STATUSES, STATUS_ICON, type Priority } from "./statusIcons";
 import { makeTask } from "./tasks";
 import { childList, insertAfterLine, itemAt, itemAtPos, listOf, type Item } from "./tree";
-import { TAG_STOP } from "../tag";
+import { TAG_AFTER, TAG_STOP } from "../tag";
 
 interface Choice {
   id: string;
@@ -565,8 +565,9 @@ export const Suggestions = Extension.create({
         editor: this.editor,
         pluginKey: new PluginKey("tagSearch"),
         char: "#",
-        // Only at a word's start: not in "C#" or URLs' "#anchor".
-        allowedPrefixes: [" ", "　"],
+        // Only at a word's start (or right after CJK punctuation): not in
+        // "C#" or URLs' "#anchor".
+        allowedPrefixes: [" ", "　", ...TAG_AFTER],
         // A tag name has no spaces or punctuation; nor do headings start
         // with one ("# " closes the list and makes a heading).
         allow: ({ state, range }) => !state.doc.resolve(range.from).parent.type.spec.code,
