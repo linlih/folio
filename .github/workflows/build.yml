@@ -100,11 +100,22 @@ jobs:
             echo "::warning::No APPLE_CERTIFICATE secret; the Mac app is not signed with Folio's certificate."
             exit 0
           fi
-          {
-            echo "APPLE_CERTIFICATE=$APPLE_CERTIFICATE"
-            echo "APPLE_CERTIFICATE_PASSWORD=$APPLE_CERTIFICATE_PASSWORD"
-            echo "APPLE_SIGNING_IDENTITY=Folio Code Signing"
-          } >> "$GITHUB_ENV"
+          # Imported here rather than handed to tauri as APPLE_CERTIFICATE:
+          # tauri then only looks among trusted identities, and this
+          # self-signed one is not (v0.1.20). Given just the name, it signs
+          # the way a local build does.
+          kc="$RUNNER_TEMP/folio-signing.keychain-db"
+          kp="$(openssl rand -hex 16)"
+          security create-keychain -p "$kp" "$kc"
+          security set-keychain-settings -lut 21600 "$kc"
+          security unlock-keychain -p "$kp" "$kc"
+          echo "$APPLE_CERTIFICATE" | base64 --decode > "$RUNNER_TEMP/folio.p12"
+          security import "$RUNNER_TEMP/folio.p12" -k "$kc" -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign >/dev/null
+          rm "$RUNNER_TEMP/folio.p12"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$kp" "$kc" >/dev/null
+          security list-keychains -d user -s "$kc" $(security list-keychains -d user | tr -d '"')
+          security find-identity -p codesigning "$kc"
+          echo "APPLE_SIGNING_IDENTITY=Folio Code Signing" >> "$GITHUB_ENV"
       # Signs the update packages (the apps check that signature before
       # installing) and, for a tag, adds them to the release. latest.json is
       # written once all three are there (updater, below): three builds
