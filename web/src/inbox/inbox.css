@@ -44,3 +44,17 @@
 .clip-source-inbox { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; }
 .clip-source-inbox .button { padding: 2px 10px; font-size: 12.5px; }
 .clip-source-from { margin-left: 0; }
+
+/* Text on its way in (InboxView PendingRow): being read, or failed. */
+.inbox-pending .inbox-open:hover { background: none; }
+.inbox-pending.saving .inbox-title { color: var(--secondary); }
+.inbox-url { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.inbox-status { display: inline-flex; align-items: center; gap: 8px; color: var(--accent); font-size: 12.5px; }
+.inbox-pending.failed .inbox-status { color: #b5523f; }
+.inbox-spinner { flex: none; width: 12px; height: 12px; border: 1.5px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
+/* The card a pending row became, once. */
+.inbox-item.just-saved { animation: folio-flash 1.6s ease-out; }
+@media (prefers-reduced-motion: reduce) {
+  .inbox-spinner { animation-duration: 2.4s; }
+  .inbox-item.just-saved { animation: none; }
+}

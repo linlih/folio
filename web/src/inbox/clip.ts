@@ -84,9 +84,79 @@ export function clipErrorText(e: unknown): string {
   return i18n.t("error.generic", { message: raw.replace(/^Error: /, "") });
 }
 
+/** A text being kept in the inbox, shown at the top of its list until its
+ *  card is there: while the page is read (that can take a while), and,
+ *  should it fail, with the reason, to try again or let go. Kept in this
+ *  device's storage too, so a share is not lost when the app is closed
+ *  before it is saved: it comes back as failed, to try again. */
+export type PendingClip = { key: string; text: string; state: "saving" | "failed"; error?: string };
+
+const PENDING = "folio.pendingClips";
+
+function loadPending(): PendingClip[] {
+  try {
+    const v: unknown = JSON.parse(localStorage.getItem(PENDING) || "[]");
+    if (!Array.isArray(v)) return [];
+    return v
+      .filter((x): x is PendingClip => !!x && typeof x.key === "string" && typeof x.text === "string")
+      .map((x) => ({ key: x.key, text: x.text, state: "failed" as const, error: x.state === "failed" ? x.error : undefined }));
+  } catch {
+    return [];
+  }
+}
+
+export const usePendingClips = create<{ items: PendingClip[]; justSaved: string | null }>(() => ({ items: loadPending(), justSaved: null }));
+
+function setPending(change: (items: PendingClip[]) => PendingClip[]) {
+  const items = change(usePendingClips.getState().items);
+  usePendingClips.setState({ items });
+  try {
+    if (items.length) localStorage.setItem(PENDING, JSON.stringify(items));
+    else localStorage.removeItem(PENDING);
+  } catch {
+    // Shown here still; only not kept past a restart.
+  }
+}
+
+let counter = 0;
+const newKey = () => `${Date.now()}-${counter++}`;
+
+/** Shows `text` at the top of the inbox as being saved. */
+function showSaving(text: string, key: string) {
+  setPending((items) => [{ key, text, state: "saving" }, ...items.filter((x) => x.key !== key)]);
+}
+
+/** Lets go of a text that could not be saved. */
+export function dropPending(key: string) {
+  setPending((items) => items.filter((x) => x.key !== key));
+}
+
+/** Keeps `text` in the inbox (saveClip), shown in its list while that
+ *  takes, and says how it went. What failed stays listed, to try again
+ *  (pass its key); text with nothing to keep does not. */
+export async function keepClip(text: string, key = newKey()): Promise<boolean> {
+  showSaving(text, key);
+  const shell = useShell.getState();
+  try {
+    const { id, fetched } = await saveClip(text);
+    dropPending(key);
+    usePendingClips.setState({ justSaved: id });
+    setTimeout(() => usePendingClips.getState().justSaved === id && usePendingClips.setState({ justSaved: null }), 2000);
+    shell.setNotice(i18n.t(fetched ? "inbox.saved" : "inbox.savedBare"));
+    return true;
+  } catch (e) {
+    const error = clipErrorText(e);
+    if (/\[(empty|not-a-link)\]/.test(String(e))) dropPending(key);
+    else setPending((items) => items.map((x) => (x.key === key ? { ...x, state: "failed", error } : x)));
+    shell.setNotice(error);
+    return false;
+  }
+}
+
 /** Picks up what other apps shared to Folio (the Android or iOS share
  *  sheet): when the app starts and each time it comes back to the front.
- *  iOS may have kept several shares; each is one call. */
+ *  iOS may have kept several shares; each is one call. Each shows in the
+ *  inbox at once, as being saved. */
 export function receiveShares() {
   let busy = false;
   const take = async () => {
@@ -94,16 +164,12 @@ export function receiveShares() {
     busy = true;
     try {
       for (let text = await backend.takeShared(); text; text = await backend.takeShared()) {
+        const key = newKey();
+        showSaving(text, key);
         // At a cold start, after the saved tabs are back (or 3 s at most).
         await Promise.race([layoutRestored(), new Promise((r) => setTimeout(r, 3000))]);
-        const shell = useShell.getState();
-        shell.open({ kind: "inbox" });
-        try {
-          const { fetched } = await saveClip(text);
-          shell.setNotice(i18n.t(fetched ? "inbox.saved" : "inbox.savedBare"));
-        } catch (e) {
-          shell.setNotice(clipErrorText(e));
-        }
+        useShell.getState().open({ kind: "inbox" });
+        await keepClip(text, key);
       }
     } catch {
       // Nothing shared, or the host cannot say.

@@ -1,4 +1,4 @@
-import { Check, ClipboardPaste, ExternalLink, Inbox, Trash2 } from "lucide-react";
+import { Check, ClipboardPaste, ExternalLink, Inbox, RotateCw, Trash2, X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { appUndo, docs } from "../app";
@@ -7,7 +7,7 @@ import { CARDS_CHANGED, moveToTrash } from "../card/actions";
 import { backend } from "../platform";
 import { EmptyState } from "../shell/EmptyState";
 import { toSide, useShell } from "../shell/tabs";
-import { clipErrorText, INBOX_CHANGED, inboxChanged, saveClip } from "./clip";
+import { dropPending, firstUrl, INBOX_CHANGED, inboxChanged, keepClip, type PendingClip, usePendingClips } from "./clip";
 import "./inbox.css";
 
 /** Takes a card out of the inbox, or puts it back, and refreshes it where
@@ -25,7 +25,8 @@ export function InboxView({ active = true }: { active?: boolean }) {
   const { open, setNotice } = useShell();
   const [items, setItems] = useState<InboxItem[] | null>(null);
   const [text, setText] = useState("");
-  const [saving, setSaving] = useState(false);
+  const pending = usePendingClips((s) => s.items);
+  const justSaved = usePendingClips((s) => s.justSaved);
 
   const reload = useCallback(() => {
     backend.inbox().then(setItems, (e) => setNotice(t("error.generic", { message: String(e) })));
@@ -42,18 +43,11 @@ export function InboxView({ active = true }: { active?: boolean }) {
     };
   }, [active, reload]);
 
+  // Shown at the top of the list while it saves; the box is free at once.
   async function save(value: string) {
-    if (!value.trim() || saving) return;
-    setSaving(true);
-    try {
-      const { fetched } = await saveClip(value);
-      setText("");
-      setNotice(t(fetched ? "inbox.saved" : "inbox.savedBare"));
-    } catch (e) {
-      setNotice(clipErrorText(e));
-    } finally {
-      setSaving(false);
-    }
+    if (!value.trim()) return;
+    setText("");
+    await keepClip(value);
   }
 
   async function paste() {
@@ -98,24 +92,26 @@ export function InboxView({ active = true }: { active?: boolean }) {
           spellCheck={false}
           autoComplete="off"
           enterKeyHint="done"
-          disabled={saving}
         />
         {text.trim() ? (
-          <button type="submit" className="button primary" disabled={saving}>
-            {saving ? t("inbox.saving") : t("inbox.save")}
+          <button type="submit" className="button primary">
+            {t("inbox.save")}
           </button>
         ) : (
-          <button type="button" className="button" disabled={saving} onClick={() => void paste()}>
+          <button type="button" className="button" onClick={() => void paste()}>
             <ClipboardPaste size={14} />
-            {saving ? t("inbox.saving") : t("inbox.paste")}
+            {t("inbox.paste")}
           </button>
         )}
       </form>
-      {items?.length === 0 && <EmptyState icon={<Inbox size={28} strokeWidth={1.5} />} title={t("inbox.empty")} hint={t("inbox.emptyHint")} />}
-      {items && items.length > 0 && (
+      {items?.length === 0 && pending.length === 0 && <EmptyState icon={<Inbox size={28} strokeWidth={1.5} />} title={t("inbox.empty")} hint={t("inbox.emptyHint")} />}
+      {(pending.length > 0 || (items && items.length > 0)) && (
         <ul className="inbox-list">
-          {items.map((item) => (
-            <li key={item.id} className="inbox-item">
+          {pending.map((p) => (
+            <PendingRow key={p.key} clip={p} />
+          ))}
+          {items?.map((item) => (
+            <li key={item.id} className={`inbox-item${item.id === justSaved ? " just-saved" : ""}`}>
               <button className="inbox-open" onClick={(e) => open({ kind: "card", cardId: item.id }, item.title, toSide(e))}>
                 <span className="inbox-title">{item.title || t("library.untitled")}</span>
                 <span className="inbox-meta">
@@ -141,5 +137,42 @@ export function InboxView({ active = true }: { active?: boolean }) {
         </ul>
       )}
     </div>
+  );
+}
+
+/** A text on its way into the inbox: being saved, or failed, with the
+ *  reason and buttons to try again or let it go. */
+function PendingRow({ clip }: { clip: PendingClip }) {
+  const { t } = useTranslation();
+  const found = firstUrl(clip.text);
+  const title = (found ? found.rest.split("\n")[0] || found.url : clip.text.trim().split("\n")[0]) || clip.text;
+  const saving = clip.state === "saving";
+  return (
+    <li className={`inbox-item inbox-pending ${clip.state}`} aria-busy={saving}>
+      <div className="inbox-open">
+        <span className="inbox-title">{title}</span>
+        {found && found.url !== title && <span className="inbox-meta inbox-url">{found.url}</span>}
+        <span className="inbox-status" role="status">
+          {saving ? (
+            <>
+              <span className="inbox-spinner" aria-hidden />
+              {t(found ? "inbox.reading" : "inbox.keeping")}
+            </>
+          ) : (
+            clip.error || t("inbox.interrupted")
+          )}
+        </span>
+      </div>
+      {!saving && (
+        <span className="inbox-actions">
+          <button className="icon-button" title={t("inbox.retry")} aria-label={t("inbox.retry")} onClick={() => void keepClip(clip.text, clip.key)}>
+            <RotateCw size={15} />
+          </button>
+          <button className="icon-button" title={t("inbox.discard")} aria-label={t("inbox.discard")} onClick={() => dropPending(clip.key)}>
+            <X size={16} />
+          </button>
+        </span>
+      )}
+    </li>
   );
 }
