@@ -1,4 +1,6 @@
 import { create } from "zustand";
+import { isJournalId, journalDate } from "../docs/ids";
+import { jumpToDay } from "./journalJump";
 
 export type TabTarget =
   | { kind: "library" }
@@ -183,7 +185,13 @@ export const useShell = create<ShellState>((set) => {
     dialog: null,
     setDialog: (dialog) => set({ dialog }),
 
-    open: (target, title = null, side = false) =>
+    open: (target, title = null, side = false) => {
+      // A journal day opens in the journal, at that day.
+      if (target.kind === "card" && isJournalId(target.cardId)) {
+        jumpToDay(journalDate(target.cardId));
+        target = { kind: "journal" };
+        title = null;
+      }
       set((s) => {
         const recent =
           target.kind === "card"
@@ -208,7 +216,8 @@ export const useShell = create<ShellState>((set) => {
         else if (side) ({ panes, other: pane } = otherPane(panes, pane.id));
         const next = withTab(pane, { key, target, title });
         return { panes: replace(panes, next), focused: next.id, recent };
-      }),
+      });
+    },
 
     close: (key, paneId) =>
       set((s) => {

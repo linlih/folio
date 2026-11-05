@@ -18,6 +18,8 @@ import { backend } from "../platform";
 import type { DayLine, JournalDay } from "../bindings/commands";
 import { blockCache, linkTitle, titleCache } from "../editor/refs";
 import { openAt } from "../card/reveal";
+import { flashBlock } from "../editor/reveal";
+import { jumpDone, useJournalJump } from "../shell/journalJump";
 import "./journal.css";
 
 const PAGE = 14;
@@ -163,6 +165,45 @@ export function JournalView() {
     return () => cancelAnimationFrame(frame);
   }, [count, near]);
 
+  // Brought here to show a day (a task, a backlink, a search hit): load the
+  // days down to it, give it an editor when a block is to be shown, scroll
+  // to it and flash the block. Its editor does not take the focus (on a
+  // phone, the keyboard would cover what was asked for).
+  const jump = useJournalJump((s) => s.jump);
+  const [quiet, setQuiet] = useState<string | null>(null);
+  useEffect(() => {
+    if (!jump) return;
+    const { date, bid, seq } = jump;
+    if (date > today) return jumpDone(seq);
+    const back = Math.round((Date.parse(today) - Date.parse(date)) / 86_400_000);
+    setCount((c) => Math.max(c, back + 1));
+    if (bid) {
+      setQuiet(date);
+      edit(date);
+    }
+    let frame = 0;
+    let tries = 0;
+    let scrolled = false;
+    const step = () => {
+      const el = sections.current.get(date);
+      // Days above it take their real heights as they draw: keep it in
+      // place a few frames (a block, below, is scrolled to by its flash).
+      if (el && (!scrolled || (!bid && tries < 20))) {
+        el.scrollIntoView({ block: "start" });
+        scrolled = true;
+      }
+      const editor = editors.current.get(date);
+      const shown = !bid ? !!el && tries >= 20 : !!editor && !editor.isDestroyed && flashBlock(editor.view, bid);
+      // About two seconds for the day's text to load, then as far as it got.
+      if (shown || ++tries > 120) return jumpDone(seq);
+      frame = requestAnimationFrame(step);
+    };
+    frame = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(frame);
+    // `edit` and `today` as they are when the jump comes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [jump]);
+
   function edit(date: string) {
     setEditing((e) => {
       const next = [date, ...e.filter((d) => d !== date)];
@@ -224,7 +265,7 @@ export function JournalView() {
                   docId={journalId(date)}
                   mode="outline"
                   placeholder={date === today ? t("journal.placeholder") : ""}
-                  autoFocus={date !== today}
+                  autoFocus={date !== today && date !== quiet}
                   onOpenCard={(id, title, side) => open({ kind: "card", cardId: id }, title, side)}
                   extensions={(h) => [extractExtension(h)]}
                   onReady={(editor) => editors.current.set(date, editor)}

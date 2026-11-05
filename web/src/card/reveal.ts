@@ -5,6 +5,7 @@ import type { EditorView } from "@tiptap/pm/view";
 import { flashBlock } from "../editor/reveal";
 import i18n from "../i18n";
 import { isJournalId, journalDate } from "../docs/ids";
+import { jumpToDay } from "../shell/journalJump";
 import { useShell } from "../shell/tabs";
 
 /** Blocks waiting to be shown, by pane and card. */
@@ -16,6 +17,12 @@ const slot = (pane: string, cardId: string) => `${pane}\n${cardId}`;
  *  to the block. */
 export function openAt(cardId: string, title: string | null, bid?: string | null, side = false) {
   const shell = useShell.getState();
+  // A journal day: the journal, at that day and block (shell/journalJump.ts).
+  if (isJournalId(cardId)) {
+    shell.open({ kind: "journal" }, null, side);
+    jumpToDay(journalDate(cardId), bid ?? null);
+    return;
+  }
   shell.open({ kind: "card", cardId }, title, side);
   if (!bid) return;
   const pane = useShell.getState().focused;

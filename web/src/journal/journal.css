@@ -50,3 +50,6 @@
 .journal-more { height: 1px; }
 /* A far-away day: only its height, so scrolling stays put (§5.2a). */
 .journal-day.placeholder { box-sizing: border-box; }
+/* A day brought into view (JournalView's jump) clears the top bar. */
+.journal-day { scroll-margin-top: 12px; }
+.shell.phone .journal-day { scroll-margin-top: 72px; }
