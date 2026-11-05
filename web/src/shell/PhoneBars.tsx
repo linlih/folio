@@ -82,7 +82,7 @@ export function PhoneTopBar({ pane }: { pane: Pane }) {
   const root = isRoot(tab.target.kind) && !inTopic;
   const back = () => goBackFrom(pane);
   return (
-    <header className="phone-top">
+    <header className={`phone-top${root ? " root" : ""}`}>
       {!root && (
         <button className="icon-button phone-back" aria-label={t("phone.back")} title={t("phone.back")} onClick={back}>
           <ChevronLeft size={20} />

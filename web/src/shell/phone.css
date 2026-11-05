@@ -11,6 +11,27 @@
 .pane.scrolled > .phone-top { border-bottom-color: var(--border); }
 .phone-top .icon-button { width: 40px; height: 40px; }
 .phone-top > .icon-button:last-child { margin-left: auto; }
+/* The bar above already sets the page off from the screen's top: the
+   page's title follows it closely, not after a second gap. */
+.shell.phone .page { padding-top: 6px; }
+/* A main page's bar holds only icons, on the right: the page's title shares
+   their row instead of starting a row below them. Scrolled, the bar has the
+   paper behind it again. */
+.shell.phone .pane { position: relative; }
+.phone-top.root { position: absolute; z-index: 5; top: 0; left: 0; right: 0; padding-top: 22px; pointer-events: none; }
+.phone-top.root .icon-button { pointer-events: auto; }
+.pane.scrolled > .phone-top.root { background: var(--paper); }
+/* 24px above the title; the icons' row (22px down) is centred on it. */
+.shell.phone .pane:has(> .phone-top.root) .page { padding-top: 24px; }
+/* What sat right of the title goes to the next line, the icons' place. */
+.shell.phone .pane:has(> .phone-top.root) .page-header { flex-wrap: wrap; }
+.shell.phone .pane:has(> .phone-top.root) .page-header::before { content: ""; flex-basis: 100%; order: 1; }
+.shell.phone .pane:has(> .phone-top.root) .page-header > :not(h1, .page-meta) { order: 2; margin-left: auto; }
+/* Today, the journal's top day, without saying so; its "⋯" keeps
+   clear of the icons, on a line of its own if the date is long. */
+.shell.phone .pane:has(> .phone-top.root) .journal-day.today .journal-date { flex-wrap: wrap; gap: 0 6px; padding-right: 120px; }
+.shell.phone .pane:has(> .phone-top.root) .journal-day.today .journal-today { display: none; }
+:root .shell.phone .pane:has(> .phone-top.root) .journal-day.today .journal-day-menu { width: 26px; }
 .phone-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; font-weight: 500; color: var(--text); transition: opacity 0.15s; }
 /* A page with its own title on it: the bar names it only once that title
    has scrolled away, not twice (shell/AppShell.tsx PaneView). */
