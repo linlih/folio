@@ -67,19 +67,17 @@ export function goBackFrom(pane: Pane): boolean {
 }
 
 /** The bar at the top of a pane on a phone, in place of the tab bar:
- *  Back on a page opened from another (and inside a topic of the card
- *  library, up to its parent topic or the library), the page's name, and
- *  settings. */
+ *  Back on a page opened from another, the page's name, and settings. */
 export function PhoneTopBar({ pane }: { pane: Pane }) {
   const { t } = useTranslation();
   const label = useTabLabel();
   const setDialog = useShell((s) => s.setDialog);
-  const libraryTopic = useShell((s) => s.libraryTopic);
   useHistory(pane);
   const tab = pane.tabs.find((x) => x.key === pane.active);
   if (!tab) return null;
-  const inTopic = tab.target.kind === "library" && !!libraryTopic;
-  const root = isRoot(tab.target.kind) && !inTopic;
+  // Inside a topic too the library keeps this bar: the topic's own "‹",
+  // on the page, leads up (library/TopicGrid.tsx).
+  const root = isRoot(tab.target.kind);
   const back = () => goBackFrom(pane);
   return (
     <header className={`phone-top${root ? " root" : ""}`}>
@@ -89,7 +87,7 @@ export function PhoneTopBar({ pane }: { pane: Pane }) {
         </button>
       )}
       {/* A whiteboard and a topic show their own names, on the page. */}
-      <span className="phone-title">{root || inTopic || tab.target.kind === "board" ? "" : label(tab)}</span>
+      <span className="phone-title">{root || tab.target.kind === "board" ? "" : label(tab)}</span>
       {root && (
         <button className="icon-button" aria-label={t("ai.open")} title={t("ai.open")} onClick={() => useShell.getState().setChatOpen(true)}>
           <Sparkles size={18} />

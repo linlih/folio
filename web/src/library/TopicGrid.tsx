@@ -1,5 +1,5 @@
 import { Menu } from "@base-ui/react/menu";
-import { ChevronRight, Layers, MoreHorizontal, Plus } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, Layers, Plus } from "lucide-react";
 import { useRef, useState, type DragEvent } from "react";
 import { useTranslation } from "react-i18next";
 import type { CardRow } from "../bindings/commands";
@@ -204,6 +204,10 @@ export function TopicHeader({ topicId, onNewSub }: { topicId: string; onNewSub: 
   return (
     <>
       <h1 className="library-crumbs">
+        {/* On a phone, one step up in place of the path (phone.css). */}
+        <button className="icon-button library-up" aria-label={t("phone.back")} title={t("phone.back")} onClick={() => select(topic.parent ?? null)}>
+          <ChevronLeft size={22} />
+        </button>
         <button className="library-crumb" onClick={() => select(null)}>
           {t("library.title")}
         </button>
@@ -216,17 +220,17 @@ export function TopicHeader({ topicId, onNewSub }: { topicId: string; onNewSub: 
             <ChevronRight className="library-crumb-sep" size={20} strokeWidth={1.5} />
           </>
         )}
-        {renaming ? (
-          <NameInput initial={topic.name} onDone={(v) => void rename(v)} big />
-        ) : (
-          <span className="library-crumb-current" onDoubleClick={() => setRenaming(true)}>
-            {topic.name}
-          </span>
-        )}
+        {/* The name opens the topic's menu (with a mark saying so); a
+            double click renames it in place. */}
         <Menu.Root>
-          <Menu.Trigger className="icon-button" aria-label={t("topics.menu")} title={t("topics.menu")}>
-            <MoreHorizontal size={18} />
-          </Menu.Trigger>
+          {renaming ? (
+            <NameInput initial={topic.name} onDone={(v) => void rename(v)} big />
+          ) : (
+            <Menu.Trigger className="topic-title-trigger" title={t("topics.menu")} onDoubleClick={() => setRenaming(true)}>
+              <span className="library-crumb-current">{topic.name}</span>
+              <ChevronDown className="topic-title-mark" size={18} strokeWidth={1.75} aria-hidden />
+            </Menu.Trigger>
+          )}
           <Menu.Portal>
             <Menu.Positioner side="bottom" align="start" sideOffset={4}>
               <Menu.Popup className="popup">

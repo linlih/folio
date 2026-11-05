@@ -223,3 +223,9 @@
 .library-grouping { flex: none; }
 .topic-confirm { display: flex; align-items: center; gap: 8px; margin: 0 0 14px; padding: 10px 12px; border: 1px solid color-mix(in srgb, #b5523f 35%, var(--border)); border-radius: 8px; background: color-mix(in srgb, #b5523f 5%, transparent); }
 .topic-confirm p { flex: 1; margin: 0; font-size: 13px; color: var(--text); }
+.library-view-sort { display: contents; }
+/* A topic's name, as the button of its menu. */
+.topic-title-trigger { display: inline-flex; align-items: center; gap: 6px; min-width: 0; margin-left: -6px; padding: 0 6px; border-radius: 8px; color: inherit; font: inherit; cursor: pointer; }
+.topic-title-trigger:hover, .topic-title-trigger[data-popup-open] { background: var(--hover); }
+.topic-title-mark { flex: none; color: var(--muted); transition: transform 0.15s; }
+.topic-title-trigger[data-popup-open] .topic-title-mark { transform: rotate(180deg); }

@@ -194,3 +194,15 @@ body.phone-typing:has(.keyboard-bar) .shell { padding-bottom: 44px; }
 .pull-search[data-ready="true"] { color: var(--accent); }
 .pull-search span { padding-bottom: 10px; }
 .pull-search svg { margin-bottom: 12px; }
+
+/* A topic of the card library: "‹" and its name where the library's title
+   is (no path; the bar keeps its icons, so nothing moves). */
+.library-up { display: none; }
+.shell.phone .library-up { display: inline-flex; flex: none; width: 32px; height: 36px; margin-left: -8px; color: var(--secondary); }
+.shell.phone .library-crumb, .shell.phone .library-crumb-sep { display: none; }
+.shell.phone .library-crumbs { max-width: calc(100% - 122px); }
+/* The view and the order stay together, at the end of a line. */
+.shell.phone .library-view-sort { display: flex; gap: 8px; margin-left: auto; }
+.shell.phone .library-crumb-current { min-width: 0; }
+/* Its count leads the next line, beside "new card", clear of the icons. */
+.shell.phone .page-header:has(> .library-crumbs) > .page-meta { order: 2; align-self: center; margin-left: 0; }

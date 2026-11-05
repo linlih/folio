@@ -355,6 +355,8 @@ export function CardLibrary({ active = true }: { active?: boolean }) {
               ))}
             </span>
           )}
+          {/* The view and the order keep together (a phone's lines). */}
+          <span className="library-view-sort">
           <span className="library-views" role="group" aria-label={t("library.view")}>
             {(["grid", "list"] as LibraryView[]).map((v) => (
               <button
@@ -379,6 +381,7 @@ export function CardLibrary({ active = true }: { active?: boolean }) {
               ))}
             </select>
           </label>
+          </span>
         </div>
       )}
 
