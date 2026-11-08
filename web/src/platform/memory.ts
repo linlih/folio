@@ -209,20 +209,30 @@ export function memoryBackend(now: () => number = Date.now): Backend {
       }
       return out.slice(0, limit);
     },
-    search: async (query, limit = 30) => {
-      // Every word must appear (as folio-store's search).
+    search: async (query, limit = 30, filter = {}) => {
+      // Every word must appear (as folio-store's search), narrowed by the filter.
       const terms = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
-      if (terms.length === 0) return [];
+      const tag = filter.tag?.replace(/^#/, "").toLowerCase() || null;
+      const filtered = (filter.scope ?? "all") !== "all" || !!tag || filter.since != null;
+      if (terms.length === 0 && !filtered) return [];
       const all = (text: string) => terms.every((t) => text.toLowerCase().includes(t));
       const titles: SearchHit[] = [];
       const blocks: SearchHit[] = [];
       for (const [cid, e] of live()) {
+        if (filter.scope === "journal" && !isJournalId(cid)) continue;
+        if (filter.scope === "cards" && isJournalId(cid)) continue;
+        if (filter.since != null && e.updatedAt < filter.since) continue;
         const m = readMeta(e.doc);
+        const x = extractIndex(e.doc);
+        if (tag && !x.tags.some(([, name]) => name.toLowerCase() === tag)) continue;
         const clip = m.clip ? `\n${m.clip.site}\n${m.clip.author}\n${m.clip.excerpt}` : "";
-        if (all(m.title + clip)) titles.push({ cardId: cid, cardTitle: m.title, cardKind: m.kind, bid: null, text: m.title });
-        for (const b of extractIndex(e.doc).blocks) if (all(b.text)) blocks.push({ cardId: cid, cardTitle: m.title, cardKind: m.kind, bid: b.bid, text: b.text });
+        const hit = { cardId: cid, cardTitle: m.title, cardKind: m.kind, updatedAt: e.updatedAt };
+        if (all(m.title + clip)) titles.push({ ...hit, bid: null, text: m.title });
+        if (terms.length) for (const b of x.blocks) if (all(b.text)) blocks.push({ ...hit, bid: b.bid, text: b.text });
       }
-      return [...titles, ...blocks].slice(0, limit);
+      const out = [...titles, ...blocks];
+      if (filter.newestFirst || terms.length === 0) out.sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0));
+      return out.slice(0, limit);
     },
     blockTexts: async (bids) => {
       const want = new Set(bids);
@@ -236,6 +246,7 @@ export function memoryBackend(now: () => number = Date.now): Backend {
       settings.set(key, structuredClone(value));
     },
     exportDiagnostics: async () => null,
+    exportPdf: async () => null,
     exportMarkdown: async () => null,
     cardMarkdown: async () => null,
     exportCard: async () => null,
@@ -316,6 +327,22 @@ export function memoryBackend(now: () => number = Date.now): Backend {
       throw new Error("not available in the browser");
     },
     revealBackups: async () => {},
+    // No folders in the browser: the copy elsewhere is a desktop feature.
+    backupCopyStatus: async () => ({ path: null, copyPath: null, available: false, owner: "none", encrypted: false, locked: false, sameDisk: false, running: false, lastOk: null, lastError: null, lastErrorAt: null, skippedFiles: 0, size: null }),
+    pickBackupCopyFolder: async () => null,
+    inspectBackupCopyFolder: async () => {
+      throw new Error("not available in the browser");
+    },
+    backupCopySuggestions: async () => [],
+    setBackupCopy: async () => {},
+    unlockBackupCopy: async () => {},
+    stopBackupCopy: async () => {},
+    copyBackupsNow: async () => {},
+    listCopyBackups: async () => [],
+    revealBackupCopy: async () => {},
+    restoreLibraryFromCopy: async () => {
+      throw new Error("not available in the browser");
+    },
     // The browser keeps the library in memory: nothing to move.
     libraryLocation: async () => ({ path: "(memory)", isDefault: true, fixed: true, cloudSynced: false, missing: null, defaultPath: null }),
     pickLibraryFolder: async () => null,

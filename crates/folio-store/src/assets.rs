@@ -62,7 +62,7 @@ pub fn is_hash(s: &str) -> bool {
     s.len() == 64 && s.bytes().all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f'))
 }
 
-fn path_of(dir: &Path, sha256: &str) -> PathBuf {
+pub(crate) fn path_of(dir: &Path, sha256: &str) -> PathBuf {
     dir.join(&sha256[..2]).join(&sha256[2..4]).join(sha256)
 }
 
@@ -190,6 +190,15 @@ impl Store {
     pub fn set_asset_not_uploaded(&self, sha256: &str) -> Result<()> {
         self.conn.execute("UPDATE assets SET uploaded = 0 WHERE sha256 = ?1 AND local = 1", [sha256])?;
         Ok(())
+    }
+
+    /// Every file the library knows of: recorded here (whether this device
+    /// has it or not) or used by a card. What a restored library may want
+    /// back from a backup copy (copy.rs). In hash order.
+    pub fn known_assets(&self) -> Result<Vec<String>> {
+        let mut stmt = self.conn.prepare("SELECT sha256 FROM idx.asset_refs UNION SELECT sha256 FROM assets ORDER BY 1")?;
+        let rows = stmt.query_map([], |r| r.get::<_, String>(0))?;
+        Ok(rows.collect::<std::result::Result<Vec<_>, _>>()?.into_iter().filter(|sha| is_hash(sha)).collect())
     }
 
     /// The files this device still uses, for the server to keep: those its

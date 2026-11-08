@@ -42,14 +42,27 @@ tempfile = "3"
 # The sync key in the system keychain (secret.rs). Android uses the
 # Keystore through the folio-apk plugin instead; Linux the Secret Service
 # over a pure-Rust D-Bus (no libdbus to build against).
+# Telling read-only disks (installer disk images) from real ones (backup_copy.rs).
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+# Saving a page as PDF with no print dialog (pdf.rs), through the webview
+# each desktop has; the same versions wry uses.
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSString", "NSURL", "NSDictionary", "NSObject"] }
+objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "NSPrintInfo", "NSPrintOperation", "NSResponder", "NSView", "NSWindow"] }
+objc2-web-kit = { version = "0.3", default-features = false, features = ["std", "objc2-app-kit", "WKWebView"] }
 [target.'cfg(any(target_os = "macos", target_os = "ios"))'.dependencies]
 keyring = { version = "3", features = ["apple-native"] }
 # The folder the share extension leaves shared text in (take_shared).
 [target.'cfg(target_os = "ios")'.dependencies]
 objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSFileManager", "NSURL", "NSString"] }
 [target.'cfg(target_os = "windows")'.dependencies]
+webview2-com = "0.39"
+windows = "0.62"
 keyring = { version = "3", features = ["windows-native"] }
 [target.'cfg(target_os = "linux")'.dependencies]
+webkit2gtk = "2.0"
+gtk = "0.18"
 keyring = { version = "3", features = ["async-secret-service", "async-io", "crypto-rust"] }
 
 # System-wide quick capture shortcut (desktop only).

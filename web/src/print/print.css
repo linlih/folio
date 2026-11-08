@@ -1,0 +1,37 @@
+/* Printing a card or a journal day (print.ts): only #print-root is printed,
+   in the light palette whatever the app's theme, on white. */
+#print-root { display: none; }
+
+@media print {
+  @page { margin: 18mm 16mm; }
+  html, body, #root { height: auto !important; overflow: visible !important; background: #fff !important; }
+  body > *:not(#print-root) { display: none !important; }
+  #print-root {
+    display: block;
+    --paper: #fff;
+    --ink: #1f1d1a;
+    --accent: #2f5d8a;
+    --bg: var(--paper);
+    --text: var(--ink);
+    --secondary: color-mix(in srgb, var(--ink) 72%, var(--paper));
+    --muted: color-mix(in srgb, var(--ink) 55%, var(--paper));
+    --surface: color-mix(in srgb, var(--ink) 3%, var(--paper));
+    --border: color-mix(in srgb, var(--ink) 11%, var(--paper));
+    --hover: transparent;
+    --selected: transparent;
+    color-scheme: light;
+    color: var(--text);
+    background: #fff;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+  #print-root .page { max-width: none; margin: 0; padding: 0; }
+  #print-root .print-title { margin: 0 0 14pt; font: var(--page-title-weight) 22pt / var(--page-title-leading) var(--font-body); color: var(--text); }
+  #print-root img, #print-root figure, #print-root pre, #print-root table, #print-root blockquote { break-inside: avoid; }
+  #print-root h1, #print-root h2, #print-root h3 { break-after: avoid; }
+  #print-root .journal-static:hover { background: none; }
+  /* Room kept for writing on screen, and its prompts, are not printed. */
+  #print-root .journal-day { padding: 0; border: 0; }
+  #print-root .journal-body, #print-root .card-body-area { min-height: 0 !important; }
+  #print-root .line-placeholder::before { content: none !important; }
+}

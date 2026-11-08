@@ -1434,8 +1434,12 @@ dependencies = [
  "folio-mcp",
  "folio-store",
  "folio-sync",
+ "gtk",
  "keyring",
+ "libc",
+ "objc2-app-kit",
  "objc2-foundation",
+ "objc2-web-kit",
  "serde",
  "serde_json",
  "tauri",
@@ -1452,6 +1456,9 @@ dependencies = [
  "tracing-appender",
  "tracing-subscriber",
  "ureq",
+ "webkit2gtk",
+ "webview2-com",
+ "windows",
 ]
 
 [[package]]

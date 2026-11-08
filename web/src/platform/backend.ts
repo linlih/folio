@@ -1,6 +1,6 @@
 import type { AssetEvent, AssetInfo, BackupInfo, McpStatus, SyncDevice, SyncStatus, TagInfo, TopicCount, CardText } from "../bindings/commands";
-import type { LatestRelease, LibraryLocation, PickedFolder } from "../bindings/commands";
-import type { AppInfo, Backlink, BlockText, CardRow, DocKind, JournalDay, SearchHit } from "../bindings/commands";
+import type { BackupCopyStatus, CopySuggestion, LatestRelease, LibraryLocation, PickedCopyFolder, PickedFolder } from "../bindings/commands";
+import type { AppInfo, Backlink, BlockText, CardRow, DocKind, JournalDay, SearchFilter, SearchHit } from "../bindings/commands";
 import type { ClipInfo, InboxItem, LinkPreview, TagCard, TaskRow } from "../bindings/commands";
 import type { AiEvent, AiModelInfo, AiProtocol, AiReply, AiTool, AiTurnRequest } from "../ai/types";
 
@@ -64,8 +64,9 @@ export interface Backend {
   backlinks(id: string): Promise<Backlink[]>;
   /** Blocks in other cards that mention this card's title without a link. */
   unlinkedReferences(id: string, limit?: number): Promise<Backlink[]>;
-  /** Cards by title and blocks by text, title matches first. */
-  search(query: string, limit?: number): Promise<SearchHit[]>;
+  /** Cards by title and blocks by text, title matches first; narrowed by
+   *  `filter`, which alone (no words) lists the cards it matches. */
+  search(query: string, limit?: number, filter?: SearchFilter): Promise<SearchHit[]>;
   /** Current text of blocks (for block references). */
   blockTexts(bids: string[]): Promise<BlockText[]>;
   /** #tags in use, most recently used first. */
@@ -87,6 +88,9 @@ export interface Backend {
   setLocalSetting(key: string, value: unknown): Promise<void>;
   /** Writes a diagnostics file and returns its path; null where unsupported. */
   exportDiagnostics(): Promise<string | null>;
+  /** Saves the page's #print-root as a PDF where the user picks, with no
+   *  print dialog (print/print.ts); its path, or null when cancelled. */
+  exportPdf(fileName: string): Promise<string | null>;
   /** Asks for a folder and exports every card as Markdown into a new
    *  subfolder `folderName`; null when cancelled or unsupported. */
   exportMarkdown(folderName: string, untitled: string): Promise<ExportResult | null>;
@@ -102,6 +106,28 @@ export interface Backend {
   /** Replaces the whole library with a backup (the page must reload after). */
   restoreLibrary(backup: string): Promise<void>;
   revealBackups(): Promise<void>;
+  /** A second copy of the backups and files in another folder (desktop). */
+  backupCopyStatus(): Promise<BackupCopyStatus>;
+  pickBackupCopyFolder(): Promise<PickedCopyFolder | null>;
+  /** What a suggested folder holds, as picking it would say. */
+  inspectBackupCopyFolder(path: string): Promise<PickedCopyFolder>;
+  /** Cloud drives and other disks worth suggesting. */
+  backupCopySuggestions(): Promise<CopySuggestion[]>;
+  /** Copies into `path` from now on. A folder already holding a copy keeps
+   *  its kind (an encrypted one needs its passphrase); a new one is
+   *  encrypted under `passphrase` when `encrypt`. Fails with
+   *  "wrong-passphrase" or "passphrase-short". */
+  setBackupCopy(path: string, encrypt: boolean, passphrase: string | null): Promise<void>;
+  /** Gives this computer the encrypted copy's key, by its passphrase. */
+  unlockBackupCopy(passphrase: string): Promise<void>;
+  /** Stops copying (the copy stays). */
+  stopBackupCopy(): Promise<void>;
+  copyBackupsNow(): Promise<void>;
+  /** The backups in the copy, newest first. */
+  listCopyBackups(): Promise<BackupInfo[]>;
+  revealBackupCopy(): Promise<void>;
+  /** Replaces the whole library with a backup from the copy, files too. */
+  restoreLibraryFromCopy(backup: string): Promise<void>;
   /** The library folder (§5.7): where it is, moving it, opening another.
    *  Moving and opening swap the open library; the window reloads after. */
   libraryLocation(): Promise<LibraryLocation>;

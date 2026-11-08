@@ -11,3 +11,14 @@
 .backup-confirm p { margin: 0 0 8px; font-size: 13px; line-height: 1.55; color: var(--text); }
 .backup-confirm-actions { display: flex; gap: 8px; }
 .backup-confirm-actions input { flex: 1; min-width: 0; font: 13px var(--font-ui); color: var(--text); background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 4px 8px; outline: none; }
+/* The copy elsewhere (backup_copy.rs): its row sits above the list; the
+   switch picks whose backups the list shows. */
+.backup-copy { margin-bottom: 12px; }
+.backup-copy .settings-row-label small { overflow-wrap: anywhere; }
+.backup-source { align-self: flex-start; margin: 4px 0 10px; }
+.backup-offsite { margin-bottom: 4px; }
+.backup-badge { display: inline-flex; align-items: center; gap: 3px; margin-left: 8px; padding: 1px 6px; border-radius: 999px; font-size: 11px; color: var(--secondary); background: color-mix(in srgb, var(--ink) 6%, transparent); vertical-align: 1px; }
+.backup-places { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 6px; }
+.backup-encrypt { margin: 2px 0 6px; }
+.place-confirm p.backup-encrypt-hint { color: var(--secondary); }
+.place-confirm .sync-field { margin-bottom: 8px; }

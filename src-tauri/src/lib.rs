@@ -3,9 +3,12 @@
 
 mod ai;
 mod assets;
+mod backup_copy;
 mod diagnostics;
 mod library;
 mod mcp;
+#[cfg(desktop)]
+mod pdf;
 mod secret;
 mod sync;
 
@@ -542,8 +545,8 @@ fn unlinked_references(state: tauri::State<AppState>, id: String, limit: Option<
 }
 
 #[tauri::command]
-fn search(state: tauri::State<AppState>, query: String, limit: Option<u32>) -> CmdResult<Vec<SearchHit>> {
-    Ok(lock(&state)?.search(&query, limit.unwrap_or(30))?)
+fn search(state: tauri::State<AppState>, query: String, limit: Option<u32>, filter: Option<folio_store::SearchFilter>) -> CmdResult<Vec<SearchHit>> {
+    Ok(lock(&state)?.search_with(&query, &filter.unwrap_or_default(), limit.unwrap_or(30))?)
 }
 
 #[tauri::command]
@@ -559,9 +562,11 @@ fn titles(state: tauri::State<AppState>, ids: Vec<String>) -> CmdResult<Vec<(Str
 /// Settings the page may not read or write through the commands below:
 /// the sync settings hold the server token (and, on devices without a
 /// keychain, the key), and only the host's sync commands change them; the
-/// AI keys are only ever read by the host.
+/// AI keys are only ever read by the host. Where the backups are copied to
+/// changes only through its own commands (a page must not send them to a
+/// folder of its choosing), and the library id never changes.
 fn page_may_use(key: &str) -> CmdResult<()> {
-    if key == "sync" || key.starts_with("sync.") || key == ai::KEYS {
+    if key == "sync" || key.starts_with("sync.") || key == ai::KEYS || key.starts_with(backup_copy::KEY) || key == "library.id" {
         return Err(CommandError::Other(format!("the setting {key} is not the page's")));
     }
     Ok(())
@@ -578,6 +583,32 @@ fn set_local_setting(state: tauri::State<AppState>, key: String, value: serde_js
     page_may_use(&key)?;
     Ok(lock(&state)?.set_local_setting(&key, &value)?)
 }
+
+/// Saves a card or a journal day as a PDF file where the user picks, with
+/// no print dialog: web/src/print/print.ts has put it into #print-root, and
+/// `pdf` writes the page through the webview's print engine. None when
+/// cancelled.
+#[tauri::command]
+async fn export_pdf(app: tauri::AppHandle, webview: tauri::Webview, file_name: String) -> CmdResult<Option<String>> {
+    #[cfg(desktop)]
+    {
+        use tauri_plugin_dialog::DialogExt;
+        let name = format!("{}.pdf", folio_io::file_stem(&file_name));
+        let Some(picked) = app.dialog().file().set_file_name(&name).add_filter("PDF", &["pdf"]).blocking_save_file() else {
+            return Ok(None);
+        };
+        let path = picked.into_path().map_err(|e| CommandError::Other(e.to_string()))?;
+        pdf::write(&webview, path.clone()).map_err(CommandError::Other)?;
+        tracing::info!("exported a PDF");
+        Ok(Some(path.display().to_string()))
+    }
+    #[cfg(mobile)]
+    {
+        let _ = (app, webview, file_name);
+        Err(CommandError::Other("PDF export is not available here".into()))
+    }
+}
+
 
 /// Writes a diagnostics file (no note content) and returns its path.
 #[tauri::command]
@@ -674,9 +705,10 @@ fn list_backups(state: tauri::State<AppState>) -> CmdResult<Vec<BackupInfo>> {
 }
 
 #[tauri::command]
-fn backup_now(state: tauri::State<AppState>) -> CmdResult<BackupInfo> {
+fn backup_now(app: tauri::AppHandle, state: tauri::State<AppState>) -> CmdResult<BackupInfo> {
     let info = lock(&state)?.backup(&backups_dir(&state), now_ms())?;
     tracing::info!(backup = %info.name, "backed up");
+    std::thread::spawn(move || backup_copy::run(&app));
     Ok(info)
 }
 
@@ -688,6 +720,10 @@ fn backup_now(state: tauri::State<AppState>) -> CmdResult<BackupInfo> {
 fn restore_library(state: tauri::State<AppState>, backup: String) -> CmdResult<()> {
     let mut store = lock(&state)?;
     tracing::warn!(backup = %backup, "restoring the library");
+    // Kept through the restore: the backup has the ones of its day (or
+    // none), and the copy elsewhere must go on into the same folder.
+    let library = store.library_id()?;
+    let copy_to = store.local_setting(backup_copy::KEY)?;
     // A store on an empty folder holds the slot while the library is closed.
     let placeholder = std::env::temp_dir().join(format!("folio-restore-{}", now_ms()));
     drop(std::mem::replace(&mut *store, Store::open(&placeholder)?));
@@ -698,6 +734,8 @@ fn restore_library(state: tauri::State<AppState>, backup: String) -> CmdResult<(
     let _ = std::fs::remove_dir_all(&placeholder);
     *store = reopened?;
     replaced?;
+    store.set_library_id(&library)?;
+    store.set_local_setting(backup_copy::KEY, &copy_to.unwrap_or(serde_json::Value::Null))?;
     tracing::warn!(backup = %backup, "restored the library");
     Ok(())
 }
@@ -809,7 +847,11 @@ fn switch_library(app: &tauri::AppHandle, state: &AppState, change: Change) -> C
 /// The swap itself, on the locked store (testable without the app).
 fn swap_library(store: &mut Store, data_dir: &Mutex<PathBuf>, app_dir: &std::path::Path, change: Change) -> CmdResult<PathBuf> {
     let from = data_dir.lock().unwrap_or_else(|e| e.into_inner()).clone();
-    let placeholder = std::env::temp_dir().join(format!("folio-switch-{}", now_ms()));
+    // Its own placeholder: two swaps in one millisecond (two processes, or
+    // tests in parallel) would otherwise create the same database at once.
+    static SWAPS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    let swap = SWAPS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let placeholder = std::env::temp_dir().join(format!("folio-switch-{}-{}-{swap}", std::process::id(), now_ms()));
     drop(std::mem::replace(store, Store::open(&placeholder)?));
     let changed = change(&from);
     let target = changed.as_ref().cloned().unwrap_or_else(|_| from.clone());
@@ -921,6 +963,9 @@ fn auto_backup(app: tauri::AppHandle) {
             purge_old_trash(&app, &state);
             compact_logs(&state, &dir);
         }
+        // Hourly, not only after a new backup: a drive plugged in again
+        // gets what it missed.
+        backup_copy::run(&app);
         assets::sweep(&state);
         std::thread::sleep(std::time::Duration::from_secs(60 * 60));
     });
@@ -1293,6 +1338,7 @@ pub fn run() {
             get_local_setting,
             set_local_setting,
             export_diagnostics,
+            export_pdf,
             export_markdown,
             card_markdown,
             export_card,
@@ -1303,6 +1349,17 @@ pub fn run() {
             backup_now,
             restore_library,
             reveal_backups,
+            backup_copy::backup_copy_status,
+            backup_copy::pick_backup_copy_folder,
+            backup_copy::set_backup_copy,
+            backup_copy::inspect_backup_copy_folder,
+            backup_copy::backup_copy_suggestions,
+            backup_copy::unlock_backup_copy,
+            backup_copy::stop_backup_copy,
+            backup_copy::copy_backups_now,
+            backup_copy::list_copy_backups,
+            backup_copy::reveal_backup_copy,
+            backup_copy::restore_library_from_copy,
             library_location,
             pick_library_folder,
             move_library,

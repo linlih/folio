@@ -53,3 +53,38 @@
 /* A day brought into view (JournalView's jump) clears the top bar. */
 .journal-day { scroll-margin-top: 12px; }
 .shell.phone .journal-day { scroll-margin-top: 72px; }
+
+/* The calendar button (and "back to today"), in the page's top right corner,
+   kept there while the days scroll under it; it takes no room of its own. */
+.journal-bar { position: sticky; top: 10px; z-index: 3; height: 0; display: flex; justify-content: flex-end; align-items: flex-start; gap: 6px; margin-right: -44px; }
+.journal-bar > * { background: var(--paper); }
+.journal-calendar-button { width: 30px; height: 30px; border-radius: 8px; color: var(--secondary); }
+.journal-back-today { height: 30px; box-shadow: var(--shadow); }
+/* Narrow pages have no side padding to sit in: inside the column. */
+@media (max-width: 720px), (max-height: 500px) and (hover: none) and (pointer: coarse) { .journal-bar { margin-right: 0; } }
+.shell.phone .journal-bar .journal-calendar-button { display: none; }
+.shell.phone .journal-bar { top: 64px; justify-content: center; }
+.journal-day.future .journal-date { color: var(--secondary); }
+
+/* The month calendar in its popup. */
+.journal-calendar { padding: 10px; }
+.calendar { width: 252px; font: 13px var(--font-ui); }
+.calendar-head { display: flex; align-items: center; gap: 2px; margin-bottom: 6px; }
+.calendar-head .icon-button { width: 26px; height: 26px; }
+.calendar-title { flex: 1; text-align: center; font-weight: 600; color: var(--text); }
+.calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+.calendar-weekday { padding: 4px 0; text-align: center; font-size: 11.5px; color: var(--muted); }
+.calendar-day { position: relative; height: 32px; border-radius: 6px; color: var(--text); font-variant-numeric: tabular-nums; }
+.calendar-day:hover { background: var(--hover); }
+.calendar-day.outside { color: var(--muted); opacity: 0.6; }
+.calendar-day.today { color: var(--accent); font-weight: 650; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 55%, transparent); }
+/* Something was written that day. */
+.calendar-day.written::after { content: ""; position: absolute; left: 50%; bottom: 4px; width: 4px; height: 4px; margin-left: -2px; border-radius: 50%; background: var(--accent); opacity: 0.75; }
+.calendar-foot { display: flex; justify-content: center; margin-top: 8px; }
+.shell.phone .calendar-day { height: 40px; font-size: 15px; }
+.shell.phone .calendar { width: min(320px, calc(100vw - 48px)); }
+/* The chevron takes the room of the gap after the date, so the "⋯" beside
+   it stays where it was, clear of the top bar's buttons. */
+.journal-date:has(.journal-date-picker) { gap: 2px; }
+.journal-date-picker { display: inline-flex; align-items: center; gap: 2px; padding: 0; font: inherit; color: inherit; text-align: left; }
+.journal-date-picker svg { flex: none; color: var(--muted); }

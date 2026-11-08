@@ -1,5 +1,5 @@
 import { Channel, convertFileSrc, invoke } from "@tauri-apps/api/core";
-import type { AppInfo, AssetInfo, BackupInfo, Backlink, BlockText, CardRow, JournalDay, McpStatus, SearchHit, SyncDevice, SyncStatus, TagInfo, TopicCount, CardText } from "../bindings/commands";
+import type { AppInfo, AssetInfo, BackupCopyStatus, BackupInfo, CopySuggestion, PickedCopyFolder, Backlink, BlockText, CardRow, JournalDay, McpStatus, SearchHit, SyncDevice, SyncStatus, TagInfo, TopicCount, CardText } from "../bindings/commands";
 import type { AiKeyInfo, Backend, ExportResult } from "./backend";
 import type { AiEvent, AiModelInfo, AiReply, AiTool } from "../ai/types";
 import type { LatestRelease, LibraryLocation, PickedFolder } from "../bindings/commands";
@@ -31,12 +31,14 @@ export function tauriBackend(): Backend {
     journalDays: (from, to) => invoke<JournalDay[]>("journal_days", { from, to }),
     backlinks: (id) => invoke<Backlink[]>("backlinks", { id }),
     unlinkedReferences: (id, limit) => invoke<Backlink[]>("unlinked_references", { id, limit }),
-    search: (query, limit) => invoke<SearchHit[]>("search", { query, limit }),
+    search: (query, limit, filter) => invoke<SearchHit[]>("search", { query, limit, filter }),
     blockTexts: (bids) => invoke<BlockText[]>("block_texts", { bids }),
     titles: (ids) => invoke<[string, string][]>("titles", { ids }),
     getLocalSetting: <T,>(key: string) => invoke<T | null>("get_local_setting", { key }),
     setLocalSetting: (key, value) => invoke<void>("set_local_setting", { key, value }),
     exportDiagnostics: () => invoke<string>("export_diagnostics"),
+    // WKWebView ignores window.print(): the host opens the dialog.
+    exportPdf: (fileName) => invoke<string | null>("export_pdf", { fileName }),
     exportMarkdown: (folderName, untitled) => invoke<ExportResult | null>("export_markdown", { folderName, untitled }),
     tags: (limit) => invoke<TagInfo[]>("tags", { limit }),
     topicCards: (topic) => invoke<CardRow[]>("topic_cards", { topic }),
@@ -53,6 +55,17 @@ export function tauriBackend(): Backend {
     backupNow: () => invoke<BackupInfo>("backup_now"),
     restoreLibrary: (backup) => invoke<void>("restore_library", { backup }),
     revealBackups: () => invoke<void>("reveal_backups"),
+    backupCopyStatus: () => invoke<BackupCopyStatus>("backup_copy_status"),
+    pickBackupCopyFolder: () => invoke<PickedCopyFolder | null>("pick_backup_copy_folder"),
+    inspectBackupCopyFolder: (path) => invoke<PickedCopyFolder>("inspect_backup_copy_folder", { path }),
+    backupCopySuggestions: () => invoke<CopySuggestion[]>("backup_copy_suggestions"),
+    setBackupCopy: (path, encrypt, passphrase) => invoke<void>("set_backup_copy", { path, encrypt, passphrase }),
+    unlockBackupCopy: (passphrase) => invoke<void>("unlock_backup_copy", { passphrase }),
+    stopBackupCopy: () => invoke<void>("stop_backup_copy"),
+    copyBackupsNow: () => invoke<void>("copy_backups_now"),
+    listCopyBackups: () => invoke<BackupInfo[]>("list_copy_backups"),
+    revealBackupCopy: () => invoke<void>("reveal_backup_copy"),
+    restoreLibraryFromCopy: (backup) => invoke<void>("restore_library_from_copy", { backup }),
     libraryLocation: () => invoke<LibraryLocation>("library_location"),
     pickLibraryFolder: (purpose) => invoke<PickedFolder | null>("pick_library_folder", { purpose }),
     moveLibrary: (to) => invoke<string>("move_library", { to }),

@@ -86,7 +86,13 @@
     "placeholder": "Write about today…",
     "today": "Today",
     "loadMore": "Earlier days",
-    "empty": "Nothing written"
+    "empty": "Nothing written",
+    "calendar": "Calendar",
+    "prevMonth": "Previous month",
+    "nextMonth": "Next month",
+    "prevYear": "Previous year",
+    "nextYear": "Next year",
+    "backToToday": "Back to today"
   },
   "tabs": {
     "close": "Close tab",
@@ -268,7 +274,23 @@
     "tags": "Tags",
     "commands": "Commands",
     "commandHint": "Type to search cards and text; start with > to run a command.",
-    "topics": "Topics"
+    "topics": "Topics",
+    "filter": {
+      "scope": "Scope",
+      "all": "All",
+      "cards": "Cards",
+      "journal": "Journal",
+      "time": "Time",
+      "any": "Any time",
+      "week": "Last 7 days",
+      "month": "Last 30 days",
+      "year": "This year",
+      "tag": "Tag",
+      "anyTag": "Any tag",
+      "sort": "Sort",
+      "best": "Best match",
+      "newest": "Recently changed"
+    }
   },
   "refs": {
     "copied": "Block reference copied; paste it anywhere to reference this block",
@@ -284,7 +306,7 @@
   },
   "backup": {
     "title": "Backup and restore",
-    "description": "A backup is made every day; the newest 14 are kept. Backups are on this computer (same disk as the library); copy them elsewhere for safety.",
+    "description": "Backed up once a day, keeping the last 14, on this computer (on the same disk as the library). If this computer breaks or is lost, the sync server or a copy kept elsewhere brings your notes back.",
     "now": "Back up now",
     "reveal": "Show in Finder",
     "none": "No backups yet.",
@@ -295,7 +317,63 @@
     "confirmWord": "restore",
     "typeToConfirm": "Type “{{word}}” to confirm",
     "upgrade": "Before upgrade",
-    "repair": "Before repair"
+    "repair": "Before repair",
+    "copy": {
+      "title": "Keep a copy elsewhere",
+      "hint": "After each backup, the backups and every image and attachment are copied to a cloud drive, an external drive or a NAS too, so a failed disk here loses nothing.",
+      "choose": "Choose location…",
+      "change": "Change location…",
+      "stop": "Stop copying",
+      "stopped": "Stopped copying; the backups already there stay",
+      "now": "Copy now",
+      "running": "Copying…",
+      "never": "Not copied yet",
+      "done": "Last copied {{when}} · {{backups}} backups, {{files}} images and attachments, {{size}} in all",
+      "doneAt": "Last copied {{when}}",
+      "unavailable": "This location cannot be found right now (is the drive plugged in?). What it missed is copied within an hour of it coming back.",
+      "foreign": "This folder holds another library's backups: you can restore from them, but nothing is copied into it, so two libraries' backups never mix.",
+      "failed": "The last copy failed: {{message}}",
+      "skipped_one": "{{count}} image or attachment could not be read or is damaged, so it was not copied; it is tried again next time.",
+      "skipped_other": "{{count}} images or attachments could not be read or are damaged, so they were not copied; they are tried again next time.",
+      "sameDisk": "This location is on the same disk as the library: if the disk fails, both copies are lost. A USB drive, another disk or a cloud drive folder is safer.",
+      "pickNew": "The backups and all images and attachments will be copied into a new “Folio Backup” folder in “{{path}}”. New content is added after every backup; nothing else in the folder is touched.",
+      "pickOurs": "“{{path}}” already holds this library's backups; copying goes on there.",
+      "pickOther": "“{{path}}” holds another library's backups (say, from before a new computer). Choose “Elsewhere” in the backup list below to restore the whole library from them; copying then goes on there.",
+      "start": "Start copying",
+      "use": "Use this location",
+      "useToRestore": "Use this location",
+      "fromLocal": "This computer",
+      "fromCopy": "Elsewhere",
+      "confirmFiles": "The backup's images and attachments come back too.",
+      "chooseOther": "Another place…",
+      "icloud": "iCloud Drive",
+      "drive": "Disk {{name}}",
+      "named": "{{label}} ({{path}})",
+      "encrypted": "Encrypted",
+      "encryptTitle": "Encryption",
+      "encryptYes": "Encrypt",
+      "encryptNo": "Don't encrypt",
+      "encryptYesHint": "Encrypted with a passphrase: whoever gets these files sees neither your notes nor the file names. This computer remembers the key, so copying needs no typing; restoring on another computer asks for the passphrase.",
+      "encryptNoHint": "Not encrypted: the backups are plain files that anyone who can open this drive can read.",
+      "encryptNoCloud": "Not encrypted: the cloud provider and anyone who can sign in to this account can read your notes.",
+      "passphrase": "Passphrase",
+      "forgotten": "Keep this passphrase safe: without it this copy cannot be restored, and Folio cannot help.",
+      "enterPassphrase": "The backups here are encrypted: enter the passphrase they were made with.",
+      "wrongPassphrase": "Wrong passphrase.",
+      "locked": "This copy is encrypted and this computer does not have its key: enter the passphrase to keep copying.",
+      "mode": "The backups in this folder are not encrypted the way the settings say; copying has stopped. Choose this place again.",
+      "unlock": "Unlock"
+    },
+    "offsite": {
+      "title": "Copies off this computer",
+      "sync": "The sync server holds the whole library as it is now, images and attachments included, end-to-end encrypted · Last synced: {{when}}",
+      "syncNever": "Sync is on but has not succeeded yet: the server does not have a full copy.",
+      "syncFailing": "Sync is failing: the copy on the server may be out of date. Check the sync settings.",
+      "syncPending": "Some changes or files are not up yet; they go up once you are online.",
+      "syncNote": "Sync keeps only the latest version: to undo a deletion or a bad edit, restore a backup below.",
+      "none": "Your notes are only on this computer: if its disk fails or it is lost, they are gone. Turn on sync, or keep a copy elsewhere below.",
+      "turnOnSync": "Turn on sync…"
+    }
   },
   "dialog": {
     "done": "Done",
@@ -1220,5 +1298,9 @@
     "allDone": "All done 🎉",
     "doneOf": "{{done}} of {{total}} done",
     "weekOf": "{{done}}/{{goal}} this week"
+  },
+  "print": {
+    "export": "Export as PDF…",
+    "saved": "Saved to {{path}}"
   }
 }

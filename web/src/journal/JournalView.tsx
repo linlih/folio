@@ -3,7 +3,7 @@ import { TodayTasks } from "./TodayTasks";
 import { JournalHabits } from "../habits/JournalHabits";
 import { usePullToSearch } from "../shell/pullSearch";
 import { usePhone } from "../shell/phone";
-import { MoreHorizontal, Search } from "lucide-react";
+import { ArrowUp, ChevronDown, MoreHorizontal, Search } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { copyMarkdown, exportCardMarkdown } from "../card/markdown";
 import { useTranslation } from "react-i18next";
@@ -20,6 +20,8 @@ import { blockCache, linkTitle, titleCache } from "../editor/refs";
 import { openAt } from "../card/reveal";
 import { flashBlock } from "../editor/reveal";
 import { jumpDone, useJournalJump } from "../shell/journalJump";
+import { CalendarButton } from "./JournalCalendar";
+import { canExportPdf, exportPdf } from "../print/print";
 import "./journal.css";
 
 const PAGE = 14;
@@ -53,6 +55,9 @@ export function JournalView() {
   const { t, i18n } = useTranslation();
   const open = useShell((s) => s.open);
   const today = useToday();
+  // A future day asked for (planning): the stream starts there, above today.
+  const [ahead, setAhead] = useState<string | null>(null);
+  const top = ahead && ahead > today ? ahead : today;
   const [count, setCount] = useState(PAGE);
   const [texts, setTexts] = useState<Map<string, JournalDay>>(new Map());
   // Most recently used first; today starts with an editor.
@@ -61,7 +66,8 @@ export function JournalView() {
   const editors = useRef(new Map<string, Editor>());
   const page = useRef<HTMLDivElement>(null);
   const pullHint = useRef<HTMLDivElement>(null);
-  usePullToSearch(page, pullHint, usePhone());
+  const phone = usePhone();
+  usePullToSearch(page, pullHint, phone);
   // Days near the visible part, rendered in full; their last heights.
   const [near, setNear] = useState<Set<string>>(() => new Set(Array.from({ length: PAGE }, (_, i) => addDays(today, -i))));
   const heights = useRef(new Map<string, number>());
@@ -76,7 +82,7 @@ export function JournalView() {
     continueAtEnd(editor, true);
   }
 
-  const days = Array.from({ length: count }, (_, i) => addDays(today, -i));
+  const days = Array.from({ length: count }, (_, i) => addDays(top, -i));
   const oldest = days[days.length - 1];
 
   const loadTexts = useCallback(async (from: string, to: string) => {
@@ -94,10 +100,10 @@ export function JournalView() {
   const loaded = useRef<string | null>(null);
   useEffect(() => {
     const from = oldest;
-    const to = loaded.current && loaded.current > from && loaded.current <= today ? addDays(loaded.current, -1) : today;
+    const to = loaded.current && loaded.current > from && loaded.current <= top ? addDays(loaded.current, -1) : top;
     loaded.current = from;
     void loadTexts(from, to);
-  }, [oldest, today, loadTexts]);
+  }, [oldest, top, loadTexts]);
 
   // Which days are near the visible part of the stream.
   useEffect(() => {
@@ -173,12 +179,19 @@ export function JournalView() {
   const [quiet, setQuiet] = useState<string | null>(null);
   useEffect(() => {
     if (!jump) return;
-    const { date, bid, seq } = jump;
-    if (date > today) return jumpDone(seq);
-    const back = Math.round((Date.parse(today) - Date.parse(date)) / 86_400_000);
-    setCount((c) => Math.max(c, back + 1));
+    const { date, bid, seq, write } = jump;
+    // A future day: the stream starts at it; the days down to today and
+    // those already loaded stay (the stream grows at its top).
+    const newTop = date > top ? date : top;
+    if (newTop !== top) setAhead(newTop);
+    const added = daysBetween(top, newTop);
+    setCount((c) => Math.max(c + added, daysBetween(date, newTop) + 1));
     if (bid) {
       setQuiet(date);
+      edit(date);
+    } else if (write) {
+      // On a phone the keyboard would cover the day: an editor, no cursor.
+      setQuiet(phone || date === today ? date : null);
       edit(date);
     }
     let frame = 0;
@@ -231,6 +244,24 @@ export function JournalView() {
         <Search size={15} />
         <span />
       </div>
+      {/* The calendar, kept in reach while scrolling (on a phone it is in
+          the top bar); and the way back from planning ahead. */}
+      <div className="journal-bar">
+        {top !== today && (
+          <button
+            className="button journal-back-today"
+            onClick={() => {
+              setAhead(null);
+              setCount((c) => Math.max(PAGE, c - daysBetween(today, top)));
+              page.current?.closest(".view")?.scrollTo({ top: 0 });
+            }}
+          >
+            <ArrowUp size={14} />
+            {t("journal.backToToday")}
+          </button>
+        )}
+        <CalendarButton className="icon-button journal-calendar-button" />
+      </div>
       {days.map((date) => {
         const text = texts.get(date);
         const live = editing.includes(date);
@@ -251,12 +282,21 @@ export function JournalView() {
             key={date}
             ref={sectionRef(date)}
             data-date={date}
-            className={`journal-day${date === today ? " today" : ""}${!live && date < today && !dayHasLines(text) ? " blank" : ""}`}
+            className={`journal-day${date === today ? " today" : ""}${date > today ? " future" : ""}${!live && date !== today && !dayHasLines(text) ? " blank" : ""}`}
           >
             <h2 className="journal-date">
-              {heading(date)}
+              {/* On a phone the top day's date opens the calendar (the top
+                  bar has no room beside its "⋯"). */}
+              {phone && date === top ? (
+                <CalendarButton className="journal-date-picker">
+                  {heading(date)}
+                  <ChevronDown size={14} />
+                </CalendarButton>
+              ) : (
+                heading(date)
+              )}
               {date === today && <span className="journal-today">{t("journal.today")}</span>}
-              <DayMenu date={date} />
+              <DayMenu date={date} title={heading(date)} />
             </h2>
             <JournalHabits date={date} today={today} />
             {live ? (
@@ -288,15 +328,19 @@ export function JournalView() {
   );
 }
 
+/** Whole days from `a` to `b` (YYYY-MM-DD); negative when `b` is earlier. */
+const daysBetween = (a: string, b: string) => Math.round((Date.parse(b) - Date.parse(a)) / 86_400_000);
+
 /** Whether a day's index has any written line. */
 const dayHasLines = (day?: JournalDay) => !!(day?.lines?.length || day?.text?.trim());
 
 /** A day's actions, behind "⋯" on its date (shown on hover). */
-function DayMenu({ date }: { date: string }) {
+function DayMenu({ date, title }: { date: string; title: string }) {
   const { t } = useTranslation();
+  const trigger = useRef<HTMLButtonElement>(null);
   return (
     <Menu.Root>
-      <Menu.Trigger className="icon-button journal-day-menu" aria-label={t("markdown.dayMenu")} title={t("markdown.dayMenu")}>
+      <Menu.Trigger ref={trigger} className="icon-button journal-day-menu" aria-label={t("markdown.dayMenu")} title={t("markdown.dayMenu")}>
         <MoreHorizontal size={15} />
       </Menu.Trigger>
       <Menu.Portal>
@@ -308,6 +352,14 @@ function DayMenu({ date }: { date: string }) {
             <Menu.Item className="popup-item" onClick={() => void exportCardMarkdown(journalId(date), date)}>
               {t("markdown.export")}
             </Menu.Item>
+            {canExportPdf() && (
+              <Menu.Item
+                className="popup-item"
+                onClick={() => void exportPdf(title, trigger.current?.closest(".journal-day")?.querySelector(".journal-body .ProseMirror, .journal-static") ?? null)}
+              >
+                {t("print.export")}
+              </Menu.Item>
+            )}
           </Menu.Popup>
         </Menu.Positioner>
       </Menu.Portal>

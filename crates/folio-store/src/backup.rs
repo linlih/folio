@@ -235,17 +235,37 @@ pub fn apply_pending_restore(data_dir: &Path, now_ms: i64) -> Result<Option<Stri
 /// backup lacks, and other devices would not send it that. Reporting starts
 /// over with what the library now has.
 pub fn replace_library(data_dir: &Path, backup: &str, now_ms: i64) -> Result<()> {
+    let source = backup_path(&backups_dir(data_dir), backup)?;
+    replace_library_with(data_dir, &source, now_ms)
+}
+
+/// Like [`replace_library`], from a backup in a copy folder (`copy.rs`),
+/// opened with `cipher` when the copy is encrypted. The copy's files are
+/// put back after by `copy::restore_files`.
+pub fn replace_library_from_copy(data_dir: &Path, copy_dir: &Path, backup: &str, cipher: Option<&dyn crate::copy::Cipher>, now_ms: i64) -> Result<()> {
+    backup_path(copy_dir, backup)?;
+    let taken = data_dir.join("store.db.from-copy");
+    crate::copy::take_backup(copy_dir, backup, &taken, cipher).map_err(|e| match e {
+        crate::copy::CopyError::Io(e) => StoreError::Io(e),
+        other => StoreError::Damaged(other.to_string()),
+    })?;
+    let replaced = replace_library_with(data_dir, &taken, now_ms);
+    let _ = std::fs::remove_file(&taken);
+    replaced
+}
+
+fn replace_library_with(data_dir: &Path, source: &Path, now_ms: i64) -> Result<()> {
     let dir = backups_dir(data_dir);
-    let source = backup_path(&dir, backup)?;
     let store_path = data_dir.join("store.db");
     if store_path.exists() {
         let current = Connection::open(&store_path)?;
         let safety = dir.join(format!("{PREFIX}{now_ms}{SAFETY_SUFFIX}.db"));
         let _ = std::fs::remove_file(&safety);
+        std::fs::create_dir_all(&dir)?;
         current.execute("VACUUM main INTO ?1", [safety.to_string_lossy()])?;
     }
     let incoming = data_dir.join("store.db.incoming");
-    std::fs::copy(&source, &incoming)?;
+    std::fs::copy(source, &incoming)?;
     let [a, b, c] = crate::PEER_KEYS;
     let copy = Connection::open(&incoming)?;
     copy.execute("DELETE FROM sync_state WHERE key IN (?1, ?2, ?3) OR key LIKE 'sync.acks.%'", [a, b, c])?;
@@ -346,6 +366,49 @@ mod tests {
         let safety: Vec<_> = list_backups(&dir).unwrap().into_iter().filter(|b| b.safety).collect();
         assert_eq!(safety.len(), 1);
         assert_eq!(safety[0].created_at, 500);
+    }
+
+    #[test]
+    fn a_lost_library_comes_back_from_the_copy_with_its_files() {
+        let old = tempfile::tempdir().unwrap();
+        let chosen = tempfile::tempdir().unwrap();
+        // An encrypted copy, the harder case (copy.rs tests the plain one).
+        let cipher = crate::copy::tests::Xor(7);
+        let (card, sha, library) = {
+            let mut s = Store::open(old.path()).unwrap();
+            let card = s.create_card(CardKind::Note, "要保住的", 1).unwrap();
+            let mut inc = crate::Incoming::create(&s.assets_dir()).unwrap();
+            inc.write(b"photo").unwrap();
+            let sha = s.add_asset(inc, "p.png", "image/png", 2).unwrap().sha256;
+            s.backup(&backups_dir(old.path()), 100).unwrap();
+            let library = s.library_id().unwrap();
+            crate::copy::copy_backups(&backups_dir(old.path()), &s.assets_dir(), chosen.path(), &library, Some(&cipher), Some(&serde_json::json!({}))).unwrap();
+            (card, sha, library)
+        };
+        drop(old); // The disk is gone.
+
+        // A new computer: a new, empty library; its folder picked again.
+        let new = tempfile::tempdir().unwrap();
+        let fresh_id = Store::open(new.path()).unwrap().library_id().unwrap();
+        assert_ne!(fresh_id, library);
+        let copy = crate::copy::copy_dir(chosen.path());
+        assert_eq!(crate::copy::owner(chosen.path(), &fresh_id).unwrap(), crate::copy::Owner::Other(library.clone()));
+        let name = list_backups(&copy).unwrap()[0].name.clone();
+        // A wrong passphrase's key gets nothing, and changes nothing.
+        assert!(replace_library_from_copy(new.path(), &copy, &name, Some(&crate::copy::tests::Xor(8)), 500).is_err());
+        assert_eq!(Store::open(new.path()).unwrap().library_id().unwrap(), fresh_id);
+        replace_library_from_copy(new.path(), &copy, &name, Some(&cipher), 500).unwrap();
+
+        let s = Store::open(new.path()).unwrap();
+        let wanted = s.known_assets().unwrap();
+        assert_eq!(crate::copy::restore_files(&copy, &s.assets_dir(), &wanted, Some(&cipher)).unwrap(), 1);
+        s.set_library_id(&library).unwrap();
+        assert!(s.live_cards().unwrap().iter().any(|c| c.id == card.as_str()));
+        assert_eq!(s.asset_file(&sha).unwrap().map(|(p, _)| std::fs::read(p).unwrap()), Some(b"photo".to_vec()));
+        // The copy is this library's again: copying goes on into it.
+        assert_eq!(crate::copy::owner(chosen.path(), &s.library_id().unwrap()).unwrap(), crate::copy::Owner::Ours);
+        assert!(Store::open(new.path()).is_ok());
+        assert!(replace_library_from_copy(new.path(), &copy, "../store.db", Some(&cipher), 600).is_err());
     }
 
     #[test]

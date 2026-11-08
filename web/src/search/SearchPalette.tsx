@@ -1,7 +1,7 @@
 import { CalendarDays, ChevronRight, FileText, Hash, Layers, Plus, Search, TextQuote } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { CardRow, SearchHit, TagInfo } from "../bindings/commands";
+import type { CardRow, SearchFilter, SearchHit, TagInfo } from "../bindings/commands";
 import { openTag } from "../editor/tag";
 import { cardsChanged } from "../card/actions";
 import { cardName, openAt } from "../card/reveal";
@@ -27,6 +27,21 @@ export function snippet(text: string, query: string, room = 60): { before: strin
   };
 }
 
+/** Time filters: changed within the last so many days, or this year. */
+const TIMES = ["any", "week", "month", "year"] as const;
+type Time = (typeof TIMES)[number];
+
+/** The filter bar's choices as the host's filter. */
+export function toFilter(scope: SearchFilter["scope"], time: Time, tag: string, newest: boolean, now = new Date()): SearchFilter {
+  const day = 86_400_000;
+  const since =
+    time === "week" ? now.getTime() - 7 * day : time === "month" ? now.getTime() - 30 * day : time === "year" ? new Date(now.getFullYear(), 0, 1).getTime() : null;
+  return { scope, tag: tag || null, since, newestFirst: newest };
+}
+
+/** Whether the filter narrows anything (sorting alone does not). */
+export const filtering = (f: SearchFilter) => (f.scope ?? "all") !== "all" || !!f.tag || f.since != null;
+
 interface Row {
   key: string;
   icon: "card" | "journal" | "block" | "new" | "tag" | "command" | "topic";
@@ -43,7 +58,7 @@ const COMMAND_PREFIX = /^\s*[>》]/;
 /** Global search (Cmd+K): card titles first, then blocks (design/ARCHITECTURE
  *  §8 M2). Enter opens the card, at the block for block hits. */
 export function SearchPalette() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { searchOpen, setSearchOpen } = useShell();
   const [query, setQuery] = useState("");
   const [hits, setHits] = useState<SearchHit[]>([]);
@@ -53,6 +68,18 @@ export function SearchPalette() {
   const pinyin = usePinyin();
   const topics = useTopics((s) => s.topics);
   const [index, setIndex] = useState(0);
+  const [scope, setScope] = useState<NonNullable<SearchFilter["scope"]>>("all");
+  const [time, setTime] = useState<Time>("any");
+  const [tag, setTag] = useState("");
+  const [newest, setNewest] = useState(false);
+  const filter = useMemo(() => toFilter(scope, time, tag, newest), [scope, time, tag, newest]);
+  const filtered = filtering(filter);
+  const dateFmt = useMemo(() => {
+    const thisYear = new Intl.DateTimeFormat(i18n.language, { month: "short", day: "numeric" });
+    const other = new Intl.DateTimeFormat(i18n.language, { year: "numeric", month: "short", day: "numeric" });
+    const year = new Date().getFullYear();
+    return (ms: number) => (new Date(ms).getFullYear() === year ? thisYear : other).format(ms);
+  }, [i18n.language]);
   const input = useRef<HTMLInputElement>(null);
   const list = useRef<HTMLUListElement>(null);
 
@@ -61,6 +88,10 @@ export function SearchPalette() {
     setQuery("");
     setHits([]);
     setIndex(0);
+    setScope("all");
+    setTime("any");
+    setTag("");
+    setNewest(false);
     backend.tags(500).then(setTags, () => setTags([]));
     backend.listCards(100_000).then(setCards, () => setCards([]));
     setTimeout(() => input.current?.focus());
@@ -72,13 +103,13 @@ export function SearchPalette() {
     if (!searchOpen || commandMode) return;
     let stale = false;
     const timer = setTimeout(() => {
-      backend.search(query, 40).then((h) => !stale && (setHits(h), setIndex(0)), () => {});
+      backend.search(query, filtered && !query.trim() ? 100 : 40, filter).then((h) => !stale && (setHits(h), setIndex(0)), () => {});
     }, 90);
     return () => {
       stale = true;
       clearTimeout(timer);
     };
-  }, [query, searchOpen, commandMode]);
+  }, [query, searchOpen, commandMode, filter, filtered]);
 
   const rows = useMemo<Row[]>(() => {
     if (commandMode)
@@ -95,16 +126,20 @@ export function SearchPalette() {
           .slice(0, 5)
           .map((x) => ({ key: `topic:${x.id}`, icon: "topic", title: x.path, topicId: x.id }))
       : [];
-    const out: Row[] = [...topicRows, ...tagRows, ...withPinyinTitles(hits, cards, query).map((h): Row => ({
+    // Narrowed or newest first: the host's results as they are (pinyin
+    // matches know nothing of tags and times; topics and tags are no cards).
+    const narrowed = filtered || filter.newestFirst;
+    const found = narrowed ? hits : withPinyinTitles(hits, cards, query);
+    const out: Row[] = [...(narrowed ? [] : topicRows), ...(narrowed ? [] : tagRows), ...found.map((h): Row => ({
       key: `${h.cardId}:${h.bid ?? ""}`,
       icon: h.bid ? "block" : isJournalId(h.cardId) ? "journal" : "card",
       title: cardName(h.cardId, h.cardTitle),
       hit: h,
     }))];
     const q = query.trim();
-    if (q && !hits.some((h) => !h.bid && h.cardTitle === q)) out.push({ key: "new", icon: "new", title: t("search.newCard", { title: q }) });
+    if (q && !narrowed && !hits.some((h) => !h.bid && h.cardTitle === q)) out.push({ key: "new", icon: "new", title: t("search.newCard", { title: q }) });
     return out;
-  }, [hits, cards, tags, topics, query, t, commandMode, pinyin]);
+  }, [hits, cards, tags, topics, query, t, commandMode, pinyin, filtered, filter.newestFirst]);
 
   const close = () => setSearchOpen(false);
 
@@ -155,8 +190,38 @@ export function SearchPalette() {
           />
           <kbd>Esc</kbd>
         </label>
-        {!query.trim() && <p className="search-hint">{t("search.commandHint")}</p>}
-        {query.trim() && (
+        {!commandMode && (
+          <div className="search-filters">
+            <div className="segmented" role="radiogroup" aria-label={t("search.filter.scope")}>
+              {(["all", "cards", "journal"] as const).map((v) => (
+                <button key={v} role="radio" aria-checked={scope === v} className={scope === v ? "on" : undefined} onClick={() => setScope(v)}>
+                  {t(`search.filter.${v}`)}
+                </button>
+              ))}
+            </div>
+            <select className={`search-select${time !== "any" ? " on" : ""}`} value={time} aria-label={t("search.filter.time")} onChange={(e) => setTime(e.target.value as Time)}>
+              {TIMES.map((v) => (
+                <option key={v} value={v}>
+                  {t(`search.filter.${v}`)}
+                </option>
+              ))}
+            </select>
+            <select className={`search-select${tag ? " on" : ""}`} value={tag} aria-label={t("search.filter.tag")} onChange={(e) => setTag(e.target.value)}>
+              <option value="">{t("search.filter.anyTag")}</option>
+              {tags.map((x) => (
+                <option key={x.key} value={x.key}>
+                  #{x.name}
+                </option>
+              ))}
+            </select>
+            <select className={`search-select${newest ? " on" : ""}`} value={newest ? "newest" : "best"} aria-label={t("search.filter.sort")} onChange={(e) => setNewest(e.target.value === "newest")}>
+              <option value="best">{t("search.filter.best")}</option>
+              <option value="newest">{t("search.filter.newest")}</option>
+            </select>
+          </div>
+        )}
+        {!query.trim() && !filtered && <p className="search-hint">{t("search.commandHint")}</p>}
+        {(query.trim() || filtered) && (
           <ul className="search-results" ref={list} role="listbox">
             {rows.length === 0 && <li className="search-empty">{t("search.none")}</li>}
             {rows.map((row, i) => {
@@ -187,6 +252,7 @@ export function SearchPalette() {
                       )}
                       {s && <span className="search-in">{t("search.inCard", { title: row.title })}</span>}
                     </span>
+                    {row.hit?.updatedAt != null && <span className="search-date">{dateFmt(row.hit.updatedAt)}</span>}
                     {row.command?.combo && <kbd className="search-combo">{keyLabel(row.command.combo)}</kbd>}
                   </button>
                 </li>

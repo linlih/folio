@@ -11,6 +11,7 @@
 
 pub mod assets;
 pub mod backup;
+pub mod copy;
 mod compact;
 mod repair;
 mod schema;
@@ -22,7 +23,7 @@ use loro::{ExportMode, LoroDoc};
 use folio_core::card::{self, CardKind, CardSummary};
 use folio_core::{DocId, DocKind};
 use rusqlite::{Connection, OptionalExtension, params};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 pub use assets::{AssetInfo, Incoming, Swept};
 pub use backup::{BackupInfo, CardVersion};
@@ -208,6 +209,37 @@ pub struct SearchHit {
     pub card_kind: String,
     pub bid: Option<String>,
     pub text: String,
+    /// When the card last changed.
+    pub updated_at: i64,
+}
+
+/// What a search is narrowed to (web/src/search).
+#[derive(Clone, Debug, Default, PartialEq, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct SearchFilter {
+    pub scope: SearchScope,
+    /// A tag the card has, by name (with or without its #).
+    pub tag: Option<String>,
+    /// Changed at or after this time (ms).
+    pub since: Option<i64>,
+    /// Newest first rather than best match first.
+    pub newest_first: bool,
+}
+
+impl SearchFilter {
+    fn is_empty(&self) -> bool {
+        self.scope == SearchScope::All && self.tag.is_none() && self.since.is_none()
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum SearchScope {
+    #[default]
+    All,
+    /// Cards, not journal days.
+    Cards,
+    Journal,
 }
 
 /// A block's current text, for rendering block references.
@@ -314,6 +346,9 @@ const PURGED: &str = "purged";
 /// `sync_state` keys of this library's peer ids: Rust's, the editor's and
 /// the API replica's (§4.5 rule 3).
 pub(crate) const PEER_KEYS: [&str; 3] = ["peer.rust", "peer.frontend", "peer.api"];
+
+/// `local_settings` key of [`Store::library_id`].
+const LIBRARY_ID: &str = "library.id";
 
 impl Store {
     /// Opens (creating if needed) `store.db` and `index.db` in `dir`.
@@ -1055,42 +1090,89 @@ impl Store {
     /// characters use the full-text index, shorter queries a substring scan
     /// (trigram cannot match them; two-character Chinese words are common).
     pub fn search(&self, query: &str, limit: u32) -> Result<Vec<SearchHit>> {
+        self.search_with(query, &SearchFilter::default(), limit)
+    }
+
+    /// [`Store::search`] narrowed to cards or journal days, to cards with a
+    /// tag, to what changed since a time, and optionally newest first. With
+    /// no words but a filter, the matching cards, newest first.
+    pub fn search_with(&self, query: &str, filter: &SearchFilter, limit: u32) -> Result<Vec<SearchHit>> {
         // Every word must appear, as people expect, not the words as a phrase.
         let terms: Vec<&str> = query.split_whitespace().collect();
+        let row = |r: &rusqlite::Row| {
+            Ok(SearchHit { card_id: r.get(0)?, card_title: r.get(1)?, card_kind: r.get(2)?, bid: r.get(3)?, text: r.get(4)?, updated_at: r.get(5)? })
+        };
+        let mut args: Vec<rusqlite::types::Value> = Vec::new();
+        // The filter's conditions on the card `c`, with their arguments.
+        let mut cond = String::new();
+        let mut arg = |args: &mut Vec<rusqlite::types::Value>, v: rusqlite::types::Value| {
+            args.push(v);
+            format!("?{}", args.len())
+        };
+        let filters = |args: &mut Vec<rusqlite::types::Value>, cond: &mut String, arg: &mut dyn FnMut(&mut Vec<rusqlite::types::Value>, rusqlite::types::Value) -> String| {
+            match filter.scope {
+                SearchScope::All => {}
+                SearchScope::Cards => cond.push_str(" AND c.card_id NOT LIKE 'journal:%'"),
+                SearchScope::Journal => cond.push_str(" AND c.card_id LIKE 'journal:%'"),
+            }
+            if let Some(tag) = &filter.tag {
+                let p = arg(args, tag.trim_start_matches('#').to_lowercase().into());
+                cond.push_str(&format!(" AND EXISTS (SELECT 1 FROM idx.tags t WHERE t.card_id = c.card_id AND t.tag = {p})"));
+            }
+            if let Some(since) = filter.since {
+                let p = arg(args, since.into());
+                cond.push_str(&format!(" AND c.updated_at >= {p}"));
+            }
+        };
         if terms.is_empty() {
-            return Ok(Vec::new());
+            if filter.is_empty() {
+                return Ok(Vec::new());
+            }
+            filters(&mut args, &mut cond, &mut arg);
+            let lim = arg(&mut args, (limit as i64).into());
+            let sql = format!(
+                "SELECT c.card_id, c.title, c.kind, NULL, c.title, c.updated_at FROM idx.cards c
+                  WHERE c.deleted_at IS NULL{cond} ORDER BY c.updated_at DESC LIMIT {lim}"
+            );
+            let mut stmt = self.conn.prepare_cached(&sql)?;
+            let rows = stmt.query_map(rusqlite::params_from_iter(args), row)?;
+            return Ok(rows.collect::<std::result::Result<_, _>>()?);
         }
-        let row = |r: &rusqlite::Row| Ok(SearchHit { card_id: r.get(0)?, card_title: r.get(1)?, card_kind: r.get(2)?, bid: r.get(3)?, text: r.get(4)? });
         if terms.iter().all(|t| fts_ok(t)) {
             // FTS5: phrases separated by spaces are ANDed.
-            let pattern = terms.iter().map(|t| fts_phrase(t)).collect::<Vec<_>>().join(" ");
-            let mut stmt = self.conn.prepare_cached(
-                "SELECT x.card_id, c.title, c.kind, NULLIF(x.bid, ''), x.text
+            let pattern = arg(&mut args, terms.iter().map(|t| fts_phrase(t)).collect::<Vec<_>>().join(" ").into());
+            filters(&mut args, &mut cond, &mut arg);
+            let lim = arg(&mut args, (limit as i64).into());
+            let order = if filter.newest_first { "c.updated_at DESC, x.bid = '' DESC, bm25(fts)" } else { "x.bid = '' DESC, bm25(fts), c.updated_at DESC" };
+            let sql = format!(
+                "SELECT x.card_id, c.title, c.kind, NULLIF(x.bid, ''), x.text, c.updated_at
                    FROM idx.fts x JOIN idx.cards c ON c.card_id = x.card_id
-                  WHERE fts MATCH ?1 AND c.deleted_at IS NULL
-                  ORDER BY x.bid = '' DESC, bm25(fts), c.updated_at DESC LIMIT ?2",
-            )?;
-            let rows = stmt.query_map(params![pattern, limit], row)?;
+                  WHERE fts MATCH {pattern} AND c.deleted_at IS NULL{cond}
+                  ORDER BY {order} LIMIT {lim}"
+            );
+            let mut stmt = self.conn.prepare_cached(&sql)?;
+            let rows = stmt.query_map(rusqlite::params_from_iter(args), row)?;
             return Ok(rows.collect::<std::result::Result<_, _>>()?);
         }
         // A word too short for the trigram index (two Chinese characters):
         // LIKE for every word.
-        let all = |column: &str| (0..terms.len()).map(|i| format!("{column} LIKE ?{} ESCAPE '\\'", i + 1)).collect::<Vec<_>>().join(" AND ");
+        let words: Vec<String> = terms.iter().map(|t| arg(&mut args, like(t).into())).collect();
+        filters(&mut args, &mut cond, &mut arg);
+        let lim = arg(&mut args, (limit as i64).into());
+        let all = |column: &str| words.iter().map(|p| format!("{column} LIKE {p} ESCAPE '\\'")).collect::<Vec<_>>().join(" AND ");
+        let order = if filter.newest_first { "updated_at DESC, rank" } else { "rank, updated_at DESC" };
         let sql = format!(
-            "SELECT * FROM (
-               SELECT card_id, title, kind, NULL, title, 0 AS rank, updated_at FROM idx.cards
-                WHERE {} AND deleted_at IS NULL
+            "SELECT card_id, title, kind, bid, text, updated_at FROM (
+               SELECT c.card_id, c.title, c.kind, NULL AS bid, c.title AS text, 0 AS rank, c.updated_at FROM idx.cards c
+                WHERE {} AND c.deleted_at IS NULL{cond}
                UNION ALL
                SELECT b.card_id, c.title, c.kind, b.bid, b.text, 1, c.updated_at
                  FROM idx.blocks b JOIN idx.cards c ON c.card_id = b.card_id
-                WHERE {} AND c.deleted_at IS NULL
-             ) ORDER BY rank, updated_at DESC LIMIT ?{}",
-            all("(title || char(10) || ifnull(clip_text, ''))"),
+                WHERE {} AND c.deleted_at IS NULL{cond}
+             ) ORDER BY {order} LIMIT {lim}",
+            all("(c.title || char(10) || ifnull(c.clip_text, ''))"),
             all("b.text"),
-            terms.len() + 1
         );
-        let mut args: Vec<rusqlite::types::Value> = terms.iter().map(|t| like(t).into()).collect();
-        args.push((limit as i64).into());
         let mut stmt = self.conn.prepare_cached(&sql)?;
         let rows = stmt.query_map(rusqlite::params_from_iter(args), row)?;
         Ok(rows.collect::<std::result::Result<_, _>>()?)
@@ -1247,6 +1329,23 @@ impl Store {
             params![key, value.to_string()],
         )?;
         Ok(())
+    }
+
+    /// This library's id, made the first time it is asked for. It tells
+    /// apart the backup copies of different libraries (copy.rs); it stays
+    /// through a restore (the restoring code sets it again) and is never
+    /// synced: every device's library has its own.
+    pub fn library_id(&self) -> Result<String> {
+        if let Some(serde_json::Value::String(id)) = self.local_setting(LIBRARY_ID)? {
+            return Ok(id);
+        }
+        let id = format!("{:016x}{:016x}", loro::LoroDoc::new().peer_id(), loro::LoroDoc::new().peer_id());
+        self.set_library_id(&id)?;
+        Ok(id)
+    }
+
+    pub fn set_library_id(&self, id: &str) -> Result<()> {
+        self.set_local_setting(LIBRARY_ID, &serde_json::Value::String(id.to_owned()))
     }
 
     // ---- internals ----
@@ -2020,6 +2119,49 @@ mod tests {
         push_inline(&doc, p, "tag", &[("name", name)]).unwrap();
         doc.commit();
         doc.export(ExportMode::all_updates()).unwrap()
+    }
+
+    #[test]
+    fn search_narrows_to_journal_or_cards_a_tag_and_a_time() {
+        use folio_core::body::{add_block, push_inline, push_text};
+        let dir = tempfile::tempdir().unwrap();
+        let mut s = Store::open(dir.path()).unwrap();
+        let old = write_tagged(&mut s, "旧的读书计划", &[("a1", "读书计划的第一步", &["读书"])], 1_000);
+        let new = write_tagged(&mut s, "新的读书计划", &[("b1", "读书计划写完了", &[])], 5_000);
+        let day = DocId::journal(2026, 11, 2).unwrap();
+        let doc = LoroDoc::new();
+        doc.set_peer_id(s.peer + 1).unwrap();
+        card::init_card(&doc, CardKind::Journal, "2026-11-02", 3).unwrap();
+        let p = add_block(&doc, None, "paragraph", &[("bid", "j1".into())]).unwrap();
+        push_text(&doc, p, "今天定了读书计划 ").unwrap();
+        push_inline(&doc, p, "tag", &[("name", "读书")]).unwrap();
+        doc.commit();
+        s.apply_update(&day, DocKind::Card, &doc.export(ExportMode::all_updates()).unwrap(), Origin::Local, 3_000).unwrap();
+
+        let cards = |q: &str, f: SearchFilter| {
+            let mut ids: Vec<String> = s.search_with(q, &f, 20).unwrap().into_iter().map(|h| h.card_id).collect();
+            ids.dedup();
+            ids
+        };
+        let (old, new, day) = (old.to_string(), new.to_string(), day.to_string());
+        for q in ["读书计划", "计划"] {
+            // Both the full-text path and the short-word path filter alike.
+            assert_eq!(cards(q, SearchFilter { scope: SearchScope::Journal, ..Default::default() }), vec![day.clone()], "{q}");
+            assert!(!cards(q, SearchFilter { scope: SearchScope::Cards, ..Default::default() }).contains(&day), "{q}");
+            let mut tagged = cards(q, SearchFilter { tag: Some("#读书".into()), ..Default::default() });
+            tagged.sort();
+            tagged.dedup();
+            let mut want = vec![old.clone(), day.clone()];
+            want.sort();
+            assert_eq!(tagged, want, "{q}");
+            assert!(!cards(q, SearchFilter { since: Some(2_000), ..Default::default() }).contains(&old), "{q}");
+            assert_eq!(cards(q, SearchFilter { newest_first: true, ..Default::default() }), vec![new.clone(), day.clone(), old.clone()], "{q}");
+        }
+        // No words: what the filter alone finds, newest first; no filter, nothing.
+        assert_eq!(cards("", SearchFilter { tag: Some("读书".into()), ..Default::default() }), vec![day.clone(), old.clone()]);
+        assert!(cards(" ", SearchFilter { newest_first: true, ..Default::default() }).is_empty());
+        let hit = &s.search_with("读书计划", &SearchFilter::default(), 1).unwrap()[0];
+        assert!(hit.updated_at > 0);
     }
 
     #[test]

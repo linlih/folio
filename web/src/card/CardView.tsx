@@ -21,6 +21,7 @@ import { downloadCardFiles } from "../editor/assets";
 import { backend } from "../platform";
 import { usePhone } from "../shell/phone";
 import { onReveal, revealIn, takePending } from "./reveal";
+import { canExportPdf, exportPdf } from "../print/print";
 import "./card.css";
 
 /** Title and body behave as one text (Notion, Heptabase): ↑ on the body's
@@ -62,6 +63,7 @@ function CardMenu({ cardId, title }: { cardId: string; title: string }) {
   // Phones download files when they are looked at; this takes a card's
   // all along before going offline (design/attachments.md §5.4).
   const phone = usePhone() && backend.kind === "tauri";
+  const trigger = useRef<HTMLButtonElement>(null);
   const downloadAll = async () => {
     const h = await docs().open(cardId);
     const n = await downloadCardFiles(JSON.stringify(h.doc.toJSON()));
@@ -69,7 +71,7 @@ function CardMenu({ cardId, title }: { cardId: string; title: string }) {
   };
   return (
     <Menu.Root>
-      <Menu.Trigger className="icon-button card-menu" aria-label={t("card.menu")} title={t("card.menu")}>
+      <Menu.Trigger ref={trigger} className="icon-button card-menu" aria-label={t("card.menu")} title={t("card.menu")}>
         <MoreHorizontal size={18} />
       </Menu.Trigger>
       <Menu.Portal>
@@ -91,6 +93,14 @@ function CardMenu({ cardId, title }: { cardId: string; title: string }) {
             <Menu.Item className="popup-item" onClick={() => void exportCardMarkdown(cardId, title)}>
               {t("markdown.export")}
             </Menu.Item>
+            {canExportPdf() && (
+              <Menu.Item
+                className="popup-item"
+                onClick={() => void exportPdf(title || t("library.untitled"), trigger.current?.closest(".card-page")?.querySelector(".card-body-area .ProseMirror") ?? null)}
+              >
+                {t("print.export")}
+              </Menu.Item>
+            )}
             {phone && (
               <>
                 <Menu.Separator className="popup-separator" />

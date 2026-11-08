@@ -167,6 +167,18 @@ export interface SearchHit {
   /** null for a match on the card's title. */
   bid: string | null;
   text: string;
+  /** When the card last changed; left out by pinyin title matches. */
+  updatedAt?: number;
+}
+
+/** What a search is narrowed to (folio_store::SearchFilter). */
+export interface SearchFilter {
+  scope?: "all" | "cards" | "journal";
+  /** A tag the card has. */
+  tag?: string | null;
+  /** Changed at or after (ms). */
+  since?: number | null;
+  newestFirst?: boolean;
 }
 
 export interface BlockText {
@@ -185,6 +197,55 @@ export interface BackupInfo {
   safety: boolean;
   /** Why: "restore", "upgrade" (a new storage layout) or "repair" (a document that could not be read). */
   reason: string | null;
+}
+
+/** Whose backups a folder holds: none yet, this library's, or another's. */
+export type CopyOwner = "none" | "ours" | "other";
+
+/** The second copy of the backups in another folder (§5.4, backup_copy.rs). */
+export interface BackupCopyStatus {
+  /** The chosen folder; null when no copy is made. */
+  path: string | null;
+  /** The "Folio Backup" folder inside it. */
+  copyPath: string | null;
+  /** The chosen folder is there now (the drive is plugged in). */
+  available: boolean;
+  owner: CopyOwner;
+  /** The copy is encrypted under a passphrase. */
+  encrypted: boolean;
+  /** Encrypted, and this computer does not have its key: the passphrase is
+   *  needed to copy or restore. */
+  locked: boolean;
+  /** On the same disk as the library. */
+  sameDisk: boolean;
+  running: boolean;
+  lastOk: number | null;
+  /** "unavailable", "foreign", "locked", "mode" or a message. */
+  lastError: string | null;
+  lastErrorAt: number | null;
+  /** Files that could not be copied last time (unreadable or damaged). */
+  skippedFiles: number;
+  size: { backups: number; files: number; bytes: number } | null;
+}
+
+/** A folder picked for the copy; nothing saved yet. */
+export interface PickedCopyFolder {
+  path: string;
+  owner: CopyOwner;
+  /** The folder already holds a copy: whether it is encrypted (the choice is
+   *  made). Null: a new copy, encrypted or not as the user chooses. */
+  encrypted: boolean | null;
+  sameDisk: boolean;
+  cloudSynced: boolean;
+}
+
+/** A place suggested for the copy: a cloud drive, or a disk other than the library's. */
+export interface CopySuggestion {
+  path: string;
+  kind: "icloud" | "onedrive" | "googleDrive" | "dropbox" | "cloud" | "drive";
+  /** The drive's or service's own name. */
+  label: string;
+  cloud: boolean;
 }
 
 

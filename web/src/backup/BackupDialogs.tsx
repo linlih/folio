@@ -5,15 +5,22 @@ import { docs } from "../app";
 import type { BackupInfo } from "../bindings/commands";
 import { backend } from "../platform";
 import { useShell } from "../shell/tabs";
+import { BackupCopyRow, OffsiteSummary, useCopyStatus } from "./BackupCopy";
 import "./backup.css";
 
-function useWhen() {
+export function useWhen() {
   const { i18n } = useTranslation();
   const fmt = new Intl.DateTimeFormat(i18n.language, { dateStyle: "medium", timeStyle: "short" });
   return (ms: number) => fmt.format(ms);
 }
 
-const size = (bytes: number) => (bytes >= 1 << 20 ? `${(bytes / (1 << 20)).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`);
+export const size = (bytes: number) =>
+  bytes >= 2 ** 30 ? `${(bytes / 2 ** 30).toFixed(1)} GB` : bytes >= 1 << 20 ? `${(bytes / (1 << 20)).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`;
+
+/** The desktop app: phones have no folder to choose (the copy elsewhere is
+ *  a desktop feature; a phone's notes are safe on the sync server). */
+export const desktopApp = () =>
+  backend.kind === "tauri" && !/Android|iPhone|iPad/i.test(navigator.userAgent) && !(/Mac/.test(navigator.userAgent) && navigator.maxTouchPoints > 0);
 
 /** Settings → Backup and restore: the backups, back up now, and restoring
  *  the whole library (design/ARCHITECTURE.md §5.4). */
@@ -25,9 +32,15 @@ export function BackupsPanel() {
   const [busy, setBusy] = useState(false);
   const [confirm, setConfirm] = useState<string | null>(null);
   const [typed, setTyped] = useState("");
+  // Which backups are listed: this computer's, or the copy elsewhere's.
+  const [source, setSource] = useState<"local" | "copy">("local");
+  const copy = useCopyStatus();
+  const copyUsable = !!copy?.path && copy.available && copy.owner !== "none";
+  const from = copyUsable ? source : "local";
 
-  const reload = () => backend.listBackups().then(setList, (e) => setNotice(t("error.generic", { message: String(e) })));
-  useEffect(() => void reload(), []); // eslint-disable-line react-hooks/exhaustive-deps
+  const reload = () =>
+    (from === "copy" ? backend.listCopyBackups() : backend.listBackups()).then(setList, (e) => setNotice(t("error.generic", { message: String(e) })));
+  useEffect(() => void reload(), [from]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const backupNow = async () => {
     setBusy(true);
@@ -45,7 +58,7 @@ export function BackupsPanel() {
   const restoreAll = async (name: string) => {
     try {
       await docs().flushAll();
-      await backend.restoreLibrary(name);
+      await (from === "copy" ? backend.restoreLibraryFromCopy(name) : backend.restoreLibrary(name));
       // Everything open in memory belongs to the replaced library.
       window.location.reload();
     } catch (e) {
@@ -56,6 +69,8 @@ export function BackupsPanel() {
 
   return (
     <>
+      <OffsiteSummary copy={copy} />
+      {desktopApp() && <BackupCopyRow status={copy} />}
       <div className="dialog-actions">
         <button className="button primary" disabled={busy} onClick={() => void backupNow()}>
           <History size={14} />
@@ -68,6 +83,15 @@ export function BackupsPanel() {
           </button>
         )}
       </div>
+      {copyUsable && (
+        <div className="segmented backup-source" role="radiogroup">
+          {(["local", "copy"] as const).map((v) => (
+            <button key={v} role="radio" aria-checked={from === v} className={from === v ? "on" : undefined} onClick={() => setSource(v)}>
+              {t(v === "local" ? "backup.copy.fromLocal" : "backup.copy.fromCopy")}
+            </button>
+          ))}
+        </div>
+      )}
       {list?.length === 0 && <p className="dialog-empty">{t("backup.none")}</p>}
       {list && list.length > 0 && (
         <ul className="backup-list">
@@ -97,6 +121,7 @@ export function BackupsPanel() {
               {confirm === b.name && (
                 <div className="backup-confirm">
                   <p>{t("backup.confirmAll", { date: when(b.createdAt) })}</p>
+                  {from === "copy" && <p>{t("backup.copy.confirmFiles")}</p>}
                   <div className="backup-confirm-actions">
                     <input
                       autoFocus
