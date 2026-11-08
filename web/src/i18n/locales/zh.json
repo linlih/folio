@@ -144,6 +144,14 @@
       "small": "小",
       "medium": "中",
       "large": "大"
+    },
+    "paragraphGap": "段落间距",
+    "paragraphGapHint": "段落之间多空出的距离；同一段内换行（Shift+Enter）不受影响。",
+    "gap": {
+      "none": "无",
+      "small": "小",
+      "medium": "中",
+      "large": "大"
     }
   },
   "error": {

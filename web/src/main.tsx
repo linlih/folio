@@ -4,7 +4,20 @@ import "./design/fonts.css";
 import "./design/tokens.css";
 import "./design/base.css";
 import { startDocs } from "./app";
-import { applyTextSize, applyTextWidth, applyTheme, isTextSize, isTextWidth, isTheme, TEXT_SIZE_SETTING, TEXT_WIDTH_SETTING, THEME_SETTING } from "./design/theme";
+import {
+  applyParagraphGap,
+  applyTextSize,
+  applyTextWidth,
+  applyTheme,
+  isParagraphGap,
+  isTextSize,
+  isTextWidth,
+  isTheme,
+  PARAGRAPH_GAP_SETTING,
+  TEXT_SIZE_SETTING,
+  TEXT_WIDTH_SETTING,
+  THEME_SETTING,
+} from "./design/theme";
 import i18n, { initI18n, isLanguage, LANGUAGE_SETTING, systemLanguage } from "./i18n";
 import { backend } from "./platform";
 import { AppShell } from "./shell/AppShell";
@@ -22,9 +35,12 @@ if (backend.kind === "tauri" && /Mac/.test(navigator.userAgent) && navigator.max
 async function start() {
   const theme = await backend.getLocalSetting<string>(THEME_SETTING).catch(() => null);
   if (isTheme(theme)) applyTheme(theme);
-  const [width, size] = await Promise.all([TEXT_WIDTH_SETTING, TEXT_SIZE_SETTING].map((k) => backend.getLocalSetting<string>(k).catch(() => null)));
+  const [width, size, gap] = await Promise.all(
+    [TEXT_WIDTH_SETTING, TEXT_SIZE_SETTING, PARAGRAPH_GAP_SETTING].map((k) => backend.getLocalSetting<string>(k).catch(() => null)),
+  );
   if (isTextWidth(width)) applyTextWidth(width);
   if (isTextSize(size)) applyTextSize(size);
+  if (isParagraphGap(gap)) applyParagraphGap(gap);
   const saved = await backend.getLocalSetting<string>(LANGUAGE_SETTING).catch(() => null);
   await initI18n(isLanguage(saved) ? saved : systemLanguage());
   await startDocs();

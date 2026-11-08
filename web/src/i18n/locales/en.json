@@ -144,6 +144,14 @@
       "small": "Small",
       "medium": "Medium",
       "large": "Large"
+    },
+    "paragraphGap": "Paragraph spacing",
+    "paragraphGapHint": "Extra space between paragraphs; a line break within one (Shift+Enter) is not affected.",
+    "gap": {
+      "none": "None",
+      "small": "Small",
+      "medium": "Medium",
+      "large": "Large"
     }
   },
   "error": {

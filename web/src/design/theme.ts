@@ -35,3 +35,15 @@ export function applyTextWidth(w: TextWidth) {
 export function applyTextSize(s: TextSize) {
   document.documentElement.style.setProperty("--body-size", TEXT_SIZES[s]);
 }
+
+// The space between paragraphs (token --paragraph-gap), apart from the
+// line height within one.
+
+export const PARAGRAPH_GAP_SETTING = "ui.paragraphGap";
+export const PARAGRAPH_GAPS = { none: "0", small: "0.5em", medium: "0.8em", large: "1.2em" } as const;
+export type ParagraphGap = keyof typeof PARAGRAPH_GAPS;
+export const isParagraphGap = (v: unknown): v is ParagraphGap => typeof v === "string" && v in PARAGRAPH_GAPS;
+
+export function applyParagraphGap(g: ParagraphGap) {
+  document.documentElement.style.setProperty("--paragraph-gap", PARAGRAPH_GAPS[g]);
+}

@@ -6,12 +6,17 @@ import { docs } from "../app";
 import type { AppInfo } from "../bindings/commands";
 import { BackupsPanel } from "../backup/BackupDialogs";
 import {
+  applyParagraphGap,
   applyTextSize,
   applyTextWidth,
   applyTheme,
+  isParagraphGap,
   isTextSize,
   isTextWidth,
   isTheme,
+  PARAGRAPH_GAP_SETTING,
+  PARAGRAPH_GAPS,
+  type ParagraphGap,
   TEXT_SIZE_SETTING,
   TEXT_SIZES,
   TEXT_WIDTH_SETTING,
@@ -205,10 +210,12 @@ function GeneralPanel() {
   const [theme, setTheme] = useState<Theme>("system");
   const [width, setWidth] = useState<TextWidth>("medium");
   const [size, setSize] = useState<TextSize>("medium");
+  const [gap, setGap] = useState<ParagraphGap>("small");
   useEffect(() => {
     void backend.getLocalSetting<string>(THEME_SETTING).then((v) => isTheme(v) && setTheme(v), () => {});
     void backend.getLocalSetting<string>(TEXT_WIDTH_SETTING).then((v) => isTextWidth(v) && setWidth(v), () => {});
     void backend.getLocalSetting<string>(TEXT_SIZE_SETTING).then((v) => isTextSize(v) && setSize(v), () => {});
+    void backend.getLocalSetting<string>(PARAGRAPH_GAP_SETTING).then((v) => isParagraphGap(v) && setGap(v), () => {});
   }, []);
   return (
     <>
@@ -253,6 +260,17 @@ function GeneralPanel() {
             setSize(v);
             applyTextSize(v);
             void backend.setLocalSetting(TEXT_SIZE_SETTING, v);
+          }}
+        />
+      </Row>
+      <Row label={t("settings.paragraphGap")} hint={t("settings.paragraphGapHint")}>
+        <Choice
+          value={gap}
+          options={(Object.keys(PARAGRAPH_GAPS) as ParagraphGap[]).map((v) => ({ value: v, label: t(`settings.gap.${v}`) }))}
+          onChange={(v) => {
+            setGap(v);
+            applyParagraphGap(v);
+            void backend.setLocalSetting(PARAGRAPH_GAP_SETTING, v);
           }}
         />
       </Row>
