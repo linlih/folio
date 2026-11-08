@@ -1,0 +1,83 @@
+/* The assistant's proposed changes in a card (ai/review.ts): deleted text
+   struck in red, new text in green, a row to accept or reject each. */
+:root {
+  --ai-add-bg: color-mix(in srgb, #3f8f4a 13%, var(--paper));
+  --ai-add-strong: color-mix(in srgb, #3f8f4a 26%, var(--paper));
+  --ai-add-fg: color-mix(in srgb, #1f6a2b 88%, var(--ink));
+  --ai-add-bar: #5a9e5f;
+  --ai-del-bg: color-mix(in srgb, #c5503b 13%, var(--paper));
+  --ai-del-fg: color-mix(in srgb, #a33a27 90%, var(--ink));
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --ai-add-fg: #a9dcae; --ai-del-fg: #f0b2a6; --ai-add-bar: #6fb377; }
+}
+:root[data-theme="dark"] { --ai-add-fg: #a9dcae; --ai-del-fg: #f0b2a6; --ai-add-bar: #6fb377; }
+
+.ai-review-bar {
+  position: sticky; top: 0; z-index: 4;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px;
+  margin: 0 0 14px; padding: 7px 10px;
+  border: 1px solid var(--border); border-radius: 10px;
+  background: color-mix(in srgb, var(--paper) 94%, transparent);
+  backdrop-filter: blur(6px);
+  font: var(--ui-size) / 1.4 var(--font-ui);
+}
+.ai-review-label { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; }
+.ai-review-label svg { color: var(--accent); }
+.ai-review-left { color: var(--muted); font-weight: 400; }
+.ai-review-nav { display: inline-flex; align-items: center; }
+.ai-review-pos { min-width: 40px; text-align: center; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.ai-review-views button { padding: 2px 9px; font-size: 12.5px; }
+.ai-review-spacer { flex: 1; }
+.ai-review-all { height: 26px; font-size: 12.5px; }
+
+/* A changed block. */
+.card-body .ai-hunk {
+  margin-left: -14px; padding: 4px 12px 4px 11px;
+  border-left: 3px solid var(--ai-add-bar); border-radius: 0 6px 6px 0;
+  background: color-mix(in srgb, var(--ai-add-bg) 40%, transparent);
+}
+.card-body .ai-hunk.current { box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 40%, transparent); }
+.card-body .ai-hunk.stale { border-left-color: var(--muted); background: var(--hover); }
+.card-body .ai-del { text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--ai-del-fg) 70%, transparent); background: var(--ai-del-bg); color: var(--ai-del-fg); border-radius: 3px; }
+.card-body .ai-ins, .ai-title-diff .ai-ins { text-decoration: none; background: var(--ai-add-strong); color: var(--ai-add-fg); border-radius: 3px; }
+.card-body .ai-ins.quiet { background: none; color: inherit; text-decoration: underline; text-decoration-color: var(--ai-add-bar); text-underline-offset: 3px; }
+.card-body .ai-hidden { display: none; }
+
+/* The row above a change. */
+.ai-head-wrap { display: block; }
+.ai-head { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin-bottom: 3px; font: 12px / 1.6 var(--font-ui); color: var(--muted); user-select: none; -webkit-user-select: none; }
+.ai-who { margin-right: auto; }
+.ai-stale { color: var(--ai-del-fg); }
+.ai-state { color: var(--ai-add-fg); }
+.ai-act { height: 22px; padding: 0 9px; border: 1px solid var(--border); border-radius: 6px; background: var(--paper); color: var(--text); font: 12px var(--font-ui); cursor: pointer; }
+.ai-act:hover { background: var(--hover); }
+.ai-act.ai-yes { border-color: transparent; background: var(--ai-add-bar); color: #fff; }
+.ai-act.ai-yes:hover { background: color-mix(in srgb, var(--ai-add-bar) 85%, var(--ink)); }
+.ai-act:disabled { opacity: 0.45; cursor: default; }
+
+/* Split view: the old block above the new one. */
+.ai-lines { display: grid; gap: 3px; }
+.ai-line { display: grid; grid-template-columns: 16px minmax(0, 1fr); gap: 4px; padding: 1px 6px 1px 4px; border-radius: 4px; }
+.ai-line.old { background: var(--ai-del-bg); color: var(--ai-del-fg); }
+.ai-line.new { background: var(--ai-add-bg); color: var(--ai-add-fg); }
+.ai-sign { font: 600 12px / inherit var(--font-mono); text-align: center; }
+
+/* Content to be added at the end. */
+.card-body .ai-added { margin: var(--paragraph-gap) 0 0 -14px; padding: 4px 12px 6px 11px; border-left: 3px solid var(--ai-add-bar); border-radius: 0 6px 6px 0; background: var(--ai-add-bg); }
+.card-body .ai-added.current { box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 40%, transparent); }
+.ai-added-body > * { margin: 0; }
+.ai-added-body > * + * { margin-top: var(--paragraph-gap); }
+.ai-added-body ul, .ai-added-body ol { padding-left: 1.4em; }
+/* The editor draws bullets itself and hides the list's own (editor.css). */
+.card-body .ai-added-body ul:not([data-type="taskList"]) > li { list-style: disc; }
+.card-body .ai-added-body ol > li { list-style: decimal; }
+.ai-added-body li + li { margin-top: 0.2em; }
+
+/* A new title. */
+.ai-title-change { margin: 2px 0 10px -14px; padding: 4px 12px 6px 11px; border-left: 3px solid var(--ai-add-bar); border-radius: 0 6px 6px 0; background: color-mix(in srgb, var(--ai-add-bg) 40%, transparent); }
+.ai-title-change.current { box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 40%, transparent); }
+.ai-title-diff { display: block; font: var(--page-title-weight) 22px / var(--page-title-leading) var(--font-body); color: var(--text); }
+.ai-title-diff .ai-del { text-decoration: line-through; background: var(--ai-del-bg); color: var(--ai-del-fg); border-radius: 3px; }
+
+@media print { .ai-review-bar, .ai-head, .ai-added, .ai-title-change { display: none !important; } }

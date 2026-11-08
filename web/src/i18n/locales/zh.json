@@ -1134,6 +1134,31 @@
       "rename_card": "改标题",
       "set_card_topic": "归入主题"
     },
+    "review": {
+      "title": "AI 修改审阅",
+      "summary_one": "AI 建议了 {{count}} 处修改",
+      "summary_other": "AI 建议了 {{count}} 处修改",
+      "left": "· 还剩 {{count}} 处",
+      "prev": "上一处",
+      "next": "下一处",
+      "view": "显示方式",
+      "views": {
+        "inline": "对照",
+        "lines": "分行",
+        "after": "修改后"
+      },
+      "acceptAll": "全部接受",
+      "rejectAll": "全部拒绝",
+      "accept": "接受",
+      "reject": "拒绝",
+      "accepted": "已接受",
+      "takeBack": "撤回",
+      "stale": "这段在提议后被你改过，只能拒绝",
+      "edit": "AI 修改",
+      "add": "AI 新增",
+      "rename": "AI 改标题",
+      "showInCard": "在卡片中查看"
+    },
     "write": {
       "allow": "允许",
       "decline": "拒绝",

@@ -16,6 +16,7 @@ import { allowAll, decide, editLast, messageText, newChat, openChat, regenerate,
 import { parseMarkdown, renderBlocks, type Target } from "./markdown";
 import { clearQuote, useAskAi } from "./ask";
 import { useMention } from "./Mention";
+import { goToChange, IN_CARD } from "./reviewState";
 import { EffortPicker, ModelPicker, WriteModePicker } from "./ModelPicker";
 import { fromPreset, ProviderForm, type Draft } from "./AiSettings";
 import { loadAiSettings, PRESETS, useAiSettings } from "./settings";
@@ -711,6 +712,17 @@ function ProposalView({ chatId, pending }: { chatId: string; pending: PendingWri
         {p.topic !== undefined && <p>{t(p.add ? "ai.write.topicAdd" : "ai.write.topicRemove", { topic: p.topic })}</p>}
       </div>
       <div className="chat-proposal-actions">
+        {IN_CARD.has(part.name) && p.cardId && (
+          <button
+            className="chat-link chat-proposal-show"
+            onClick={() => {
+              openAt(p.cardId!, p.target, typeof part.input?.block_id === "string" ? part.input.block_id : null);
+              setTimeout(() => goToChange(part.id), 300);
+            }}
+          >
+            {t("ai.review.showInCard")}
+          </button>
+        )}
         {allowed === undefined ? (
           <>
             <button className="button" onClick={() => decide(chatId, part.id, false)}>

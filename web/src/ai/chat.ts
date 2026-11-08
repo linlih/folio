@@ -15,6 +15,8 @@ import { backend } from "../platform";
 import { turnEffort } from "./effort";
 import { currentProvider, modelInfo, useAiSettings } from "./settings";
 import type { AiMessage, AiPart, AiTool, AiToolResult } from "./types";
+import { openAt } from "../card/reveal";
+import { goToChange, IN_CARD } from "./reviewState";
 import { apply, isWriteTool, propose, WRITE_TOOLS, type Proposal, type WriteRecord } from "./writes";
 
 type ToolPart = Extract<AiPart, { type: "tool" }>;
@@ -104,6 +106,13 @@ export function allowAll(chatId: string, forChat = false) {
 /** Shows the proposals and resolves once each is answered (or the answer stopped). */
 function ask(chatId: string, pending: PendingWrite[]): Promise<void> {
   patchLive(chatId, (t) => ({ ...t, pending }));
+  // Changes to a card are shown in it too (ai/review.ts): open it at the first.
+  const first = pending.find((p) => IN_CARD.has(p.part.name) && p.proposal.cardId);
+  if (first?.proposal.cardId) {
+    const bid = typeof first.part.input?.block_id === "string" ? first.part.input.block_id : null;
+    openAt(first.proposal.cardId, first.proposal.target, bid);
+    setTimeout(() => goToChange(first.part.id), 300);
+  }
   return new Promise<void>((resolve) => waiting.set(chatId, resolve)).finally(() => waiting.delete(chatId));
 }
 
@@ -134,7 +143,7 @@ async function runWrites(chatId: string, parts: ToolPart[], source: string): Pro
       continue;
     }
     try {
-      const r = await apply(part.name, part.input, source);
+      const r = await apply(part.name, part.input, source, direct ? undefined : proposal);
       results.push({ id: part.id, content: r.content, isError: false });
       writes[part.id] = { ...at, cardId: r.change?.cardId ?? at.cardId, status: "done", ...(r.change ? { change: r.change } : {}) };
     } catch (e) {

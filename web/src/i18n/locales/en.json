@@ -1134,6 +1134,31 @@
       "rename_card": "Rename",
       "set_card_topic": "File under topic"
     },
+    "review": {
+      "title": "AI changes",
+      "left": "· {{count}} left",
+      "prev": "Previous change",
+      "next": "Next change",
+      "view": "Show as",
+      "views": {
+        "inline": "Inline",
+        "lines": "Split",
+        "after": "Result"
+      },
+      "acceptAll": "Accept all",
+      "rejectAll": "Reject all",
+      "accept": "Accept",
+      "reject": "Reject",
+      "accepted": "Accepted",
+      "takeBack": "Take back",
+      "stale": "You edited this after it was suggested; it can only be rejected",
+      "edit": "AI edit",
+      "add": "AI addition",
+      "rename": "AI title",
+      "showInCard": "Show in card",
+      "summary_one": "AI suggests 1 change",
+      "summary_other": "AI suggests {{count}} changes"
+    },
     "write": {
       "allow": "Allow",
       "decline": "Decline",

@@ -22,6 +22,7 @@ import { backend } from "../platform";
 import { usePhone } from "../shell/phone";
 import { onReveal, revealIn, takePending } from "./reveal";
 import { canExportPdf, exportPdf } from "../print/print";
+import { TitleChange } from "../ai/ReviewBar";
 import "./card.css";
 
 /** Title and body behave as one text (Notion, Heptabase): ↑ on the body's
@@ -217,6 +218,7 @@ export function CardView({ cardId, pane, active = true }: { cardId: string; pane
           <CardMenu cardId={cardId} title={title} />
         </div>
       )}
+      {handle && <TitleChange cardId={cardId} />}
       {handle && <TopicRow handle={handle} />}
       {handle && <ClipSource handle={handle} />}
       {handle && <CardFields handle={handle} />}

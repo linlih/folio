@@ -221,7 +221,8 @@ function allBlocks(doc: PmNode): Set<string> {
 }
 
 /** Makes the change; returns what the model is told, and what undoes it. */
-export async function apply(name: string, input: Record<string, unknown>, source: string): Promise<{ content: string; change: Change | null }> {
+/** `proposal`: what the user agreed to; a block changed since is left alone. */
+export async function apply(name: string, input: Record<string, unknown>, source: string, proposal?: Proposal): Promise<{ content: string; change: Change | null }> {
   const hub = docs();
   switch (name) {
     case "create_card": {
@@ -275,6 +276,7 @@ export async function apply(name: string, input: Record<string, unknown>, source
       try {
         const change = await withHeadlessEditor(h, (editor) => {
           const at = findBlock(editor, bid).text;
+          if (proposal?.before !== undefined && at.node.textContent !== proposal.before) throw new Error(EDITED_SINCE);
           const before = contentHtml(editor, at.node);
           replaceText(editor, at, inlineHtml(parseInline(str(input, "text"))), source);
           const afterText = findBlock(editor, bid).text.node.textContent;
@@ -317,6 +319,10 @@ export async function apply(name: string, input: Record<string, unknown>, source
   }
   throw new Error(`Unknown tool ${name}.`);
 }
+
+/** What the model is told when the user edited a block after the change
+ *  to it was proposed: the user's text wins. */
+const EDITED_SINCE = "The user edited this block after the change was proposed, so it was not changed. Read the card again before proposing a new change.";
 
 /** Thrown when what the change made was changed since: undoing it would
  *  lose the later edit. */

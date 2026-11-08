@@ -305,6 +305,24 @@ describe("changing notes", () => {
     await expect(undo(record.change!)).rejects.toBeInstanceOf(ChangedSince);
   });
 
+  it("leaves a block the user edited after the change to it was proposed", async () => {
+    await setWriteMode("ask");
+    const cardId = await notes().createCard({ title: "笔记", lines: ["第一行", "第二行"], source: "human" });
+    const [, second] = await blocks(cardId);
+    const seen = once("update_block", { card_id: cardId, block_id: second.bid, text: "AI 改的" });
+    const id = await newChat("改");
+    const done = send(id, "改", null);
+    await until(() => !!useChatLive.getState().live[id]?.pending);
+    const h = await docs().open(cardId);
+    await withHeadlessEditor(h, (editor) => void editor.commands.insertContentAt(editor.state.doc.content.size - 1, "，我加的"));
+    await docs().release(cardId);
+    decide(id, useChatLive.getState().live[id]!.pending![0].part.id, true);
+    await done;
+    expect((await blocks(cardId))[1].text).toBe("第二行，我加的");
+    const result = seen[1].messages.at(-1)!;
+    expect(result.role === "tools" && result.results[0]).toMatchObject({ isError: true, content: expect.stringMatching(/edited this block/) });
+  });
+
   it("reports a card that does not exist without asking", async () => {
     await setWriteMode("ask");
     const seen = once("append_to_card", { card_id: "no-such-card", content: "x" });

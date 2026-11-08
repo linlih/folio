@@ -243,3 +243,4 @@ p.chat-before { margin: 0 0 6px; }
 .chat-model-positioner { z-index: 80; }
 /* Above the settings dialog, and the chat panel it may open from. */
 .ai-add-positioner { z-index: 95; }
+.chat-proposal-show { margin-right: auto; }
