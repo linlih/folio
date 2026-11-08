@@ -109,8 +109,10 @@ export class DocHub {
         const entry = this.entries.get(id);
         if (!entry) return;
         const handle = await entry.handle.catch(() => null);
-        await afterComposition();
         const snapshot = handle && (await this.backend.docSnapshot(id));
+        // Checked once the copy is here, right before it goes in: the next
+        // word may have started while it was being read.
+        await afterComposition();
         if (handle && snapshot && this.entries.get(id) === entry) handle.persistence.mergeHost(snapshot);
       }),
     );

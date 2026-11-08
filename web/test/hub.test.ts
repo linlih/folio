@@ -150,4 +150,39 @@ describe("DocHub", () => {
     expect(open.doc.getMap("synced").get("from")).toBe("elsewhere");
     await hub.release(id);
   });
+
+  it("holds it too when the next word starts while the host's copy is being read", async () => {
+    const backend = memoryBackend();
+    const id = await backend.createCard("t");
+    const hub = new DocHub(backend, MEMORY_FRONTEND_PEER);
+    const open = await hub.open(id);
+    const other = new LoroDoc();
+    other.setPeerId(78n);
+    other.import((await backend.docSnapshot(id))!);
+    const before = other.oplogVersion();
+    other.getMap("synced").set("from", "elsewhere");
+    other.commit();
+    await backend.applyUpdate(id, "card", other.export({ mode: "update", from: before }));
+    // Reading the host's copy takes a while (IPC); a word starts meanwhile.
+    const read = backend.docSnapshot.bind(backend);
+    let arrive!: () => void;
+    const slow = new Promise<void>((r) => (arrive = r));
+    backend.docSnapshot = async (doc: string) => {
+      const snapshot = await read(doc);
+      await slow;
+      return snapshot;
+    };
+    let done = false;
+    const refreshed = hub.refresh([id]).then(() => (done = true));
+    await new Promise((r) => setTimeout(r, 0));
+    document.dispatchEvent(new CompositionEvent("compositionstart"));
+    arrive();
+    await new Promise((r) => setTimeout(r, 20));
+    expect(done).toBe(false);
+    expect(open.doc.getMap("synced").get("from")).toBeUndefined();
+    document.dispatchEvent(new CompositionEvent("compositionend", { data: "中文" }));
+    await refreshed;
+    expect(open.doc.getMap("synced").get("from")).toBe("elsewhere");
+    await hub.release(id);
+  });
 });
