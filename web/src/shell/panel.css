@@ -31,7 +31,11 @@
 .details-tags { display: flex; flex-wrap: wrap; gap: 4px; }
 .details-tag { padding: 0 6px; border-radius: 4px; background: var(--hover); color: var(--accent); }
 .details-tag:hover { background: var(--selected); }
-/* A narrow window: the panel lies over the cards instead of squeezing them. */
-@media (max-width: 1100px) {
-  .details-panel { position: fixed; z-index: 50; top: 0; right: 0; bottom: 0; box-shadow: var(--shadow); }
+/* Beside the cards while they keep 460px (sidebar 240px, panel 280px); in
+   a window too narrow for that, the panel lies over them. */
+@media (max-width: 979px) {
+  .shell:not(.sidebar-closed) > .details-panel { position: fixed; z-index: 50; top: 0; right: 0; bottom: 0; box-shadow: var(--shadow); }
+}
+@media (max-width: 739px) {
+  .shell > .details-panel { position: fixed; z-index: 50; top: 0; right: 0; bottom: 0; box-shadow: var(--shadow); }
 }

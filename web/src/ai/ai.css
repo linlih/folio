@@ -22,8 +22,13 @@
    under the keyboard rather than shrinking it (shell/PhoneBars.tsx). */
 body.phone-typing .chat-panel.phone { top: var(--vv-top, 0px); bottom: auto; height: var(--vv-height, 100%); padding-bottom: 0; }
 body.phone-typing .chat-panel.phone .chat-compose { margin-bottom: 8px; }
-@media (max-width: 1100px) {
-  .chat-panel:not(.phone) { position: fixed; z-index: 50; top: 0; right: 0; bottom: 0; box-shadow: var(--shadow); }
+/* Beside the cards while they keep 460px (sidebar 240px, panel 380px);
+   in a window too narrow for that, over them. */
+@media (max-width: 1079px) {
+  .shell:not(.sidebar-closed) > .chat-panel:not(.phone) { position: fixed; z-index: 50; top: 0; right: 0; bottom: 0; box-shadow: var(--shadow); }
+}
+@media (max-width: 839px) {
+  .shell > .chat-panel:not(.phone) { position: fixed; z-index: 50; top: 0; right: 0; bottom: 0; box-shadow: var(--shadow); }
 }
 
 .chat-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex: none; height: 39px; padding: 0 8px 0 10px; }
