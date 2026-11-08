@@ -323,6 +323,20 @@ describe("changing notes", () => {
     expect(result.role === "tools" && result.results[0]).toMatchObject({ isError: true, content: expect.stringMatching(/edited this block/) });
   });
 
+  it("keeps quotes, ampersands and angle brackets as typed", async () => {
+    await setWriteMode("auto");
+    const cardId = await notes().createCard({ title: "符号", lines: ["旧的", "旧的"], source: "human" });
+    const [first, second] = await blocks(cardId);
+    const plain = `他说"好" & 'ok' <b>不是标签</b> a<b、c>d 1 > 0 &amp; © 😀`;
+    once("update_block", { card_id: cardId, block_id: first.bid, text: plain });
+    await send(await newChat("改"), "改", null);
+    once("update_block", { card_id: cardId, block_id: second.bid, text: `**"粗"** & <i>` });
+    await send(await newChat("改"), "改", null);
+    const [a, b] = await blocks(cardId);
+    expect(a.text).toBe(plain);
+    expect(b.text).toBe(`"粗" & <i>`);
+  });
+
   it("reports a card that does not exist without asking", async () => {
     await setWriteMode("ask");
     const seen = once("append_to_card", { card_id: "no-such-card", content: "x" });

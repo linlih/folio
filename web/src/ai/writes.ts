@@ -5,7 +5,7 @@
 // Blocks it writes are marked "ai:<model>" (§0.3 provenance).
 
 import type { Node as PmNode } from "@tiptap/pm/model";
-import { DOMSerializer } from "@tiptap/pm/model";
+import { DOMParser as PmDOMParser, DOMSerializer } from "@tiptap/pm/model";
 import { TextSelection } from "@tiptap/pm/state";
 import type { Editor } from "@tiptap/core";
 import { docs, notes } from "../app";
@@ -144,8 +144,12 @@ const contentHtml = (editor: Editor, node: PmNode) => {
 function replaceText(editor: Editor, at: { pos: number; node: PmNode }, html: string, source: string | null) {
   const from = at.pos + 1;
   const to = from + at.node.content.size;
-  if (html) editor.commands.insertContentAt({ from, to }, html, { updateSelection: false });
-  else if (to > from) editor.commands.command(({ tr }) => (tr.delete(from, to), true));
+  // Parsed here, not by insertContentAt: given text with no marks, that
+  // inserts the HTML source itself, so "&quot;" would show for a quote.
+  const box = document.createElement("div");
+  box.innerHTML = html;
+  const content = PmDOMParser.fromSchema(editor.schema).parseSlice(box).content;
+  editor.commands.command(({ tr }) => (tr.replaceWith(from, to, content), true));
   editor.commands.command(({ tr }) => (tr.setNodeAttribute(at.pos, "source", source), true));
 }
 
