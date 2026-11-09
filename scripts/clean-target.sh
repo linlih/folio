@@ -9,6 +9,11 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 days="${1:-30}"
+# Homebrew's rustup is not linked into PATH, and cargo installs tools to
+# ~/.cargo/bin: find both even when the shell does not.
+for d in "$HOME/.cargo/bin" /opt/homebrew/opt/rustup/bin /usr/local/opt/rustup/bin; do
+  [ -d "$d" ] && PATH="$d:$PATH"
+done
 if ! cargo sweep --version >/dev/null 2>&1; then
   echo "cargo-sweep is not installed: cargo install cargo-sweep" >&2
   exit 1
