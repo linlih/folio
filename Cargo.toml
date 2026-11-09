@@ -21,3 +21,9 @@ tracing = "0.1"
 uuid = { version = "1", features = ["v7"] }
 folio-core = { path = "crates/folio-core" }
 folio-store = { path = "crates/folio-store" }
+
+# Debug builds keep full debug info for Folio's own crates but only line
+# numbers for dependencies (backtraces still name files and lines): a
+# fraction of the size in target/, and no slower to build.
+[profile.dev.package."*"]
+debug = "line-tables-only"
