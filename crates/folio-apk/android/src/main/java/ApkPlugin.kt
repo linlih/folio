@@ -9,6 +9,7 @@ import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
 import android.webkit.WebView
+import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.FileProvider
 import app.tauri.annotation.Command
 import app.tauri.annotation.InvokeArg
@@ -48,7 +49,13 @@ private const val SEAL_ALIAS = "folio-sync-key"
 /** Downloaded update packages and the system installer, text other apps
  *  share to Folio, and the sealed sync key (lib.rs says why). */
 @TauriPlugin
-class ApkPlugin(private val activity: Activity) : Plugin(activity) {
+class ApkPlugin(first: Activity) : Plugin(first) {
+    /** The activity in front. Android may destroy Folio's activity while it
+     *  is in the background and keep the app running; the plugin, made
+     *  once, then outlives the activity it was made with, and a share
+     *  starts a new one (onCreate, not onNewIntent). */
+    private var activity: Activity = first
+
     private fun dir(): File = File(activity.cacheDir, "updates")
 
     /** Shared text the page has not taken yet. */
@@ -64,6 +71,12 @@ class ApkPlugin(private val activity: Activity) : Plugin(activity) {
     /** Shared to while already running. */
     override fun onNewIntent(intent: Intent) {
         receive(intent)
+    }
+
+    /** Also a new activity, and the share that started it. */
+    override fun onResume(activity: AppCompatActivity) {
+        this.activity = activity
+        receive(activity.intent)
     }
 
     /** Keeps the text of a share (its subject first when the text lacks it,

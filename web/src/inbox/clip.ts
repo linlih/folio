@@ -159,9 +159,16 @@ export async function keepClip(text: string, key = newKey()): Promise<boolean> {
  *  inbox at once, as being saved. */
 export function receiveShares() {
   let busy = false;
-  const take = async () => {
-    if (busy || document.visibilityState !== "visible") return;
+  let again = false;
+  const take = async (): Promise<void> => {
+    if (document.visibilityState !== "visible") return;
+    // Shared again while the last one is being saved: look once that is done.
+    if (busy) {
+      again = true;
+      return;
+    }
     busy = true;
+    again = false;
     try {
       for (let text = await backend.takeShared(); text; text = await backend.takeShared()) {
         const key = newKey();
@@ -176,6 +183,7 @@ export function receiveShares() {
     } finally {
       busy = false;
     }
+    if (again) return take();
   };
   void take();
   document.addEventListener("visibilitychange", () => void take());
