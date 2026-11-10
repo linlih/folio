@@ -202,18 +202,18 @@ function linePlaceholder(whole: string) {
  *  text, deletes the composed text first; the item's line is then empty
  *  and WebKit moves it out of the item, into a new item after it or after
  *  the list. The chosen characters land on a line of their own and the item
- *  stays empty, or, when ProseMirror misses the deletion, keeps them too.
- *  Put them back once the composition is over. (Safari keeps the line in
- *  place.) */
+ *  stays empty, or, when ProseMirror misses the deletion, keeps them too,
+ *  or keeps the pinyin as it was before the choice (macOS, Sogou). Put them
+ *  back once the composition is over. (Safari keeps the line in place.) */
 function compositionRepair() {
-  let item: string | null = null;
-  let pending: { bid: string; timer: ReturnType<typeof setTimeout> } | null = null;
+  let item: { bid: string; wasEmpty: boolean } | null = null;
+  let pending: { bid: string; wasEmpty: boolean; timer: ReturnType<typeof setTimeout> } | null = null;
   // The page scrolls to follow the stray line; it goes back once that is undone.
   let scrolled: [Element, number][] = [];
   // Tries the repair; an early try that finds nothing leaves the later ones.
   const run = (view: EditorView, last = true) => {
     if (!pending || view.composing || view.isDestroyed) return;
-    const repaired = repairComposition(view, pending.bid);
+    const repaired = repairComposition(view, pending.bid, pending.wasEmpty);
     if (!repaired && !last) return;
     clearTimeout(pending.timer);
     pending = null;
@@ -226,14 +226,15 @@ function compositionRepair() {
       handleDOMEvents: {
         compositionstart(view) {
           scrolled = [];
-          item = (itemAt(view.state.selection.$from)?.node.attrs.bid as string | undefined) ?? null;
+          const at = itemAt(view.state.selection.$from)?.node;
+          item = at?.attrs.bid ? { bid: at.attrs.bid as string, wasEmpty: !at.firstChild?.content.size } : null;
           return false;
         },
         compositionend(view) {
-          const bid = item;
+          const started = item;
           item = null;
-          if (!bid) return false;
-          pending = { bid, timer: setTimeout(() => run(view), 50) };
+          if (!started) return false;
+          pending = { ...started, timer: setTimeout(() => run(view), 50) };
           // After ProseMirror has read the committed text from the page (a
           // microtask its own handler, which runs after this one, queues),
           // before the page is drawn; the timer is there if it is late.
@@ -260,9 +261,11 @@ function compositionRepair() {
 
 /** Moves the cursor's line back into the item `bid` when it sits right
  *  after it, as the only content of the next item or after the list the
- *  item ends, and the item was left empty or holding the same text. Keeps
- *  the cursor where it was in the text. */
-export function repairComposition(view: { state: EditorState; dispatch(tr: Transaction): void }, bid: string): boolean {
+ *  item ends, and the item was left empty or holding the same text, or,
+ *  when it was empty as the composition began (`wasEmpty`), whatever the
+ *  composition left there (its pinyin). Keeps the cursor where it was in
+ *  the text. */
+export function repairComposition(view: { state: EditorState; dispatch(tr: Transaction): void }, bid: string, wasEmpty = false): boolean {
   const { state } = view;
   const { $head } = state.selection;
   const line = $head.parent;
@@ -272,7 +275,7 @@ export function repairComposition(view: { state: EditorState; dispatch(tr: Trans
     n!.attrs.bid === bid &&
     n!.childCount === 1 &&
     n!.firstChild!.isTextblock &&
-    (n!.firstChild!.content.size === 0 || n!.firstChild!.textContent === line.textContent);
+    (wasEmpty || n!.firstChild!.content.size === 0 || n!.firstChild!.textContent === line.textContent);
   // Replaces the text of the item at `at` with the line, which spans from..to.
   const move = (from: number, to: number, at: number, target: PMNode) => {
     const start = at + 2;

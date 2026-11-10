@@ -131,6 +131,27 @@ describe("input feel", () => {
     expect(repairComposition(f.view, "elsewhere")).toBe(false);
   });
 
+  it("drops the pinyin a composition left in the item it moved out of (macOS)", async () => {
+    // Typed into an empty nested item; WebKit kept the pinyin there and put
+    // the chosen characters on a new item after it.
+    const html = "<ul><li><p>above</p><ul><li><p>zhogn'wen</p></li><li><p>中文</p></li></ul></li></ul>";
+    const e = await journal(html);
+    const items: string[] = [];
+    e.state.doc.descendants((n) => void (n.type.name === "listItem" && items.push(n.attrs.bid)));
+    cursorAfter(e, "中文");
+    expect(repairComposition(e.view, items[1], true)).toBe(true);
+    const texts: string[] = [];
+    e.state.doc.descendants((n) => void (n.type.name === "listItem" && texts.push(n.firstChild!.textContent)));
+    expect(texts).toEqual(["above", "中文"]);
+    expect(caret(e)).toBe("中文|");
+    // An item that had text before the composition keeps it.
+    const f = await journal(html);
+    const fItems: string[] = [];
+    f.state.doc.descendants((n) => void (n.type.name === "listItem" && fItems.push(n.attrs.bid)));
+    cursorAfter(f, "中文");
+    expect(repairComposition(f.view, fItems[1], false)).toBe(false);
+  });
+
   it("drops the copy when the item iOS moved the composition out of kept it too", async () => {
     const html = "<ul><li><p>above</p></li><li><p>你好</p></li><li><p>你好</p></li></ul>";
     const e = await journal(html);
