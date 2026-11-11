@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>查询块草图</title>
+<!-- Static mockups for design/query.md; colours and fonts from web/src/design/tokens.css. -->
+<style>
+:root {
+  --ink: #2b2925; --paper: #fdfaf6; --accent: #2f5d8a;
+  --text: var(--ink);
+  --secondary: color-mix(in srgb, var(--ink) 72%, var(--paper));
+  --muted: color-mix(in srgb, var(--ink) 55%, var(--paper));
+  --surface: color-mix(in srgb, var(--ink) 3%, var(--paper));
+  --border: color-mix(in srgb, var(--ink) 11%, var(--paper));
+  --hover: color-mix(in srgb, var(--ink) 6%, transparent);
+  --red: #b5523f;
+  --font-body: "Source Serif 4", "Noto Serif SC", ui-serif, Georgia, "Songti SC", serif;
+  --font-ui: system-ui, -apple-system, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
+  --mono: ui-monospace, "SF Mono", Menlo, monospace;
+}
+* { box-sizing: border-box; }
+body { margin: 0; padding: 32px 16px 64px; background: #ece8e1; font: 14px/1.5 var(--font-ui); color: var(--text); }
+h1.sheet { max-width: 1180px; margin: 0 auto 6px; font: 600 20px/1.4 var(--font-ui); }
+p.lead { max-width: 1180px; margin: 0 auto 28px; color: var(--secondary); }
+.row { display: flex; flex-wrap: wrap; gap: 28px; justify-content: center; align-items: flex-start; max-width: 1180px; margin: 0 auto 40px; }
+.label { font: 600 12px/1.4 var(--font-ui); color: var(--secondary); margin: 0 0 8px; letter-spacing: .02em; }
+.frame { background: var(--paper); border-radius: 10px; box-shadow: 0 1px 2px rgb(0 0 0 / .06), 0 8px 28px rgb(0 0 0 / .08); overflow: hidden; position: relative; }
+.desk { width: 760px; min-height: 640px; padding: 36px 64px; }
+.phone { width: 360px; height: 740px; }
+.card-title { font: 600 28px/1.3 var(--font-body); margin: 0 0 6px; }
+.meta { font-size: 12px; color: var(--muted); margin-bottom: 18px; }
+.tag { color: var(--accent); }
+.body p, .body li { font: 16px/1.7 var(--font-body); margin: 0; }
+.body ul { margin: 0 0 6px; padding-left: 22px; }
+
+/* the query block */
+.q { margin: 12px 0 14px; border-left: 2px solid var(--border); background: var(--surface); border-radius: 0 8px 8px 0; }
+.q-head { display: flex; align-items: center; gap: 8px; padding: 8px 10px 6px 12px; font-size: 13px; color: var(--secondary); cursor: pointer; }
+.q-head svg { flex: none; }
+.q-title { font-weight: 600; color: var(--text); }
+.q-count { color: var(--muted); }
+.q-tools { margin-left: auto; display: flex; gap: 2px; color: var(--muted); }
+.q-tools span { width: 24px; height: 24px; display: grid; place-items: center; border-radius: 5px; }
+.q-head.open { background: var(--hover); border-radius: 0 8px 0 0; }
+.q-group { padding: 4px 12px 0; font: 600 12px/1.8 var(--font-ui); color: var(--secondary); }
+.q-group.red { color: var(--red); }
+.task { display: flex; gap: 8px; align-items: flex-start; padding: 4px 12px; }
+.circle { flex: none; width: 15px; height: 15px; margin-top: 5px; border-radius: 50%; border: 1.6px solid var(--muted); }
+.circle.doing { border-color: #c79a2a; background: conic-gradient(#c79a2a 0 50%, transparent 0); }
+.circle.done { border-color: var(--accent); background: var(--accent); }
+.t-text { font: 15px/1.6 var(--font-body); }
+.t-text.done { color: var(--muted); text-decoration: line-through; }
+.t-meta { font-size: 11.5px; color: var(--muted); }
+.chip { display: inline-block; padding: 0 6px; border-radius: 4px; background: var(--hover); color: var(--secondary); font-size: 11px; margin-left: 4px; }
+.chip.red { background: color-mix(in srgb, #c9524a 12%, transparent); color: var(--red); }
+.more { padding: 6px 12px 10px; font-size: 12.5px; color: var(--accent); }
+
+/* the panel */
+.panel { position: absolute; left: 64px; width: 540px; background: var(--paper); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 12px 36px rgb(0 0 0 / .14); font-size: 13px; }
+.tabs { display: flex; gap: 2px; padding: 8px 10px 0; border-bottom: 1px solid var(--border); }
+.tabs span { padding: 6px 12px 8px; color: var(--secondary); border-bottom: 2px solid transparent; }
+.tabs span.on { color: var(--text); font-weight: 600; border-color: var(--accent); }
+.tabs .done { margin-left: auto; padding: 3px 12px; margin-bottom: 6px; border-radius: 6px; background: var(--accent); color: white; font-weight: 500; border: 0; }
+.pbody { padding: 12px 14px 12px; }
+.line { display: flex; align-items: center; gap: 6px; margin-bottom: 10px; color: var(--secondary); }
+.sel { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--paper); color: var(--text); white-space: nowrap; }
+.sel::after { content: "▾"; font-size: 9px; color: var(--muted); }
+.sel.plain::after { content: none; }
+.cond { display: grid; grid-template-columns: 96px 78px 1fr 24px; gap: 6px; align-items: center; padding: 4px 0; }
+.cond .x { color: var(--muted); text-align: center; }
+.vals { display: flex; flex-wrap: wrap; gap: 4px; }
+.pill { padding: 2px 8px; border-radius: 999px; border: 1px solid var(--border); color: var(--secondary); font-size: 12px; }
+.pill.on { background: color-mix(in srgb, var(--accent) 12%, transparent); border-color: color-mix(in srgb, var(--accent) 35%, transparent); color: var(--accent); }
+.grp { margin: 4px 0 4px 0; padding: 6px 8px 4px 10px; border-left: 2px solid color-mix(in srgb, var(--accent) 35%, transparent); background: var(--surface); border-radius: 0 6px 6px 0; }
+.grp .line { margin-bottom: 4px; font-size: 12px; }
+.adds { display: flex; gap: 14px; margin-top: 8px; color: var(--accent); font-size: 12.5px; }
+.foot { display: flex; justify-content: space-between; padding: 8px 14px; border-top: 1px solid var(--border); color: var(--muted); font-size: 12px; }
+.code { font: 13px/1.6 var(--mono); padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); white-space: pre-wrap; }
+.err { text-decoration: underline wavy var(--red); text-underline-offset: 3px; }
+.errmsg { margin-top: 8px; color: var(--red); font-size: 12.5px; }
+.hint { margin-top: 10px; color: var(--muted); font-size: 12px; line-height: 1.7; }
+.presets { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 4px; }
+.preset { padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; }
+.preset b { display: block; font-weight: 600; font-size: 13px; }
+.preset small { color: var(--muted); font-size: 11.5px; }
+
+/* phone */
+.ph-top { height: 44px; display: flex; align-items: center; padding: 0 12px; gap: 8px; color: var(--secondary); font-size: 13px; }
+.ph-body { padding: 4px 18px; filter: saturate(.9); }
+.ph-body .card-title { font-size: 24px; }
+.dim { position: absolute; inset: 0; background: rgb(0 0 0 / .28); }
+.sheet2 { position: absolute; left: 0; right: 0; bottom: 0; height: 74%; background: var(--paper); border-radius: 14px 14px 0 0; box-shadow: 0 -8px 30px rgb(0 0 0 / .18); font-size: 13.5px; }
+.grab { width: 36px; height: 4px; border-radius: 2px; background: var(--border); margin: 8px auto 2px; }
+.sheet2 .tabs { padding: 4px 12px 0; }
+.mrow { display: flex; align-items: center; justify-content: space-between; padding: 11px 16px; border-bottom: 1px solid var(--border); }
+.mrow .k { color: var(--secondary); font-size: 12px; }
+.mrow .v { color: var(--text); }
+.mrow .chev { color: var(--muted); margin-left: 6px; }
+.mrow .neg { font-size: 11px; color: var(--red); margin-right: 6px; }
+.madd { padding: 12px 16px; color: var(--accent); }
+.mfoot { position: absolute; bottom: 0; left: 0; right: 0; padding: 10px 16px 18px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; color: var(--muted); font-size: 12.5px; background: var(--paper); }
+.mfoot .btn { padding: 7px 18px; border-radius: 8px; background: var(--accent); color: white; }
+</style>
+</head>
+<body>
+<h1 class="sheet">查询块 · 界面草图</h1>
+<p class="lead">配合 design/query.md。静态示意，不是实际界面；字体、颜色取自 Folio 的 tokens。</p>
+
+<svg width="0" height="0" style="position:absolute"><symbol id="funnel" viewBox="0 0 16 16"><path d="M2 3h12l-4.6 5.4V13l-2.8-1.4V8.4z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></symbol></svg>
+
+<div class="row">
+  <div>
+    <div class="label">① 卡片里的查询块（默认展开）</div>
+    <div class="frame desk" style="min-height:560px">
+      <h2 class="card-title">项目 A</h2>
+      <div class="meta">卡片 · 修改于 11月12日 · <span class="tag">#项目A</span></div>
+      <div class="body">
+        <ul><li>目标：12 月中上线第一版</li><li>负责人：[[张三]]</li></ul>
+      </div>
+      <div class="q">
+        <div class="q-head"><svg width="14" height="14"><use href="#funnel"/></svg><span class="q-title">未完成任务 · 本卡相关</span><span class="q-count">5</span><span class="q-tools"><span>⋯</span><span>⌄</span></span></div>
+        <div class="q-group red">已过期 1</div>
+        <div class="task"><span class="circle"></span><div><div class="t-text">和设计确认首页稿</div><div class="t-meta">日记 · 11月8日<span class="chip red">截止 11月10日</span></div></div></div>
+        <div class="q-group">今天 1</div>
+        <div class="task"><span class="circle doing"></span><div><div class="t-text">接口文档补全登录部分</div><div class="t-meta">项目 A<span class="chip">计划 今天</span></div></div></div>
+        <div class="q-group">接下来 7 天 2</div>
+        <div class="task"><span class="circle done"></span><div><div class="t-text done">约张三过一遍排期</div><div class="t-meta">日记 · 11月11日 · 刚完成，下次刷新后移走</div></div></div>
+        <div class="task"><span class="circle"></span><div><div class="t-text">准备周五评审材料</div><div class="t-meta">周会记录<span class="chip">截止 11月14日</span></div></div></div>
+        <div class="more">显示全部 5 条</div>
+      </div>
+      <div class="body"><p>下面接着写自己的笔记……</p></div>
+      <div class="hint">· 结果区左边一条竖线、底色稍深，和正文分开<br>· 点圆圈直接完成；点文字跳到原处（⌘ 点击在旁边分栏打开）<br>· 点标题行打开条件面板</div>
+    </div>
+  </div>
+</div>
+
+<div class="row">
+  <div>
+    <div class="label">② 条件面板（桌面，挂在查询块下方，改动立刻生效）</div>
+    <div class="frame desk" style="min-height:600px">
+      <h2 class="card-title">项目 A</h2>
+      <div class="q" style="margin-top:14px">
+        <div class="q-head open"><svg width="14" height="14"><use href="#funnel"/></svg><span class="q-title">未完成任务 · 本卡相关 · 7 天内到期</span><span class="q-count">4</span><span class="q-tools"><span>⋯</span><span>⌄</span></span></div>
+      </div>
+      <div class="panel" style="top:112px">
+        <div class="tabs"><span class="on">条件</span><span>显示</span><span>文字</span><button class="done">完成</button></div>
+        <div class="pbody">
+          <div class="line">查 <span class="sel">任务</span>，满足 <span class="sel">全部</span> 条件</div>
+          <div class="cond"><span class="sel">任务状态</span><span class="sel">是</span><div class="vals"><span class="pill on">未完成</span><span class="pill">已完成</span><span class="pill">已取消</span><span class="pill">具体状态…</span></div><span class="x">⋯</span></div>
+          <div class="cond"><span class="sel">到期</span><span class="sel">在…之前</span><div class="vals"><span class="sel">7 天后</span></div><span class="x">⋯</span></div>
+          <div class="grp">
+            <div class="line">条件组，满足 <span class="sel">任一</span></div>
+            <div class="cond"><span class="sel">位置</span><span class="sel">在</span><div class="vals"><span class="sel">本卡</span></div><span class="x">⋯</span></div>
+            <div class="cond"><span class="sel">链接</span><span class="sel">链接到</span><div class="vals"><span class="sel">本卡</span></div><span class="x">⋯</span></div>
+          </div>
+          <div class="adds"><span>+ 条件</span><span>+ 条件组</span><span style="margin-left:auto;color:var(--secondary)">✦ 用一句话描述（第三步）</span></div>
+        </div>
+        <div class="foot"><span>4 条结果</span><span>Esc 关闭 · ⌘Z 撤回</span></div>
+      </div>
+    </div>
+  </div>
+  <div>
+    <div class="label">③ 新插入时：常用查询</div>
+    <div class="frame" style="width:380px;padding:14px">
+      <div class="presets">
+        <div class="preset"><b>本卡相关的未完成任务</b><small>在本卡里或链接到本卡</small></div>
+        <div class="preset"><b>7 天内到期</b><small>含已过期，按日期分组</small></div>
+        <div class="preset"><b>最近 7 天新建的卡片</b><small>按创建时间倒序</small></div>
+        <div class="preset"><b>最近 7 天修改的卡片</b><small>按修改时间倒序</small></div>
+        <div class="preset"><b>带某个标签的卡片</b><small>先选标签</small></div>
+        <div class="preset"><b>最近日记里带某个标签的块</b><small>先选标签</small></div>
+      </div>
+      <div class="hint">选一个就生成条件，面板停在条件页，可以接着改；也可以直接「+ 条件」从空白开始。</div>
+    </div>
+    <div class="label" style="margin-top:24px">④ 文字页（边打边解析，写错标红）</div>
+    <div class="frame" style="width:380px">
+      <div class="tabs"><span>条件</span><span>显示</span><span class="on">文字</span></div>
+      <div class="pbody">
+        <div class="code">任务：未完成 (在:本卡 OR 链接:本卡) <span class="err">到其</span>:&lt;=+7天 排序:到期</div>
+        <div class="errmsg">不认识的关键字「到其」，是不是「到期」？</div>
+        <div class="hint">全角冒号「：」自动当成「:」。<br>没改对之前，查询块按上一次正确的条件显示。<br>中英文关键字都认：<span style="font-family:var(--mono)">task:open due:&lt;=+7d</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row">
+  <div>
+    <div class="label">⑤ 手机：点标题行，从底部弹出</div>
+    <div class="frame phone">
+      <div class="ph-top">‹ 项目 A</div>
+      <div class="ph-body">
+        <h2 class="card-title">项目 A</h2>
+        <div class="q"><div class="q-head"><svg width="14" height="14"><use href="#funnel"/></svg><span class="q-title">未完成任务 · 本卡相关</span><span class="q-count">5</span></div>
+          <div class="task"><span class="circle"></span><div class="t-text">和设计确认首页稿</div></div>
+        </div>
+      </div>
+      <div class="dim"></div>
+      <div class="sheet2">
+        <div class="grab"></div>
+        <div class="tabs"><span class="on">条件</span><span>显示</span><span>文字</span></div>
+        <div class="mrow"><span class="k">查</span><span class="v">任务 · 满足全部<span class="chev">›</span></span></div>
+        <div class="mrow"><span class="k">任务状态</span><span class="v">未完成<span class="chev">›</span></span></div>
+        <div class="mrow"><span class="k">到期</span><span class="v">7 天内<span class="chev">›</span></span></div>
+        <div class="mrow"><span class="k">任一满足</span><span class="v">在本卡 · 链接到本卡<span class="chev">›</span></span></div>
+        <div class="mrow"><span class="k">标签</span><span class="v"><span class="neg">不含</span>#归档<span class="chev">›</span></span></div>
+        <div class="madd">+ 条件　　+ 条件组</div>
+        <div class="mfoot"><span>4 条结果</span><span class="btn">完成</span></div>
+      </div>
+    </div>
+  </div>
+  <div>
+    <div class="label">⑥ 手机：编辑一个条件（日期）</div>
+    <div class="frame phone">
+      <div class="dim" style="background:rgb(0 0 0 / .12)"></div>
+      <div class="sheet2" style="height:86%">
+        <div class="grab"></div>
+        <div class="mrow" style="border:0"><span style="color:var(--accent)">‹ 返回</span><span class="v" style="font-weight:600">到期</span><span style="color:var(--red);font-size:12.5px">删除</span></div>
+        <div class="mrow"><span class="v">今天</span></div>
+        <div class="mrow"><span class="v">本周</span></div>
+        <div class="mrow"><span class="v" style="color:var(--accent);font-weight:600">7 天内（含已过期）</span><span style="color:var(--accent)">✓</span></div>
+        <div class="mrow"><span class="v">已过期</span></div>
+        <div class="mrow"><span class="v">没有日期</span></div>
+        <div class="mrow"><span class="v">自定义…</span><span class="k">前 / 后 N 天、具体日期</span></div>
+        <div class="mrow"><span class="k">取反（不满足这个条件）</span><span class="pill">关</span></div>
+        <div class="hint" style="padding:0 16px">“到期” = 有截止看截止，否则看计划，和任务页一致。</div>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>
