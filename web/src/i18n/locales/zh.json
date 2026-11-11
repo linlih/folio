@@ -973,6 +973,9 @@
   },
   "tasks": {
     "title": "任务",
+    "add": "添加任务",
+    "addClose": "收起",
+    "addPlaceholder": "要做什么？",
     "open": "未完成",
     "closed": "已完成",
     "finish": "标记完成",

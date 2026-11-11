@@ -973,6 +973,9 @@
   },
   "tasks": {
     "title": "Tasks",
+    "add": "Add a task",
+    "addClose": "Close",
+    "addPlaceholder": "What needs doing?",
     "open": "Open",
     "closed": "Done",
     "finish": "Mark done",

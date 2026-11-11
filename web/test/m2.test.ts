@@ -119,4 +119,16 @@ describe("quick capture", () => {
     const { editor } = await bind(doc);
     expect(outline(editor)).toEqual(["call mum", "[ ] pay rent", "[x] done already"]);
   });
+
+  it("adds a task from the task page to that day's journal, scheduled for it", async () => {
+    const backend = memoryBackend();
+    const api = createNotesApi(new DocHub(backend, MEMORY_FRONTEND_PEER), backend, MEMORY_API_PEER);
+    await api.addTask("2026-11-20", "  buy \"milk\" & eggs ", "human");
+    const doc = new LoroDoc();
+    doc.import((await backend.docSnapshot("journal:2026-11-20"))!);
+    const { editor } = await bind(doc);
+    expect(outline(editor)).toEqual(['[ ] buy "milk" & eggs']);
+    const rows = await backend.tasks(false);
+    expect(rows.map((r) => [r.cardId, r.text, r.scheduled])).toEqual([["journal:2026-11-20", 'buy "milk" & eggs', "2026-11-20"]]);
+  });
 });

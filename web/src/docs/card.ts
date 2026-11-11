@@ -468,8 +468,9 @@ export const setTaskDone = (doc: LoroDoc, bid: string, done: boolean) => setTask
 
 /** Appends one block per line: paragraphs in a document card, items of the
  *  last top-level list in an outline (journal). `source` marks blocks not
- *  written by a person (§0.3). Returns nothing; the caller commits. */
-export function appendBlocks(doc: LoroDoc, lines: string[], outline: boolean, source: string | null) {
+ *  written by a person (§0.3); `taskAttrs` are given to each task (its
+ *  date). Returns nothing; the caller commits. */
+export function appendBlocks(doc: LoroDoc, lines: string[], outline: boolean, source: string | null, taskAttrs: Record<string, string> = {}) {
   if (!outline) {
     for (const line of lines) addParagraph(doc, undefined, line, source);
     return;
@@ -481,7 +482,7 @@ export function appendBlocks(doc: LoroDoc, lines: string[], outline: boolean, so
     // "- " is just a bullet; "[ ] " / "[x] " make a task (as typed).
     const line = raw.replace(/^\s*[-*+]\s+/, "");
     const task = line.match(/^\[([ xX])\]\s+(.*)$/);
-    const item = addNode(doc, list.id, task ? "taskItem" : "listItem", { bid: newBid(), source, ...(task ? { checked: task[1] !== " " } : {}) });
+    const item = addNode(doc, list.id, task ? "taskItem" : "listItem", { bid: newBid(), source, ...(task ? { checked: task[1] !== " ", ...taskAttrs } : {}) });
     addParagraph(doc, item.id, task ? task[2] : line, source);
   }
 }

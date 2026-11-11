@@ -3,6 +3,12 @@
 .tasks-switch button { padding: 3px 12px; border-radius: 6px; font: 13px/1.5 var(--font-ui); color: var(--secondary); }
 .tasks-switch button[aria-selected="true"] { background: var(--paper); color: var(--text); box-shadow: 0 0 0 1px var(--border); }
 
+.tasks-add { flex: none; align-self: center; width: 30px; height: 30px; margin-left: 6px; color: var(--secondary); }
+/* A task being written (NewTask.tsx), above the list. */
+.new-task { display: flex; align-items: center; gap: 4px; margin: -4px 0 18px; padding: 2px 0; border-bottom: 1px solid var(--border); }
+.new-task-circle { flex: none; width: 15px; height: 15px; margin: 0 7px 0 8px; border: 1.5px solid var(--muted); border-radius: 50%; }
+.new-task > input { flex: 1; min-width: 0; padding: 8px 0; border: 0; outline: 0; background: transparent; font: 15px/1.45 var(--font-body); color: var(--text); }
+
 .task-group { margin-bottom: 24px; }
 .task-group h2 { display: flex; align-items: baseline; gap: 8px; margin: 0 0 4px; font: 600 13px/1.6 var(--font-ui); color: var(--secondary); }
 .task-group[data-group="overdue"] h2 { color: #b5523f; }

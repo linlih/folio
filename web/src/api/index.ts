@@ -25,6 +25,8 @@ export interface NotesApi {
   createCard(input: { title: string; lines?: string[]; source: Source }): Promise<string>;
   /** Adds lines to a journal day (`YYYY-MM-DD`) as outline items. */
   appendToJournal(date: string, lines: string[], source: Source): Promise<void>;
+  /** Adds a task to a journal day, scheduled for that day. */
+  addTask(date: string, text: string, source: Source): Promise<void>;
 }
 
 /** `peer` is the API replica's own peer id (`appInfo().apiPeer`): it edits
@@ -85,5 +87,8 @@ export function createNotesApi(hub: DocHub, backend: Backend, peer: string, now:
 
     appendToJournal: (date, lines, source) =>
       write(journalId(date), (doc) => appendBlocks(doc, lines, true, source === "human" ? null : source)),
+
+    addTask: (date, text, source) =>
+      write(journalId(date), (doc) => appendBlocks(doc, [`[ ] ${text.trim()}`], true, source === "human" ? null : source, { scheduled: date })),
   };
 }

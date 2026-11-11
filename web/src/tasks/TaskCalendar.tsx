@@ -17,11 +17,23 @@ const CHIPS = 3;
  *  its tasks; a day picked lists them, each with a date button to move it.
  *  On a computer a task can be dragged to another day. Tasks with no date
  *  wait below, to be given one. */
-export function TaskCalendar({ rows, today, onChange }: { rows: TaskRow[]; today: string; onChange: (was: TaskRow, now: TaskRow | null) => void }) {
+export function TaskCalendar({
+  rows,
+  today,
+  selected,
+  onSelect: setSelected,
+  onChange,
+}: {
+  rows: TaskRow[];
+  today: string;
+  /** The day picked, kept by the task page (a task added is for it). */
+  selected: string;
+  onSelect: (day: string) => void;
+  onChange: (was: TaskRow, now: TaskRow | null) => void;
+}) {
   const { t, i18n } = useTranslation();
   const phone = usePhone();
   const [view, setView] = useState<"month" | "week">(phone ? "week" : "month");
-  const [selected, setSelected] = useState(today);
   const first = firstDayOfWeek(i18n.language);
   const days = view === "month" ? monthOf(selected, first) : weekOf(selected, first);
   const tasks = useMemo(() => byDay(rows), [rows]);
@@ -34,7 +46,7 @@ export function TaskCalendar({ rows, today, onChange }: { rows: TaskRow[]; today
     const [y, m, dd] = d.split("-").map(Number);
     return new Date(y, m - 1, dd);
   };
-  const step = (n: number) => setSelected((d) => (view === "month" ? addMonths(d, n) : addDays(d, 7 * n)));
+  const step = (n: number) => setSelected(view === "month" ? addMonths(selected, n) : addDays(selected, 7 * n));
 
   const move = (row: TaskRow, date: string) =>
     moveTask(row, date).then(

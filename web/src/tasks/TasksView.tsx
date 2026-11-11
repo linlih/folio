@@ -1,4 +1,4 @@
-import { SquareCheck } from "lucide-react";
+import { Plus, SquareCheck, X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { TaskRow } from "../bindings/commands";
@@ -10,6 +10,7 @@ import { useShell } from "../shell/tabs";
 import { groupTasks } from "./group";
 import { TaskCalendar } from "./TaskCalendar";
 import { HabitsView } from "../habits/HabitsView";
+import { NewTask } from "./NewTask";
 import { replaceRow, TaskItem } from "./TaskItem";
 import "./tasks.css";
 
@@ -58,6 +59,18 @@ export function TasksView({ active = true }: { active?: boolean }) {
   const change = (was: TaskRow) => (now: TaskRow | null) => setRows((rs) => (rs ? replaceRow(rs, was, now) : rs));
 
   const today = localDate(new Date());
+  // The calendar's picked day; a task added there is for that day.
+  const [day, setDay] = useState(today);
+  const [adding, setAdding] = useState(false);
+  const [newDate, setNewDate] = useState(today);
+  const startAdding = () => {
+    setNewDate(mode === "calendar" ? day : today);
+    setAdding(true);
+  };
+  const pickDay = (d: string) => {
+    setDay(d);
+    setNewDate(d);
+  };
   const item = (r: TaskRow) => <TaskItem key={`${r.cardId}/${r.bid}`} row={r} today={today} onChange={change(r)} />;
 
   return (
@@ -71,9 +84,21 @@ export function TasksView({ active = true }: { active?: boolean }) {
             </button>
           ))}
         </div>
+        {mode !== "habits" && (
+          <button
+            className="icon-button tasks-add"
+            title={t(adding ? "tasks.addClose" : "tasks.add")}
+            aria-label={t(adding ? "tasks.addClose" : "tasks.add")}
+            aria-expanded={adding}
+            onClick={() => (adding ? setAdding(false) : startAdding())}
+          >
+            {adding ? <X size={17} /> : <Plus size={18} />}
+          </button>
+        )}
       </header>
+      {adding && mode !== "habits" && <NewTask date={newDate} onDate={setNewDate} onAdded={reload} onClose={() => setAdding(false)} />}
       {mode === "habits" && <HabitsView today={today} />}
-      {mode === "calendar" && rows && <TaskCalendar rows={rows} today={today} onChange={(was, now) => change(was)(now)} />}
+      {mode === "calendar" && rows && <TaskCalendar rows={rows} today={today} selected={day} onSelect={pickDay} onChange={(was, now) => change(was)(now)} />}
       {(mode === "open" || mode === "closed") && rows?.length === 0 && (
         <EmptyState icon={<SquareCheck size={28} strokeWidth={1.5} />} title={t(mode === "closed" ? "tasks.noneClosed" : "tasks.none")} hint={mode === "closed" ? undefined : t("tasks.noneHint")} />
       )}
