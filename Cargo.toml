@@ -5,7 +5,7 @@ members = ["crates/*", "src-tauri"]
 exclude = ["spike"]
 
 [workspace.package]
-version = "0.1.30"
+version = "0.1.31"
 edition = "2024"
 license = "AGPL-3.0-only"
 publish = false
