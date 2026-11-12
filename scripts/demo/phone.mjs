@@ -1,0 +1,16 @@
+import { open, nav, write } from "./lib.mjs";
+import { seed } from "./seed.mjs";
+const { browser, page } = await open({ width: 1280, height: 800, scale: 3 });
+await seed(page); await nav(page, "Journal");
+await page.locator(".journal-day.today .ProseMirror, .journal-day.today .journal-static").first().click();
+await page.keyboard.press("Meta+ArrowDown"); await page.keyboard.press("End"); await page.keyboard.press("Enter");
+await write(page, ["Call with [[Dana]] about the pricing table", "\tShe wants one plan on the home page #project"]);
+await page.setViewportSize({ width: 390, height: 800 }); await page.waitForTimeout(900);
+const tab = async (n) => { await page.locator(".phone-nav-item", { hasText: n }).click(); await page.waitForTimeout(800); };
+await tab("Tasks"); await tab("Journal");
+await page.evaluate(() => { document.activeElement?.blur(); for (const e of document.querySelectorAll("*")) if (e.scrollTop > 0) e.scrollTop = 0; });
+await page.waitForTimeout(500);
+await page.screenshot({ path: "ph-journal.png" });
+await tab("Tasks"); await page.screenshot({ path: "ph-tasks.png" });
+await tab("Card library"); await page.screenshot({ path: "ph-library.png" });
+await browser.close();
