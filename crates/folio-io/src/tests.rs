@@ -39,7 +39,7 @@ fn main() {}
 fn a_card_written_in_the_editor_as_markdown() {
     let titles = |id: &str| (id == "card-2").then(|| "Renamed card".to_owned());
     let blocks = |bid: &str| (bid == "blk-9").then(|| "a referenced block".to_owned());
-    assert_eq!(body_markdown(&rich(), &Links { card_title: &titles, block_text: &blocks, file: &|_, _| None }), RICH);
+    assert_eq!(body_markdown(&rich(), &Links { card_title: &titles, block_text: &blocks, file: &|_, _| None, topic_name: &|_| None, zh: false }), RICH);
 }
 
 #[test]
@@ -79,7 +79,7 @@ fn exports_cards_and_journals_with_links_to_file_names() {
         ExportCard { id: "rich".into(), title: "Rich".into(), journal_date: None, doc: rich() },
         ExportCard { id: "j".into(), title: String::new(), journal_date: Some("2026-10-24".into()), doc: journal },
     ];
-    let summary = export_markdown(dir.path(), &cards, &|_| None, &|_| None, "Untitled").unwrap();
+    let summary = export_markdown(dir.path(), &cards, &|_| None, &|_| None, "Untitled", &|_| None, false).unwrap();
     assert_eq!(summary, ExportSummary { cards: 2, journals: 1, files: 0 });
     let rich_md = std::fs::read_to_string(dir.path().join("cards/Rich.md")).unwrap();
     assert!(rich_md.contains("[[Other card]]"), "{rich_md}");
@@ -116,7 +116,7 @@ fn images_and_attachments_are_copied_once_and_linked() {
     std::fs::write(src.path().join(&other), b"other").unwrap();
     let source = |sha: &str| Some(src.path().join(sha)).filter(|p| p.is_file());
     let cards = vec![ExportCard { id: "f".into(), title: "Files".into(), journal_date: None, doc: card_with_files(&shot, &other, &missing) }];
-    let summary = export_markdown(out.path(), &cards, &|_| None, &source, "Untitled").unwrap();
+    let summary = export_markdown(out.path(), &cards, &|_| None, &source, "Untitled", &|_| None, false).unwrap();
     assert_eq!(summary.files, 2);
     let md = std::fs::read_to_string(out.path().join("cards/Files.md")).unwrap();
     // The same file twice: one copy, one name.

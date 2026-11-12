@@ -1,0 +1,126 @@
+/* The query block (design/query.md §5.1): set apart from what was written
+   by a thin line at its left and a slightly lighter background. */
+.query-block {
+  margin: 8px 0 10px;
+  border-left: 2px solid var(--border);
+  border-radius: 0 8px 8px 0;
+  background: var(--surface);
+  font: var(--ui-size) / 1.5 var(--font-ui);
+  white-space: normal;
+}
+.query-block.ProseMirror-selectednode { outline: 2px solid var(--accent); outline-offset: 1px; }
+.query-head { display: flex; align-items: center; gap: 4px; padding: 5px 6px 5px 4px; color: var(--secondary); }
+.query-static .query-head { padding-left: 12px; font-weight: 600; }
+.query-fold { width: 22px; height: 22px; color: var(--muted); }
+.query-fold svg { transition: transform 0.12s; }
+.query-fold svg.open { transform: rotate(90deg); }
+.query-title-button {
+  display: flex; align-items: center; gap: 7px; min-width: 0; flex: 1;
+  padding: 2px 6px; border: 0; border-radius: 5px; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer;
+}
+.query-title-button:hover:not(:disabled) { background: var(--hover); }
+.query-title-button:disabled { cursor: default; }
+.query-icon { flex: none; color: var(--muted); }
+.query-title { overflow: hidden; color: var(--text); font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.query-count { flex: none; color: var(--muted); font-variant-numeric: tabular-nums; }
+.query-more { width: 24px; height: 24px; color: var(--muted); }
+.query-newer .query-title { color: var(--muted); font-weight: 400; }
+.popup-item.danger { color: #b5523f; }
+
+.query-body { padding: 0 8px 6px 8px; }
+.query-body .task-list { margin: 0; }
+.query-note {
+  display: block; width: 100%; margin: 0; padding: 4px 8px 6px; border: 0; background: none;
+  color: var(--muted); font: inherit; text-align: left;
+}
+button.query-note:not(:disabled) { cursor: pointer; }
+button.query-note:not(:disabled):hover { color: var(--secondary); }
+.query-empty span { display: block; }
+.query-empty .query-empty-sum { font-size: 12px; }
+.query-all { margin: 2px 4px 2px; padding: 2px 4px; border: 0; background: none; color: var(--accent); font: inherit; font-size: 12.5px; cursor: pointer; }
+.query-group-head { margin: 6px 4px 0; font: 600 12px/1.8 var(--font-ui); color: var(--secondary); }
+.query-blocks { max-width: none; margin: 0; padding: 2px 0 0; border: 0; }
+.query-cards { list-style: none; margin: 0; padding: 0; }
+.query-card {
+  display: grid; grid-template-columns: 1fr auto; gap: 0 12px; width: 100%;
+  padding: 4px 8px; border: 0; border-radius: 6px; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer;
+}
+.query-card:hover { background: var(--hover); }
+.query-card-title { overflow: hidden; font: 15px/1.6 var(--font-body); color: var(--text); text-overflow: ellipsis; white-space: nowrap; }
+.query-card-time { grid-row: 1; grid-column: 2; color: var(--muted); font-size: 12px; line-height: 24px; }
+.query-card-preview { grid-column: 1 / -1; overflow: hidden; color: var(--muted); font-size: 12.5px; text-overflow: ellipsis; white-space: nowrap; }
+
+/* The panel: under the block on a computer, a sheet on a phone. */
+.query-popup { width: min(540px, calc(100vw - 24px)); padding: 0; }
+.query-panel { font: 13px/1.5 var(--font-ui); color: var(--text); }
+.query-tabs { display: flex; align-items: flex-end; gap: 2px; padding: 6px 10px 0; border-bottom: 1px solid var(--border); }
+.query-tab { padding: 6px 12px 7px; border: 0; border-bottom: 2px solid transparent; background: none; color: var(--secondary); font: inherit; cursor: pointer; }
+.query-tab[aria-selected="true"] { border-bottom-color: var(--accent); color: var(--text); font-weight: 600; }
+.query-done { margin: 0 0 6px auto; height: 26px; }
+.query-page { max-height: min(60vh, 520px); overflow: auto; padding: 12px 14px; }
+.query-label { color: var(--secondary); font-size: 12px; }
+.query-presets { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 14px; }
+.query-presets .query-label { grid-column: 1 / -1; }
+.query-preset { padding: 7px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); font: inherit; text-align: left; cursor: pointer; }
+.query-preset:hover { background: var(--hover); }
+.query-line { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; color: var(--secondary); }
+.query-conds > .query-line { margin-bottom: 8px; }
+.query-cond-list { list-style: none; margin: 0; padding: 0; }
+.query-cond { padding: 3px 0; }
+.query-cond-group { margin: 4px 0; padding: 6px 8px 4px 10px; border-left: 2px solid color-mix(in srgb, var(--accent) 35%, transparent); border-radius: 0 6px 6px 0; background: var(--surface); }
+.query-cond-group .query-add { margin-top: 4px; }
+.query-value { display: flex; flex: 1 1 0; flex-wrap: wrap; align-items: center; gap: 4px; min-width: 0; }
+.query-cond > .query-line { flex-wrap: nowrap; align-items: flex-start; }
+.query-cond > .query-line > .query-select, .query-cond-tools { flex: none; }
+.query-cond-tools { display: flex; align-items: center; gap: 2px; margin-left: auto; }
+.query-remove { width: 24px; height: 24px; color: var(--muted); }
+.query-select, .query-input {
+  height: 26px; padding: 0 6px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--text); font: inherit;
+}
+.query-input { min-width: 0; flex: 1; }
+.query-input[type="date"] { flex: none; }
+.query-limit { flex: none; width: 72px; }
+.query-chips, .query-tags, .query-link, .query-range { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.query-tags, .query-link { flex: 1; }
+.query-chip {
+  padding: 1px 8px; border: 1px solid var(--border); border-radius: 999px; background: none; color: var(--secondary); font: inherit; font-size: 12px; cursor: pointer;
+}
+.query-chip[aria-pressed="true"] {
+  border-color: color-mix(in srgb, var(--accent) 35%, transparent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--accent);
+}
+.query-tag { display: inline-flex; align-items: center; gap: 2px; padding: 0 4px 0 6px; border-radius: 4px; background: color-mix(in srgb, var(--accent) 10%, transparent); color: var(--accent); }
+.query-tag button { display: grid; place-items: center; padding: 1px; border: 0; background: none; color: inherit; cursor: pointer; }
+.query-fixed { color: var(--text); }
+.query-search { position: relative; flex: 1 1 120px; display: flex; min-width: 0; }
+.query-hits { position: absolute; z-index: 2; top: 100%; left: 0; right: 0; margin-top: 2px; }
+.query-hits .popup-item { width: 100%; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.query-hits .popup-item:hover { background: var(--hover); }
+.query-add { display: flex; gap: 8px; margin-top: 8px; }
+.query-add .button { height: 26px; padding: 0 8px; color: var(--accent); font-size: 12.5px; }
+/* "+ 条件": the system's menu, over the button. */
+.query-add-cond { position: relative; cursor: pointer; }
+.query-add-cond select { position: absolute; inset: 0; width: 100%; opacity: 0; cursor: pointer; }
+.query-display { display: grid; gap: 10px; }
+.query-field { display: grid; grid-template-columns: 72px 1fr; align-items: center; gap: 8px; }
+.query-field > .query-line, .query-field > .query-select { justify-self: start; }
+.query-source {
+  box-sizing: border-box; width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; resize: vertical;
+  background: var(--surface); color: var(--text); font: 13px/1.6 var(--font-mono);
+}
+.query-source[aria-invalid="true"] { border-color: color-mix(in srgb, #c9524a 55%, var(--border)); }
+.query-error { margin: 8px 0 0; color: #b5523f; font-size: 12.5px; }
+.query-hint { margin: 8px 0 0; color: var(--muted); font-size: 12px; }
+
+.query-sheet-back { position: fixed; z-index: 60; inset: 0; display: flex; align-items: flex-end; background: rgb(0 0 0 / 0.28); }
+.query-sheet {
+  box-sizing: border-box; width: 100%; max-height: 85dvh; overflow: auto;
+  padding-bottom: var(--safe-bottom, 0px); border-radius: 14px 14px 0 0; background: var(--popup); box-shadow: 0 -8px 30px rgb(0 0 0 / 0.18);
+}
+.query-sheet .query-page { max-height: none; }
+.query-sheet .query-field { grid-template-columns: 1fr; gap: 4px; }
+.query-sheet .query-select, .query-sheet .query-input { height: 32px; font-size: 15px; }
+/* Inputs that grow into a row's space, never past it. */
+.query-link, .query-tags { min-width: 0; }
+.query-search .query-input, .query-tags .query-input { width: 0; min-width: 80px; }

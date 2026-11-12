@@ -192,7 +192,7 @@ function inlineText(n: Exclude<Json, string>): string | null {
 }
 const LISTS = new Set(["bulletList", "orderedList", "taskList"]);
 /** Leaf blocks that count as content even without text. */
-const CONTENT_LEAVES = new Set(["image", "file", "horizontalRule", "cardLink"]);
+const CONTENT_LEAVES = new Set(["image", "file", "horizontalRule", "cardLink", "query"]);
 
 /** One line per text block; tabs mark depth below the outermost list. Same
  *  output as `folio_core::card::summarize(..).text`. */
@@ -401,6 +401,30 @@ export function appendTag(doc: LoroDoc, tag: string) {
   node.ensureMergeableMovableList("children");
 }
 
+/** A query's spec with tag `from` named `to` (both lower case), and how
+ *  many it renamed; null when it has none (or is not JSON). Whatever else
+ *  it holds is kept as it is. */
+export function renameTagInSpec(raw: string, from: string, to: string): { spec: string; count: number } | null {
+  let count = 0;
+  const walk = (where: unknown) => {
+    if (!Array.isArray(where)) return;
+    for (const c of where as { k?: unknown; v?: unknown; where?: unknown }[]) {
+      if (c?.k === "tag" && Array.isArray(c.v) && c.v.includes(from)) {
+        count += 1;
+        c.v = [...new Set((c.v as string[]).map((t) => (t === from ? to : t)))];
+      }
+      if (c?.k === "group") walk(c.where);
+    }
+  };
+  try {
+    const spec = JSON.parse(raw) as { where?: unknown };
+    walk(spec?.where);
+    return count && from !== to ? { spec: JSON.stringify(spec), count } : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Renames every `#from` (any case) in the body to `#to`: only the tag's
  *  name changes, so blocks keep their ids and another device's edits to
  *  the same lines merge. A line that has `#to` already loses its `#from`
@@ -418,6 +442,13 @@ export function renameTagIn(doc: LoroDoc, from: string, to: string): number {
   };
   const visit = (nodes: LoroTreeNode[] | undefined) => {
     for (const node of nodes ?? []) {
+      // A query block names tags in its conditions (design/query.md §6).
+      if (node.data.get("nodeName") === "query") {
+        const attrs = node.data.get("attributes");
+        const spec = attrs instanceof LoroMap ? attrs.get("spec") : undefined;
+        const next = typeof spec === "string" ? renameTagInSpec(spec, key, toKey) : null;
+        if (next) (attrs as LoroMap).set("spec", next.spec), (changed += next.count);
+      }
       const inline = node.data.get("children");
       if (inline instanceof LoroMovableList) {
         let hasTo = false;

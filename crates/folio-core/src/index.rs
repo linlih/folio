@@ -60,6 +60,9 @@ pub struct Extract {
     pub tags: Vec<(String, String)>,
     /// The files (images, attachments) the body uses, once each.
     pub assets: Vec<AssetRef>,
+    /// (query block id, tag in lower case) for the tags query blocks name
+    /// (design/query.md §6): renaming a tag renames them there too.
+    pub query_tags: Vec<(String, String)>,
 }
 
 /// A file a card uses: its hash, and its type as the node records it (a
@@ -229,12 +232,42 @@ fn collect_assets(node: &LoroValue, out: &mut Vec<AssetRef>) {
     }
 }
 
+/// The tags named in query blocks' conditions, wherever they sit.
+fn collect_query_tags(node: &LoroValue, out: &mut Vec<(String, String)>) {
+    if name(node) == "query" {
+        let bid = attr(node, "bid").unwrap_or_default();
+        if let Some(spec) = attr(node, "spec").and_then(|s| serde_json::from_str::<serde_json::Value>(&s).ok()) {
+            fn walk(where_: Option<&serde_json::Value>, bid: &str, out: &mut Vec<(String, String)>) {
+                for c in where_.and_then(|w| w.as_array()).into_iter().flatten() {
+                    match c.get("k").and_then(|k| k.as_str()) {
+                        Some("tag") => {
+                            for t in c.get("v").and_then(|v| v.as_array()).into_iter().flatten().filter_map(|t| t.as_str()) {
+                                let pair = (bid.to_owned(), t.to_owned());
+                                if !out.contains(&pair) {
+                                    out.push(pair);
+                                }
+                            }
+                        }
+                        Some("group") => walk(c.get("where"), bid, out),
+                        _ => {}
+                    }
+                }
+            }
+            walk(spec.get("where"), &bid, out);
+        }
+    }
+    for child in children(node) {
+        collect_query_tags(&child, out);
+    }
+}
+
 /// Blocks, links, references and files of a card body.
 pub fn extract(doc: &LoroDoc) -> Extract {
     let mut out = Extract::default();
     let root = crate::body::body_value(doc);
     walk(&children(&root), None, &mut out);
     collect_assets(&root, &mut out.assets);
+    collect_query_tags(&root, &mut out.query_tags);
     out
 }
 

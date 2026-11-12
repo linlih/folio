@@ -1,7 +1,7 @@
 import type { AssetEvent, AssetInfo, BackupInfo, McpStatus, SyncDevice, SyncStatus, TagInfo, TopicCount, CardText } from "../bindings/commands";
 import type { BackupCopyStatus, CopySuggestion, LatestRelease, LibraryLocation, PickedCopyFolder, PickedFolder } from "../bindings/commands";
 import type { AppInfo, Backlink, BlockText, CardRow, DocKind, JournalDay, SearchFilter, SearchHit } from "../bindings/commands";
-import type { ClipInfo, InboxItem, LinkPreview, TagCard, TaskRow } from "../bindings/commands";
+import type { ClipInfo, InboxItem, LinkPreview, QueryRows, ResolvedQuery, TagCard, TaskRow } from "../bindings/commands";
 import type { AiEvent, AiModelInfo, AiProtocol, AiReply, AiTool, AiTurnRequest } from "../ai/types";
 
 /** A provider with a key on this device, and the synced copy it matches. */
@@ -30,6 +30,8 @@ export interface Backend {
   /** Task items in cards not in the trash, most recently changed card
    *  first: open ones (not done or canceled), or the closed ones. */
   tasks(closed: boolean, limit?: number): Promise<TaskRow[]>;
+  /** A query block's rows (design/query.md §7). */
+  query(q: ResolvedQuery): Promise<QueryRows>;
   /** Deletes every card in the trash for good, on every device (journal
    *  days stay); returns their ids. */
   emptyTrash(): Promise<string[]>;

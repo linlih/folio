@@ -7,6 +7,7 @@ import { isBoardId } from "../docs/board";
 import { WORKSPACE_ID } from "../docs/workspace";
 import type { AiModelInfo } from "../ai/types";
 import type { Backend } from "./backend";
+import { runQuery } from "../query/engine";
 
 /** The peer ids this fake host uses: its own replica and the one it hands to
  *  the frontend, like the Rust store does (§4.5 rule 3). */
@@ -125,7 +126,10 @@ export function memoryBackend(now: () => number = Date.now): Backend {
     tagDocs: async (tag) => {
       const key = tag.trim().toLowerCase();
       return cards()
-        .filter(([, e]) => extractIndex(e.doc).tags.some(([, name]) => name.trim().toLowerCase() === key))
+        .filter(([, e]) => {
+          const x = extractIndex(e.doc);
+          return x.tags.some(([, name]) => name.trim().toLowerCase() === key) || !!x.queryTags?.some(([, t]) => t.trim().toLowerCase() === key);
+        })
         .map(([id]) => id)
         .sort();
     },
@@ -171,6 +175,14 @@ export function memoryBackend(now: () => number = Date.now): Backend {
       }
       return out.slice(0, limit);
     },
+    query: async (q) =>
+      runQuery(
+        live().map(([id, e]) => {
+          const m = readMeta(e.doc);
+          return { id, kind: m.kind, title: m.title, preview: cardPreview(e.doc), createdAt: m.createdAt, updatedAt: e.updatedAt, inboxAt: m.inboxAt, fromInbox: m.inboxAt === null ? m.inboxFrom : null, topics: readCardTopics(e.doc), index: extractIndex(e.doc) };
+        }),
+        q,
+      ),
     journalDays: async (from, to) => {
       const days: JournalDay[] = [];
       for (const [id, e] of docs) {

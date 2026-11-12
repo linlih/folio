@@ -496,6 +496,12 @@ fn tasks(state: tauri::State<AppState>, closed: bool, limit: Option<u32>) -> Cmd
     Ok(lock(&state)?.tasks(closed, limit.unwrap_or(500))?)
 }
 
+/// A query block's rows (design/query.md §7), from a query the frontend resolved.
+#[tauri::command]
+fn query(state: tauri::State<AppState>, q: folio_store::ResolvedQuery) -> CmdResult<folio_store::QueryRows> {
+    Ok(lock(&state)?.query(&q)?)
+}
+
 #[tauri::command]
 fn journal_days(state: tauri::State<AppState>, from: String, to: String) -> CmdResult<Vec<JournalDay>> {
     Ok(lock(&state)?.journal_days(&from, &to)?)
@@ -632,31 +638,38 @@ fn tagged(state: tauri::State<AppState>, tag: String, limit: Option<u32>) -> Cmd
     Ok(lock(&state)?.tagged(&tag, limit.unwrap_or(500))?)
 }
 
+/// Whether the app shows Chinese: query blocks are written in its keywords.
+fn is_zh(lang: &Option<String>) -> bool {
+    lang.as_deref().is_some_and(|l| l.starts_with("zh"))
+}
+
 /// One card (or journal day) as Markdown, with links resolved to what cards
 /// and blocks say now; `with_title` puts the title first as a heading.
 /// A card as Markdown; `file` gives the link for each image or attachment.
-fn render_card(store: &mut Store, id: &DocId, with_title: bool, file: &dyn Fn(&str, &str) -> Option<String>) -> CmdResult<String> {
+fn render_card(store: &mut Store, id: &DocId, with_title: bool, file: &dyn Fn(&str, &str) -> Option<String>, zh: bool) -> CmdResult<String> {
     let doc = store.doc_copy(id)?;
     let title = folio_core::card::summarize(&doc).title;
+    let topics = store.topic_names()?;
+    let topic_name = |t: &str| topics.get(t).cloned();
     let store = &*store;
     let card_title = |cid: &str| store.titles(&[cid.to_owned()]).ok().and_then(|t| t.into_iter().next()).map(|(_, t)| t);
     let block_text = |bid: &str| store.block_texts(&[bid.to_owned()]).ok().and_then(|b| b.into_iter().next()).map(|b| b.text);
-    let body = folio_io::body_markdown(&doc, &folio_io::Links { card_title: &card_title, block_text: &block_text, file });
+    let body = folio_io::body_markdown(&doc, &folio_io::Links { card_title: &card_title, block_text: &block_text, file, topic_name: &topic_name, zh });
     let heading = if !title.is_empty() { title } else { id.as_str().strip_prefix("journal:").unwrap_or_default().to_owned() };
     Ok(if with_title && !heading.is_empty() { format!("# {heading}\n\n{body}") } else { body })
 }
 
 /// For "Copy as Markdown": the card with its title as a heading.
 #[tauri::command]
-fn card_markdown(state: tauri::State<AppState>, id: String) -> CmdResult<String> {
-    render_card(&mut *lock(&state)?, &DocId::parse(&id)?, true, &|_, _| None)
+fn card_markdown(state: tauri::State<AppState>, id: String, lang: Option<String>) -> CmdResult<String> {
+    render_card(&mut *lock(&state)?, &DocId::parse(&id)?, true, &|_, _| None, is_zh(&lang))
 }
 
 /// Saves one card as a Markdown file, asking where (`file_name` suggested);
 /// the file is as the whole-library export writes it, its images and
 /// attachments in `assets/` beside it. None when cancelled.
 #[tauri::command]
-async fn export_card(app: tauri::AppHandle, state: tauri::State<'_, AppState>, id: String, file_name: String) -> CmdResult<Option<String>> {
+async fn export_card(app: tauri::AppHandle, state: tauri::State<'_, AppState>, id: String, file_name: String, lang: Option<String>) -> CmdResult<Option<String>> {
     use tauri_plugin_dialog::DialogExt;
     let id = DocId::parse(&id)?;
     let name = format!("{}.md", folio_io::file_stem(&file_name));
@@ -670,7 +683,7 @@ async fn export_card(app: tauri::AppHandle, state: tauri::State<'_, AppState>, i
         let source = |sha256: &str| folio_store::assets::stored_file(&files, sha256);
         let assets = path.parent().map(|p| p.join("assets")).unwrap_or_else(|| PathBuf::from("assets"));
         let copies = folio_io::FileCopies::new(assets, "assets/", &source);
-        let body = render_card(&mut store, &id, false, &|sha256, name| copies.link(sha256, name))?;
+        let body = render_card(&mut store, &id, false, &|sha256, name| copies.link(sha256, name), is_zh(&lang))?;
         copies.finish().map_err(|e| CommandError::Other(e.to_string()))?;
         body
     };
@@ -1010,6 +1023,7 @@ async fn export_markdown(
     state: tauri::State<'_, AppState>,
     folder_name: String,
     untitled: String,
+    lang: Option<String>,
 ) -> CmdResult<Option<ExportResult>> {
     use tauri_plugin_opener::OpenerExt;
     let Some(base) = pick_folder(&app)? else { return Ok(None) };
@@ -1024,9 +1038,11 @@ async fn export_markdown(
             cards.push(folio_io::ExportCard { id: row.id.clone(), title: row.title, journal_date, doc: store.doc_copy(&id)? });
         }
         let blocks = store.all_block_texts()?;
+        let topics = store.topic_names()?;
         let store = &*store;
         let asset_file = |sha256: &str| store.asset_file(sha256).ok().flatten().map(|(path, _)| path);
-        folio_io::export_markdown(&dir, &cards, &|bid| blocks.get(bid).cloned(), &asset_file, &untitled)
+        let topic_name = |t: &str| topics.get(t).cloned();
+        folio_io::export_markdown(&dir, &cards, &|bid| blocks.get(bid).cloned(), &asset_file, &untitled, &topic_name, is_zh(&lang))
             .map_err(|e| CommandError::Other(e.to_string()))?
     };
     tracing::info!(cards = summary.cards, journals = summary.journals, files = summary.files, "exported markdown");
@@ -1313,6 +1329,7 @@ pub fn run() {
             restore_card,
             list_trash,
             tasks,
+            query,
             empty_trash,
             pin_card,
             open_link,

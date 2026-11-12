@@ -157,10 +157,13 @@ fn card_markdown(store: &mut Store, id: &DocId) -> Result<Option<String>, String
         return Ok(None);
     };
     let doc = store.doc_copy(id).map_err(|e| e.to_string())?;
+    let topics = store.topic_names().map_err(|e| e.to_string())?;
     let store = &*store;
     let card_title = |cid: &str| store.titles(&[cid.to_owned()]).ok().and_then(|t| t.into_iter().next()).map(|(_, t)| t);
     let block_text = |bid: &str| store.block_texts(&[bid.to_owned()]).ok().and_then(|b| b.into_iter().next()).map(|b| b.text);
-    let body = body_markdown(&doc, &Links { card_title: &card_title, block_text: &block_text, file: &|_, _| None });
+    let topic_name = |t: &str| topics.get(t).cloned();
+    // Query blocks in English keywords: the app reads either.
+    let body = body_markdown(&doc, &Links { card_title: &card_title, block_text: &block_text, file: &|_, _| None, topic_name: &topic_name, zh: false });
     Ok(Some(format!("# {}\n\nid: {}\n\n{}", title_or(&row.title, &row.id), row.id, if body.is_empty() { "(empty)\n".into() } else { body })))
 }
 

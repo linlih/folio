@@ -20,6 +20,7 @@ import { addFiles, pickFiles } from "../assets";
 import { askText, caretAnchor } from "./popover";
 import { PRIORITIES, PRIORITY_ICON, STATUSES, STATUS_ICON, type Priority } from "./statusIcons";
 import { makeTask } from "./tasks";
+import { openNextQuery } from "../query";
 import { childList, insertAfterLine, itemAt, itemAtPos, listOf, type Item } from "./tree";
 import { TAG_AFTER, TAG_STOP } from "../tag";
 
@@ -255,6 +256,7 @@ const ICON = {
   template: svg(`<rect x="4" y="3" width="12" height="14" rx="2"/><path d="M7 7h6M7 10h6M7 13h3" stroke-dasharray="2 1.5"/>`),
   embed: svg(`<rect x="3" y="4" width="14" height="12" rx="2"/><path d="M6.5 8h7M6.5 11h5"/><path d="M3 4v12" stroke-width="2.4"/>`),
   clock: svg(`<circle cx="10" cy="10" r="7"/><path d="M10 6v4l2.5 2"/>`),
+  query: svg(`<path d="M3.5 4.5h13l-5 6v5l-3 1.5v-6.5z"/>`),
   numbered: svg(`<path d="M9 5.5h7M9 10h7M9 14.5h7M4 4.5l1-.5v3"/>`),
 };
 
@@ -278,6 +280,13 @@ function slashChoices(): Choice[] {
       run: (editor, range) => startEmbed(editor, range, "[[]]"),
     },
     // format
+    {
+      id: "query", group: g("basic"), label: t("slash.query"), icon: ICON.query, keywords: "query filter search chaxun cx",
+      run: (editor, range) => {
+        openNextQuery();
+        insertBlock(editor, range, editor.schema.nodes.query.create());
+      },
+    },
     {
       id: "link", group: g("format"), label: t("slash.link"), icon: ICON.link, keywords: "link url",
       run: async (editor, range) => {
@@ -545,6 +554,17 @@ export const Suggestions = Extension.create({
         char: "/",
         // Not inside words or URLs ("a/b", "http://"), but right after
         // Chinese or Japanese text, which has no spaces ("记下/").
+        allowedPrefixes: null,
+        allow: ({ state, range }) => slashMayOpen(state.doc.resolve(range.from)),
+        items: ({ query }) => slashChoices().filter((c) => matches(c, query)),
+        command: run,
+        render: popup,
+      }),
+      // A Chinese input method types a full-width "／" for "/".
+      Suggestion<Choice>({
+        editor: this.editor,
+        pluginKey: new PluginKey("slashMenuWide"),
+        char: "／",
         allowedPrefixes: null,
         allow: ({ state, range }) => slashMayOpen(state.doc.resolve(range.from)),
         items: ({ query }) => slashChoices().filter((c) => matches(c, query)),

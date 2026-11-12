@@ -65,7 +65,7 @@ pub fn has_pending_migrations(conn: &Connection) -> rusqlite::Result<bool> {
 }
 
 /// Bump whenever `INDEX_TABLES` changes.
-const INDEX_VERSION: i64 = 12;
+const INDEX_VERSION: i64 = 13;
 
 const INDEX_TABLES: &str = "
   CREATE TABLE idx.cards (
@@ -104,6 +104,10 @@ const INDEX_TABLES: &str = "
   CREATE TABLE idx.tags (card_id TEXT, bid TEXT, tag TEXT, name TEXT);
   CREATE INDEX idx.tags_by_tag ON tags(tag);
   CREATE INDEX idx.tags_by_card ON tags(card_id);
+  -- Tags named in query blocks' conditions (13), lower case.
+  CREATE TABLE idx.query_tags (card_id TEXT, bid TEXT, tag TEXT);
+  CREATE INDEX idx.query_tags_by_tag ON query_tags(tag);
+  CREATE INDEX idx.query_tags_by_card ON query_tags(card_id);
   -- The topics a card is in (§4.7), by topic id in the workspace document.
   CREATE TABLE idx.card_topics (card_id TEXT, topic TEXT);
   CREATE INDEX idx.card_topics_by_topic ON card_topics(topic);
@@ -132,7 +136,7 @@ pub fn migrate(conn: &Connection) -> rusqlite::Result<bool> {
     }
     conn.execute_batch(&format!(
         "DROP TABLE IF EXISTS idx.cards; DROP TABLE IF EXISTS idx.blocks; DROP TABLE IF EXISTS idx.links;
-         DROP TABLE IF EXISTS idx.refs; DROP TABLE IF EXISTS idx.fts; DROP TABLE IF EXISTS idx.tags;
+         DROP TABLE IF EXISTS idx.refs; DROP TABLE IF EXISTS idx.fts; DROP TABLE IF EXISTS idx.tags; DROP TABLE IF EXISTS idx.query_tags;
          DROP TABLE IF EXISTS idx.card_topics; DROP TABLE IF EXISTS idx.asset_refs;
          {INDEX_TABLES} PRAGMA idx.user_version = {INDEX_VERSION};"
     ))?;

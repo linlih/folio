@@ -2,6 +2,7 @@
 //! Later: the Markdown mirror, Logseq import, JSON Canvas (M6).
 
 pub mod markdown;
+pub mod query;
 
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
@@ -128,12 +129,14 @@ pub fn export_markdown(
     block_text: &dyn Fn(&str) -> Option<String>,
     asset_file: &dyn Fn(&str) -> Option<PathBuf>,
     untitled: &str,
+    topic_name: &dyn Fn(&str) -> Option<String>,
+    zh: bool,
 ) -> std::io::Result<ExportSummary> {
     let names = names(cards, untitled);
     let card_title = |id: &str| names.get(id).map(|(_, stem)| stem.clone());
     let copies = FileCopies::new(dir.join("assets"), "../assets/", asset_file);
     let file = |sha256: &str, name: &str| copies.link(sha256, name);
-    let links = Links { card_title: &card_title, block_text, file: &file };
+    let links = Links { card_title: &card_title, block_text, file: &file, topic_name, zh };
     let mut summary = ExportSummary::default();
     for folder in ["cards", "journals"] {
         std::fs::create_dir_all(dir.join(folder))?;

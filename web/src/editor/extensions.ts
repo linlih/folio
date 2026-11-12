@@ -8,6 +8,7 @@ import { CardLink } from "./cardLink";
 import { CodeBlock, CodeBlockKeys, DiagramEditing } from "./codeBlock";
 import { BlockRef } from "./refs";
 import { BlockEmbed } from "./embed";
+import { QueryNode } from "./query";
 import { Tag } from "./tag";
 import { RevealBlock } from "./reveal";
 import { MathEditing } from "./mathEditing";
@@ -93,6 +94,8 @@ export function baseExtensions(isRemote: RemoteTxPredicate, placeholder = "", mo
     CardLink,
     BlockRef,
     BlockEmbed,
+    // Live queries (design/query.md).
+    QueryNode,
     Tag,
     RevealBlock,
     BlockId(isRemote),

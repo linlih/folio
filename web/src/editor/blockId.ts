@@ -17,6 +17,7 @@ export const BLOCK_TYPES = [
   "file",
   "blockMath",
   "table",
+  "query",
 ] as const;
 
 const BLOCK_SET = new Set<string>(BLOCK_TYPES);

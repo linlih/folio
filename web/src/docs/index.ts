@@ -30,6 +30,8 @@ export interface IndexExtract {
   refs: [string, string][];
   /** [block holding the tag, tag name as written] */
   tags: [string, string][];
+  /** [query block, tag in lower case]: tags query blocks name. */
+  queryTags?: [string, string][];
 }
 
 type Json = { nodeName?: string; attributes?: Record<string, unknown>; children?: unknown[] } | string;
@@ -121,6 +123,33 @@ function walk(nodes: Json[], parent: string | null, out: IndexExtract) {
 
 export function extractIndex(doc: LoroDoc): IndexExtract {
   const out: IndexExtract = { blocks: [], links: [], refs: [], tags: [] };
-  walk(kids(bodyJson(doc) as Json), null, out);
+  const root = bodyJson(doc) as Json;
+  walk(kids(root), null, out);
+  out.queryTags = queryTags(root);
+  return out;
+}
+
+/** Tags named in query blocks' conditions, wherever they sit. */
+function queryTags(root: Json): [string, string][] {
+  const out: [string, string][] = [];
+  const conds = (where: unknown, bid: string) => {
+    if (!Array.isArray(where)) return;
+    for (const c of where as { k?: unknown; v?: unknown; where?: unknown }[]) {
+      if (c?.k === "tag" && Array.isArray(c.v)) for (const t of c.v) typeof t === "string" && !out.some(([b, x]) => b === bid && x === t) && out.push([bid, t]);
+      if (c?.k === "group") conds(c.where, bid);
+    }
+  };
+  const visit = (n: Json) => {
+    if (typeof n === "string") return;
+    if (n.nodeName === "query" && typeof n.attributes?.spec === "string") {
+      try {
+        conds((JSON.parse(n.attributes.spec) as { where?: unknown }).where, String(n.attributes.bid ?? ""));
+      } catch {
+        // Not a spec this can read: nothing to rename in it.
+      }
+    }
+    kids(n).forEach(visit);
+  };
+  visit(root);
   return out;
 }

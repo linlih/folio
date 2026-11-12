@@ -13,6 +13,7 @@ pub mod assets;
 pub mod backup;
 pub mod copy;
 mod compact;
+mod query;
 mod repair;
 mod schema;
 
@@ -28,6 +29,7 @@ use serde::{Deserialize, Serialize};
 pub use assets::{AssetInfo, Incoming, Swept};
 pub use backup::{BackupInfo, CardVersion};
 pub use compact::Compacted;
+pub use query::{QueryRows, ResolvedCond, ResolvedQuery};
 
 #[derive(Debug, thiserror::Error)]
 pub enum StoreError {
@@ -760,6 +762,15 @@ impl Store {
         Ok(self.conn.query_row("SELECT EXISTS(SELECT 1 FROM purged WHERE doc_id = ?1)", [id.as_str()], |r| r.get(0))?)
     }
 
+    /// Topic names by id (query blocks name topics by id).
+    pub fn topic_names(&mut self) -> Result<std::collections::HashMap<String, String>> {
+        let ws = DocId::workspace();
+        if self.kind_of(&ws)?.is_none() {
+            return Ok(Default::default());
+        }
+        Ok(folio_core::workspace::topics(self.doc_mut(&ws, DocKind::Workspace)?).into_iter().map(|t| (t.id, t.name)).collect())
+    }
+
     /// Deletes here what the workspace document lists as deleted for good
     /// and is not yet: the document, its updates, what waits to be sent,
     /// the reports of it and its index rows. (Local backups keep it until
@@ -793,6 +804,7 @@ impl Store {
                 ("blocks", "card_id"),
                 ("fts", "card_id"),
                 ("tags", "card_id"),
+                ("query_tags", "card_id"),
                 ("card_topics", "card_id"),
                 ("asset_refs", "doc_id"),
                 ("links", "from_card"),
@@ -901,7 +913,10 @@ impl Store {
     /// Every document with the tag: cards and journal days, in the trash
     /// too (renaming a tag reaches them all).
     pub fn tag_docs(&self, tag: &str) -> Result<Vec<String>> {
-        let mut stmt = self.conn.prepare_cached("SELECT DISTINCT card_id FROM idx.tags WHERE tag = ?1 ORDER BY card_id")?;
+        // Query blocks naming it too (design/query.md §6).
+        let mut stmt = self.conn.prepare_cached(
+            "SELECT card_id FROM idx.tags WHERE tag = ?1 UNION SELECT card_id FROM idx.query_tags WHERE tag = ?1 ORDER BY card_id",
+        )?;
         let rows = stmt.query_map([tag_key(tag)], |r| r.get(0))?;
         Ok(rows.collect::<std::result::Result<_, _>>()?)
     }
@@ -1489,9 +1504,9 @@ impl Store {
         let x = folio_core::index::extract(self.doc_mut(id, DocKind::Card)?);
         let topics = card::card_topics(self.doc_mut(id, DocKind::Card)?);
         let tx = self.conn.unchecked_transaction()?;
-        for table in ["blocks", "links", "refs", "fts", "tags", "card_topics", "asset_refs"] {
+        for table in ["blocks", "links", "refs", "fts", "tags", "query_tags", "card_topics", "asset_refs"] {
             let column = match table {
-                "blocks" | "fts" | "tags" | "card_topics" => "card_id",
+                "blocks" | "fts" | "tags" | "query_tags" | "card_topics" => "card_id",
                 "asset_refs" => "doc_id",
                 _ => "from_card",
             };
@@ -1534,6 +1549,9 @@ impl Store {
                 "INSERT INTO idx.tags(card_id, bid, tag, name) VALUES (?1, ?2, ?3, ?4)",
                 params![id.as_str(), bid, tag_key(name), name],
             )?;
+        }
+        for (bid, tag) in &x.query_tags {
+            tx.execute("INSERT INTO idx.query_tags(card_id, bid, tag) VALUES (?1, ?2, ?3)", params![id.as_str(), bid, tag_key(tag)])?;
         }
         for topic in &topics {
             tx.execute("INSERT INTO idx.card_topics(card_id, topic) VALUES (?1, ?2)", params![id.as_str(), topic])?;

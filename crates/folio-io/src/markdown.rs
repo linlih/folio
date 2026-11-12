@@ -20,11 +20,15 @@ pub struct Links<'a> {
     /// Where an image or attachment (hash, name) is linked from, already
     /// URL-safe; None writes its name alone.
     pub file: &'a dyn Fn(&str, &str) -> Option<String>,
+    /// A topic's name (query blocks name topics by id).
+    pub topic_name: &'a dyn Fn(&str) -> Option<String>,
+    /// Query blocks' keywords in Chinese, as the app shows them.
+    pub zh: bool,
 }
 
 impl Links<'_> {
     /// Links shown as their stored text (tests, no index at hand).
-    pub const STORED: Links<'static> = Links { card_title: &|_| None, block_text: &|_| None, file: &|_, _| None };
+    pub const STORED: Links<'static> = Links { card_title: &|_| None, block_text: &|_| None, file: &|_, _| None, topic_name: &|_| None, zh: false };
 }
 
 /// A path as a Markdown link target: characters that would end or confuse
@@ -308,6 +312,14 @@ fn blocks(tree: &LoroTree, nodes: &[Block], links: &Links, out: &mut Vec<String>
             "horizontalRule" => out.push("---".to_owned()),
             "image" => out.push(image(node, links)),
             "file" => out.push(file(node, links)),
+            "query" => {
+                // As text in a code block (design/query.md §8): the results
+                // are what the cards say, not part of this one.
+                let names = crate::query::QueryNames { zh: links.zh, card_title: links.card_title, topic_name: links.topic_name };
+                if let Some(text) = attr_str(node, "spec").and_then(|s| crate::query::query_text(&s, &names)) {
+                    out.push(format!("```folio-query\n{text}\n```"));
+                }
+            }
             "blockMath" => out.push(format!("$$\n{}\n$$", attr_str(node, "latex").unwrap_or_default())),
             "table" => out.push(table(tree, *id, links)),
             k if LISTS.contains(&k) => out.push(list(tree, *id, node, links)),

@@ -217,7 +217,8 @@
     "numbered": "编号列表",
     "numberedChildren": "子项编号",
     "table": "表格",
-    "template": "模板"
+    "template": "模板",
+    "query": "查询"
   },
   "suggest": {
     "none": "没有匹配",
@@ -970,6 +971,241 @@
     "undated": "更早（没有记录时间）",
     "restore": "恢复到这个版本",
     "restored": "已恢复到 {{when}} 的版本"
+  },
+  "query": {
+    "sum": {
+      "not": "不含 ",
+      "or": " 或 ",
+      "and": "、",
+      "status": "状态：{{list}}",
+      "with": "含“{{text}}”",
+      "without": "不含“{{text}}”",
+      "in": {
+        "cards": "在卡片里",
+        "journal": "在日记里",
+        "inbox": "在收集箱里",
+        "this": "在本卡里",
+        "topic": "在主题「{{name}}」"
+      },
+      "aBlock": "某个块",
+      "thisCard": "本卡",
+      "links": "链接到{{target}}",
+      "aboutThis": "本卡相关",
+      "kind": {
+        "tasks": "任务",
+        "blocks": "块",
+        "cards": "卡片"
+      },
+      "kindState": {
+        "open": "未完成任务",
+        "done": "已完成任务",
+        "canceled": "已取消任务",
+        "backlog": "待规划任务",
+        "todo": "待办任务",
+        "doing": "进行中任务",
+        "review": "审核中任务",
+        "any": "任务"
+      },
+      "state": {
+        "open": "未完成",
+        "done": "已完成",
+        "canceled": "已取消",
+        "backlog": "待规划",
+        "todo": "待办",
+        "doing": "进行中",
+        "review": "审核中",
+        "any": "全部"
+      },
+      "day": {
+        "today": "今天",
+        "page": "本页那天",
+        "tomorrow": "明天",
+        "yesterday": "昨天"
+      },
+      "period": {
+        "this-week": "本周",
+        "last-week": "上周",
+        "next-week": "下周",
+        "this-month": "本月",
+        "last-month": "上月",
+        "next-month": "下月"
+      },
+      "due": {
+        "within_one": "{{count}} 天内到期",
+        "within_other": "{{count}} 天内到期",
+        "overdue": "已过期",
+        "none": "没有日期",
+        "period": "{{period}}到期",
+        "on": "{{day}}到期"
+      },
+      "deadline": {
+        "within_one": "{{count}} 天内截止",
+        "within_other": "{{count}} 天内截止",
+        "overdue": "已过截止日期",
+        "none": "没有截止日期",
+        "period": "{{period}}截止",
+        "on": "{{day}}截止"
+      },
+      "scheduled": {
+        "within_one": "{{count}} 天内计划",
+        "within_other": "{{count}} 天内计划",
+        "overdue": "计划日期已过",
+        "none": "没有计划日期",
+        "period": "计划在{{period}}",
+        "on": "计划在{{day}}"
+      },
+      "created": {
+        "recent_one": "最近 {{count}} 天新建",
+        "recent_other": "最近 {{count}} 天新建",
+        "period": "{{period}}新建",
+        "on": "{{day}}新建"
+      },
+      "updated": {
+        "recent_one": "最近 {{count}} 天修改",
+        "recent_other": "最近 {{count}} 天修改",
+        "period": "{{period}}修改",
+        "on": "{{day}}修改"
+      },
+      "journalDay": {
+        "recent_one": "最近 {{count}} 天的日记",
+        "recent_other": "最近 {{count}} 天的日记",
+        "period": "{{period}}的日记",
+        "on": "{{day}}的日记"
+      }
+    },
+    "err": {
+      "unclosedQuote": "引号没有配对",
+      "nested": "括号最多一层",
+      "unopened": "多了一个右括号",
+      "unclosed": "括号没有闭合",
+      "emptyOr": "OR 两边都要有条件",
+      "negatedSetting": "设置不能取反",
+      "emptyTag": "# 后面要有标签名",
+      "unknownKeyNear": "不认识的关键字「{{key}}」，是不是「{{near}}」？",
+      "emptyValue": "「{{key}}:」后面要有值",
+      "fieldsLater": "字段条件还不支持，下一版会加上",
+      "badValue": "「{{key}}:」不认识「{{value}}」这个值",
+      "noTopic": "找不到主题「{{name}}」",
+      "manyTopics": "有好几个叫「{{name}}」的主题，请在条件页里选",
+      "noCard": "找不到卡片「{{name}}」",
+      "manyCards": "有 {{count}} 张叫「{{name}}」的卡片，请在条件页里选",
+      "twoSorts": "排序最多两级",
+      "badLimit": "条数是 1 到 {{max}} 的整数"
+    },
+    "newer": "这个查询需要更新 Folio 才能显示",
+    "untitled": "新查询",
+    "startHint": "选一个常用查询，或添加条件",
+    "edit": "编辑条件",
+    "display": "显示设置",
+    "copyText": "复制为文字",
+    "copied": "已复制查询",
+    "refresh": "刷新",
+    "delete": "删除查询",
+    "menu": "查询选项",
+    "fold": "收起",
+    "unfold": "展开",
+    "empty": {
+      "tasks": "没有符合的任务",
+      "blocks": "没有符合的块",
+      "cards": "没有符合的卡片"
+    },
+    "showAll": "显示全部 {{count}} 条",
+    "tooMany": "最多显示 {{max}} 条，加些条件缩小范围",
+    "noDate": "没有日期",
+    "panel": {
+      "conds": "条件",
+      "display": "显示",
+      "text": "文字",
+      "done": "完成",
+      "presets": "常用查询",
+      "find": "查",
+      "matching": "，满足",
+      "all": "全部",
+      "any": "任一",
+      "conditions": "条件",
+      "groupAll": "以下全部满足",
+      "groupAny": "以下任一满足",
+      "not": "非",
+      "negate": "取反",
+      "remove": "删除",
+      "kind": "条件种类",
+      "addCond": "条件",
+      "addGroup": "条件组",
+      "textHint": "要包含的文字",
+      "tagHint": "标签名",
+      "cardHint": "搜索卡片…",
+      "title": "标题",
+      "titleHint": "空着就用条件摘要",
+      "show": "显示",
+      "sort": "排序",
+      "thenBy": "再按",
+      "sortDefault": "默认",
+      "none": "无",
+      "asc": "升序",
+      "desc": "降序",
+      "group": "分组",
+      "limit": "条数",
+      "textTip": "例如：任务:未完成 #项目A 到期:<=+7天。⌘↩ 完成"
+    },
+    "preset": {
+      "aboutThis": "本卡相关的未完成任务",
+      "dueSoon": "7 天内到期的任务",
+      "newCards": "最近 7 天新建的卡片",
+      "editedCards": "最近 7 天修改的卡片",
+      "tagCards": "带某个标签的卡片",
+      "tagJournal": "最近日记里带某个标签的块"
+    },
+    "kinds": {
+      "tag": "标签",
+      "task": "任务状态",
+      "priority": "优先级",
+      "due": "到期",
+      "deadline": "截止日期",
+      "scheduled": "计划日期",
+      "created": "创建时间",
+      "updated": "修改时间",
+      "day": "日记日期",
+      "text": "文字",
+      "in": "位置",
+      "links": "链接到"
+    },
+    "dates": {
+      "today": "今天",
+      "overdue": "已过期",
+      "within7": "7 天内（含已过期）",
+      "this-week": "本周",
+      "next-week": "下周",
+      "last-week": "上周",
+      "this-month": "本月",
+      "last-month": "上月",
+      "none": "没有日期",
+      "recent7": "最近 7 天",
+      "recent30": "最近 30 天",
+      "page": "本页那天",
+      "custom": "自定义",
+      "from": "从",
+      "to": "到"
+    },
+    "places": {
+      "this": "本卡",
+      "cards": "卡片",
+      "journal": "日记",
+      "inbox": "收集箱",
+      "topic": "主题"
+    },
+    "sorts": {
+      "due": "到期",
+      "priority": "优先级",
+      "created": "创建时间",
+      "updated": "修改时间",
+      "day": "日期",
+      "title": "标题"
+    },
+    "groups": {
+      "card": "按卡片",
+      "day": "按日期",
+      "status": "按状态"
+    }
   },
   "tasks": {
     "title": "任务",

@@ -1,9 +1,10 @@
 import { Channel, convertFileSrc, invoke } from "@tauri-apps/api/core";
 import type { AppInfo, AssetInfo, BackupCopyStatus, BackupInfo, CopySuggestion, PickedCopyFolder, Backlink, BlockText, CardRow, JournalDay, McpStatus, SearchHit, SyncDevice, SyncStatus, TagInfo, TopicCount, CardText } from "../bindings/commands";
 import type { AiKeyInfo, Backend, ExportResult } from "./backend";
+import i18n from "../i18n";
 import type { AiEvent, AiModelInfo, AiReply, AiTool } from "../ai/types";
 import type { LatestRelease, LibraryLocation, PickedFolder } from "../bindings/commands";
-import type { InboxItem, LinkPreview, TagCard, TaskRow } from "../bindings/commands";
+import type { InboxItem, LinkPreview, QueryRows, TagCard, TaskRow } from "../bindings/commands";
 
 const ANDROID = typeof navigator !== "undefined" && /Android/i.test(navigator.userAgent);
 
@@ -27,6 +28,7 @@ export function tauriBackend(): Backend {
     restoreCard: (id) => invoke<void>("restore_card", { id }),
     listTrash: (limit) => invoke<CardRow[]>("list_trash", { limit }),
     tasks: (closed, limit) => invoke<TaskRow[]>("tasks", { closed, limit }),
+    query: (q) => invoke<QueryRows>("query", { q }),
     emptyTrash: () => invoke<string[]>("empty_trash"),
     journalDays: (from, to) => invoke<JournalDay[]>("journal_days", { from, to }),
     backlinks: (id) => invoke<Backlink[]>("backlinks", { id }),
@@ -39,15 +41,15 @@ export function tauriBackend(): Backend {
     exportDiagnostics: () => invoke<string>("export_diagnostics"),
     // WKWebView ignores window.print(): the host opens the dialog.
     exportPdf: (fileName) => invoke<string | null>("export_pdf", { fileName }),
-    exportMarkdown: (folderName, untitled) => invoke<ExportResult | null>("export_markdown", { folderName, untitled }),
+    exportMarkdown: (folderName, untitled) => invoke<ExportResult | null>("export_markdown", { folderName, untitled, lang: i18n.language }),
     tags: (limit) => invoke<TagInfo[]>("tags", { limit }),
     topicCards: (topic) => invoke<CardRow[]>("topic_cards", { topic }),
     topicCounts: () => invoke<TopicCount[]>("topic_counts"),
     cardTexts: (ids) => invoke<CardText[]>("card_texts", { ids }),
     cardTopicPairs: () => invoke<[string, string][]>("card_topic_pairs"),
     tagged: (tag, limit) => invoke<Backlink[]>("tagged", { tag, limit }),
-    cardMarkdown: (id) => invoke<string>("card_markdown", { id }),
-    exportCard: (id, fileName) => invoke<string | null>("export_card", { id, fileName }),
+    cardMarkdown: (id) => invoke<string>("card_markdown", { id, lang: i18n.language }),
+    exportCard: (id, fileName) => invoke<string | null>("export_card", { id, fileName, lang: i18n.language }),
     saveTextFile: (fileName, content) => invoke<string | null>("save_canvas", { fileName, content }),
     pinCard: (id, pinned) => invoke<void>("pin_card", { id, pinned }),
     pinnedCards: () => invoke<CardRow[]>("pinned_cards"),

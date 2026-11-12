@@ -217,7 +217,8 @@
     "numbered": "Numbered list",
     "numberedChildren": "Number children",
     "table": "Table",
-    "template": "Template"
+    "template": "Template",
+    "query": "Query"
   },
   "suggest": {
     "none": "No matches",
@@ -970,6 +971,241 @@
     "undated": "Earlier (time not recorded)",
     "restore": "Restore this version",
     "restored": "Restored the version from {{when}}"
+  },
+  "query": {
+    "sum": {
+      "not": "not ",
+      "or": " or ",
+      "and": ", ",
+      "status": "status: {{list}}",
+      "with": "with “{{text}}”",
+      "without": "without “{{text}}”",
+      "in": {
+        "cards": "in cards",
+        "journal": "in the journal",
+        "inbox": "in the inbox",
+        "this": "in this card",
+        "topic": "in topic “{{name}}”"
+      },
+      "aBlock": "a block",
+      "thisCard": "this card",
+      "links": "linking to {{target}}",
+      "aboutThis": "about this card",
+      "kind": {
+        "tasks": "Tasks",
+        "blocks": "Blocks",
+        "cards": "Cards"
+      },
+      "kindState": {
+        "open": "Open tasks",
+        "done": "Done tasks",
+        "canceled": "Canceled tasks",
+        "backlog": "Backlog tasks",
+        "todo": "To-do tasks",
+        "doing": "Tasks in progress",
+        "review": "Tasks in review",
+        "any": "Tasks"
+      },
+      "state": {
+        "open": "open",
+        "done": "done",
+        "canceled": "canceled",
+        "backlog": "backlog",
+        "todo": "to do",
+        "doing": "doing",
+        "review": "in review",
+        "any": "any"
+      },
+      "day": {
+        "today": "today",
+        "page": "this page's day",
+        "tomorrow": "tomorrow",
+        "yesterday": "yesterday"
+      },
+      "period": {
+        "this-week": "this week",
+        "last-week": "last week",
+        "next-week": "next week",
+        "this-month": "this month",
+        "last-month": "last month",
+        "next-month": "next month"
+      },
+      "due": {
+        "within_one": "due within {{count}} day",
+        "within_other": "due within {{count}} days",
+        "overdue": "overdue",
+        "none": "no date",
+        "period": "due {{period}}",
+        "on": "due {{day}}"
+      },
+      "deadline": {
+        "within_one": "deadline within {{count}} day",
+        "within_other": "deadline within {{count}} days",
+        "overdue": "past deadline",
+        "none": "no deadline",
+        "period": "deadline {{period}}",
+        "on": "deadline {{day}}"
+      },
+      "scheduled": {
+        "within_one": "scheduled within {{count}} day",
+        "within_other": "scheduled within {{count}} days",
+        "overdue": "scheduled in the past",
+        "none": "not scheduled",
+        "period": "scheduled {{period}}",
+        "on": "scheduled {{day}}"
+      },
+      "created": {
+        "recent_one": "created in the last day",
+        "recent_other": "created in the last {{count}} days",
+        "period": "created {{period}}",
+        "on": "created {{day}}"
+      },
+      "updated": {
+        "recent_one": "changed in the last day",
+        "recent_other": "changed in the last {{count}} days",
+        "period": "changed {{period}}",
+        "on": "changed {{day}}"
+      },
+      "journalDay": {
+        "recent_one": "journal of the last day",
+        "recent_other": "journal of the last {{count}} days",
+        "period": "journal {{period}}",
+        "on": "journal of {{day}}"
+      }
+    },
+    "err": {
+      "unclosedQuote": "A quote is not closed",
+      "nested": "Only one level of brackets",
+      "unopened": "A closing bracket too many",
+      "unclosed": "A bracket is not closed",
+      "emptyOr": "OR needs conditions on both sides",
+      "negatedSetting": "Settings can't be negated",
+      "emptyTag": "# needs a tag name",
+      "unknownKeyNear": "Unknown keyword “{{key}}”. Did you mean “{{near}}”?",
+      "emptyValue": "“{{key}}:” needs a value",
+      "fieldsLater": "Field conditions aren't supported yet",
+      "badValue": "“{{key}}:” doesn't take “{{value}}”",
+      "noTopic": "No topic named “{{name}}”",
+      "manyTopics": "Several topics are named “{{name}}”; pick one in Conditions",
+      "noCard": "No card titled “{{name}}”",
+      "manyCards": "{{count}} cards are titled “{{name}}”; pick one in Conditions",
+      "twoSorts": "At most two sort levels",
+      "badLimit": "The limit is a whole number from 1 to {{max}}"
+    },
+    "newer": "This query needs a newer Folio to show",
+    "untitled": "New query",
+    "startHint": "Pick a common query, or add conditions",
+    "edit": "Edit conditions",
+    "display": "Display",
+    "copyText": "Copy as text",
+    "copied": "Query copied",
+    "refresh": "Refresh",
+    "delete": "Delete query",
+    "menu": "Query options",
+    "fold": "Collapse",
+    "unfold": "Expand",
+    "empty": {
+      "tasks": "No matching tasks",
+      "blocks": "No matching blocks",
+      "cards": "No matching cards"
+    },
+    "showAll": "Show all {{count}}",
+    "tooMany": "Showing at most {{max}}; add conditions to narrow it",
+    "noDate": "No date",
+    "panel": {
+      "conds": "Conditions",
+      "display": "Display",
+      "text": "Text",
+      "done": "Done",
+      "presets": "Common queries",
+      "find": "Find",
+      "matching": "matching",
+      "all": "all",
+      "any": "any",
+      "conditions": "conditions",
+      "groupAll": "All of",
+      "groupAny": "Any of",
+      "not": "Not",
+      "negate": "Negate",
+      "remove": "Remove",
+      "kind": "Condition",
+      "addCond": "Condition",
+      "addGroup": "Group",
+      "textHint": "Text to contain",
+      "tagHint": "Tag name",
+      "cardHint": "Search cards…",
+      "title": "Title",
+      "titleHint": "Empty: a summary of the conditions",
+      "show": "Show",
+      "sort": "Sort by",
+      "thenBy": "Then by",
+      "sortDefault": "Default",
+      "none": "None",
+      "asc": "Ascending",
+      "desc": "Descending",
+      "group": "Group",
+      "limit": "Rows",
+      "textTip": "For example: task:open #projectA due:<=+7d. ⌘↩ to finish"
+    },
+    "preset": {
+      "aboutThis": "Open tasks about this card",
+      "dueSoon": "Tasks due within 7 days",
+      "newCards": "Cards created in the last 7 days",
+      "editedCards": "Cards edited in the last 7 days",
+      "tagCards": "Cards with a tag",
+      "tagJournal": "Recent journal blocks with a tag"
+    },
+    "kinds": {
+      "tag": "Tag",
+      "task": "Task status",
+      "priority": "Priority",
+      "due": "Due",
+      "deadline": "Deadline",
+      "scheduled": "Scheduled",
+      "created": "Created",
+      "updated": "Edited",
+      "day": "Journal day",
+      "text": "Text",
+      "in": "In",
+      "links": "Links to"
+    },
+    "dates": {
+      "today": "Today",
+      "overdue": "Overdue",
+      "within7": "Within 7 days (and overdue)",
+      "this-week": "This week",
+      "next-week": "Next week",
+      "last-week": "Last week",
+      "this-month": "This month",
+      "last-month": "Last month",
+      "none": "No date",
+      "recent7": "Last 7 days",
+      "recent30": "Last 30 days",
+      "page": "This page's day",
+      "custom": "Custom",
+      "from": "From",
+      "to": "To"
+    },
+    "places": {
+      "this": "This card",
+      "cards": "Cards",
+      "journal": "Journal",
+      "inbox": "Inbox",
+      "topic": "Topic"
+    },
+    "sorts": {
+      "due": "Due",
+      "priority": "Priority",
+      "created": "Created",
+      "updated": "Edited",
+      "day": "Day",
+      "title": "Title"
+    },
+    "groups": {
+      "card": "By card",
+      "day": "By day",
+      "status": "By status"
+    }
   },
   "tasks": {
     "title": "Tasks",

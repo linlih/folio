@@ -132,7 +132,7 @@ export interface Backlink {
   bid: string;
   text: string;
   /** "link" ([[card]]), "ref" (((block)) of the card), "mention" (unlinked) or "tag" (a tag page). */
-  via: "link" | "ref" | "mention" | "tag";
+  via: "link" | "ref" | "mention" | "tag" | "query";
   /** The blocks nested under it, in document order (tag pages only). */
   children?: ChildBlock[];
 }
@@ -158,6 +158,53 @@ export interface TaskRow {
   deadline: string | null;
   scheduled: string | null;
   updatedAt: number;
+}
+
+/** One condition of a query as the store runs it (folio-store's
+ *  `query`; query/resolve.ts): dates and ids already worked out. */
+export interface ResolvedCond {
+  k: "tag" | "task" | "priority" | "date" | "time" | "text" | "in" | "links" | "group";
+  not: boolean;
+  /** tag: any of these (lower case); task, priority: any of these; text:
+   *  [words]; in: ["cards"], ["journal"], ["inbox"], ["card", id] or
+   *  ["topic", id]. */
+  v?: string[];
+  /** date: due, deadline, scheduled or day; time: created or updated. */
+  field?: string;
+  /** date: YYYY-MM-DD, inclusive; null is open. */
+  from?: string | null;
+  to?: string | null;
+  /** date: has no such date. */
+  none?: boolean;
+  /** time: ms, from inclusive, to exclusive. */
+  fromMs?: number | null;
+  toMs?: number | null;
+  /** links: to this card, or to this block. */
+  card?: string;
+  block?: string;
+  /** group */
+  match?: "all" | "any";
+  where?: ResolvedCond[];
+}
+
+export interface ResolvedQuery {
+  show: "tasks" | "blocks" | "cards";
+  match: "all" | "any";
+  where: ResolvedCond[];
+  sort: { by: string; desc: boolean }[];
+  /** Cards never listed (templates). */
+  exclude: string[];
+  /** Cards still in the inbox are listed only when a condition names it. */
+  includeInbox: boolean;
+  limit: number;
+}
+
+/** A query's rows, the kind asked for, and how many there are in all. */
+export interface QueryRows {
+  tasks: TaskRow[];
+  blocks: Backlink[];
+  cards: CardRow[];
+  total: number;
 }
 
 export interface SearchHit {
