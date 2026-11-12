@@ -79,6 +79,22 @@ export async function pointer(page, touch = false) {
     document.body.appendChild(c);
     window.addEventListener("mousemove", (e) => { c.style.left = e.clientX + "px"; c.style.top = e.clientY + "px"; }, true);
     window.addEventListener("mousedown", () => (c.style.transform = "scale(.8)"), true);
+    // A native drag sends no mouse moves and its drag image is not recorded:
+    // follow dragover, and draw the dragged element under the pointer.
+    let ghost = null;
+    window.addEventListener("dragstart", (e) => {
+      const el = e.target.closest?.("[draggable=true]"); if (!el) return;
+      const r = el.getBoundingClientRect();
+      ghost = el.cloneNode(true);
+      Object.assign(ghost.style, { position: "fixed", zIndex: 99998, pointerEvents: "none", width: r.width + "px", height: r.height + "px", margin: 0, opacity: 0.75, boxShadow: "0 8px 24px rgb(0 0 0 / .18)", left: r.left + "px", top: r.top + "px" });
+      ghost.dataset.dx = e.clientX - r.left; ghost.dataset.dy = e.clientY - r.top;
+      document.body.appendChild(ghost);
+    }, true);
+    window.addEventListener("dragover", (e) => {
+      c.style.left = e.clientX + "px"; c.style.top = e.clientY + "px";
+      if (ghost) { ghost.style.left = e.clientX - ghost.dataset.dx + "px"; ghost.style.top = e.clientY - ghost.dataset.dy + "px"; }
+    }, true);
+    for (const t of ["drop", "dragend"]) window.addEventListener(t, () => { ghost?.remove(); ghost = null; c.style.transform = ""; }, true);
     window.addEventListener("mouseup", () => (c.style.transform = ""), true);
   }, touch);
   if (touch) at = { x: 195, y: 500 };
@@ -123,4 +139,22 @@ export async function record(name, size, setup, scene, touch = false) {
   // The recording starts a little before the page loads; measured below.
   console.log(name, "scene", from.toFixed(1), "→", to.toFixed(1), file);
   fs.writeFileSync(`raw/${name}.json`, JSON.stringify({ file, from, to }));
+}
+
+/** Press on `from`, move to a point (or element), release. */
+export async function drag(page, from, to, { ms = 900, fromOpts = {} } = {}) {
+  await moveTo(page, from, fromOpts);
+  await page.waitForTimeout(150);
+  await page.mouse.down(); await page.waitForTimeout(120);
+  const b = "x" in to ? null : await (typeof to === "string" ? page.locator(to).first() : to).boundingBox();
+  const end = b ? { x: b.x + b.width / 2, y: b.y + b.height / 2 } : to;
+  const steps = Math.round(ms / 16);
+  for (let i = 1; i <= steps; i++) {
+    const k = i / steps, e = k < 0.5 ? 2 * k * k : 1 - (-2 * k + 2) ** 2 / 2;
+    await page.mouse.move(at.x + (end.x - at.x) * e, at.y + (end.y - at.y) * e);
+    await page.waitForTimeout(16);
+  }
+  at = end;
+  await page.waitForTimeout(150);
+  await page.mouse.up(); await page.waitForTimeout(450);
 }

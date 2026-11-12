@@ -4,9 +4,9 @@
 
 <p align="center"><b>A local-first note app for people who think in outlines and links.</b><br>
 A daily journal, linked cards, tasks, live queries and whiteboards in one fast app.<br>
-Your notes stay on your own device.</p>
+Your notes stay on your own device. Free and open source.</p>
 
-<p align="center"><a href="#download"><b>Download</b></a> · <a href="#features">Features</a> · <a href="#self-hosting-the-sync-server">Sync server</a> · <a href="#development">Development</a></p>
+<p align="center"><a href="#download"><b>Download</b></a> · <a href="#features">Features</a> · <a href="#self-hosting-the-sync-server">Sync server</a> · <a href="#development">Development</a> · <a href="#license">License</a></p>
 
 ![Writing in the journal: an outline with a card link, a tag and a task](docs/media/write.gif)
 
@@ -31,9 +31,9 @@ A query block lists the tasks, blocks or cards that match your conditions, and s
 
 ### Lay ideas out on a whiteboard
 
-Put cards on a canvas, connect them, frame them in sections, or build a mind map with the keyboard: Tab for a subtopic, Enter for the next one. Boards export as JSON Canvas, which Obsidian opens.
+Open the card library beside a whiteboard and drag cards onto the canvas. Draw lines between them, frame them in sections, and grow a mind map from any card with the keyboard: Tab for a subtopic, Enter for the next one. The cards on a board are the same cards as in the library, so editing one updates it everywhere. Boards export as JSON Canvas, which Obsidian opens.
 
-![A mind map built with the keyboard, then a card placed beside it](docs/media/board.gif)
+![Cards dragged from the library onto a whiteboard, joined by lines, then a mind map grown from one of them](docs/media/board.gif)
 
 ### Find anything
 
@@ -178,3 +178,9 @@ npm test
 - **iOS** builds are only compile-checked for now. Installing on an iPhone needs an Apple developer account and signing (§7.2). To try it in the simulator: `npx tauri ios init` once and `scripts/ios-share.sh` (adds Folio to the share sheet), then copy `src-tauri/icons/ios/` into `src-tauri/gen/apple/Assets.xcassets/AppIcon.appiconset/` (the generated project has Tauri's placeholder icon), and `npx tauri ios build --target aarch64-sim`.
 
 Signing keys live in the repository secrets: `TAURI_SIGNING_PRIVATE_KEY` and its password for updates, `ANDROID_KEYSTORE_B64` and `ANDROID_KEYSTORE_PASSWORD` for the APK.
+
+## License
+
+Folio is free software under the [GNU Affero General Public License v3.0](LICENSE). You may use, study, change and share it; if you distribute a changed version, or run one as a service for others, you must make its source available under the same license.
+
+Copyright © 2026 linlih.

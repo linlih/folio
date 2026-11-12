@@ -1,4 +1,4 @@
-import { record, type, write, nav, click, moveTo, sleep } from "./lib.mjs";
+import { record, type, write, nav, click, moveTo, drag, sleep } from "./lib.mjs";
 import { seed } from "./seed.mjs";
 const SIZE = { width: 1080, height: 680 };
 const which = process.argv[2];
@@ -37,29 +37,45 @@ const scenes = {
       await page.waitForTimeout(1800);
     });
   },
-  // Whiteboard: a mind map by keyboard, then an existing card beside it.
+  // Whiteboard: cards dragged in from the library, joined by lines, then a
+  // mind map grown from one of them.
   async board() {
-    await record("board", SIZE, async (page) => { await seed(page, { journal: false }); await nav(page, "Whiteboards"); await page.getByText("New whiteboard").click(); await page.waitForTimeout(800); }, async (page) => {
-      await click(page, "[aria-label='Mind map']", { after: 500 });
-      const topic = async (keys, text) => {
-        for (const k of keys) { await page.keyboard.press(k); await page.waitForTimeout(260); }
-        if (text) { await page.keyboard.press("Meta+a"); await type(page, text, D); await page.waitForTimeout(300); }
-      };
-      await topic([" "], "Website redesign");
-      await topic(["Tab"], "Home page");
-      await topic(["Tab"], "Hero copy");
-      await topic(["Enter", "Enter"], "Pricing table");
-      await topic(["Enter"], null);
-      await click(page, page.locator(".board-mind", { hasText: "Home page" }), { after: 300 });
-      await topic(["Enter"], "Blog");
-      await topic(["Tab"], "Launch post");
-      await topic(["Enter"], null);
-      await page.waitForTimeout(500);
-      await click(page, "[aria-label='Add an existing card']", { after: 500 });
-      await type(page, "Dana", D + 20); await page.waitForTimeout(500);
-      await click(page, page.locator(".board-add .popup-item").first(), { after: 900 });
-      await page.keyboard.press("Escape");
-      await click(page, "[aria-label='Show everything']", { after: 2400 });
+    await record("board", { width: 1200, height: 700 }, async (page) => {
+      await seed(page, { journal: false });
+      await nav(page, "Whiteboards"); await page.getByText("New whiteboard").click(); await page.waitForTimeout(700);
+      await page.locator("[aria-label='Split view']").click(); await page.waitForTimeout(500);
+      await page.locator("[aria-label='Hide sidebar']").click(); await page.waitForTimeout(400);
+      await page.locator(".pane").first().locator(".tab", { hasText: "Card library" }).click().catch(() => page.getByText("Card library").first().click());
+      await page.waitForTimeout(600);
+      await page.locator("[aria-label='List view']:visible").click(); await page.waitForTimeout(500);
+      await page.mouse.move(300, 400); await page.mouse.wheel(0, 170); await page.waitForTimeout(600);
+      if (process.env.PROBE) { await page.screenshot({ path: "probe-list.png" }); console.log(await page.$$eval("[draggable=true]", (x) => x.map((e) => e.className + ":" + e.textContent.slice(0, 24)))); }
+    }, async (page) => {
+      const tile = (n) => page.locator("[draggable=true]:visible").filter({ has: page.getByText(n, { exact: true }) }).first();
+      const node = (n) => page.locator(".react-flow__node:visible").filter({ has: page.getByText(n, { exact: true }) }).first();
+      await page.waitForTimeout(400);
+      await drag(page, tile("Website redesign"), { x: 790, y: 330 });
+      await drag(page, tile("Dana"), { x: 1150, y: 170 });
+      await drag(page, tile("How to Take Smart Notes"), { x: 1150, y: 560 }, { ms: 800 });
+      await page.waitForTimeout(400);
+      if (process.env.PROBE) { await page.screenshot({ path: "probe-board.png" }); console.log(await page.$$eval(".react-flow__node", (x) => x.map((e) => e.className.slice(0, 80) + JSON.stringify(e.getBoundingClientRect())))); console.log(await page.$$eval(".board-handle", (x) => x.map((e) => e.className + e.dataset.handlepos + JSON.stringify(e.getBoundingClientRect())).slice(0, 8))); }
+      const fit = () => click(page, "[aria-label='Show everything']:visible", { after: 900 });
+      await fit();
+      const handle = (n, pos) => node(n).locator(`.board-handle[data-handlepos=${pos}]`).first();
+      await moveTo(page, node("Website redesign"));
+      await drag(page, handle("Website redesign", "top"), handle("Dana", "left"), { ms: 700 });
+      await moveTo(page, node("Website redesign"));
+      await drag(page, handle("Website redesign", "bottom"), handle("How to Take Smart Notes", "left"), { ms: 700 });
+      // A mind map grown from a card: Tab adds a subtopic, Enter the next one.
+      await click(page, node("Dana"), { after: 400, dy: -20 });
+      await page.keyboard.press("Tab"); await page.waitForTimeout(350);
+      await type(page, "Ask about pricing", D); await page.waitForTimeout(300);
+      await page.keyboard.press("Enter"); await page.waitForTimeout(300);
+      await page.keyboard.press("Enter"); await page.waitForTimeout(350);
+      await type(page, "Send wireframes", D); await page.waitForTimeout(300);
+      await page.keyboard.press("Enter"); await page.waitForTimeout(400);
+      await fit();
+      await page.waitForTimeout(1800);
     });
   },
   async search() {
