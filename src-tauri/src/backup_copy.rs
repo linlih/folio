@@ -227,9 +227,9 @@ fn keep_key(app: &tauri::AppHandle, s: &mut Settings, library: &str, key: &Works
     Ok(())
 }
 
-fn forget_key(s: &Settings, library: &str) {
+fn forget_key(app: &tauri::AppHandle, s: &Settings, library: &str) {
     if !s.key_in.is_empty() {
-        secret::delete(&s.key_in, &account(library));
+        secret::delete(app, &s.key_in, &account(library));
     }
 }
 
@@ -486,7 +486,7 @@ pub(crate) async fn set_backup_copy(
     // The old key is not needed any more (a key just kept under the same
     // name replaced it already).
     if old.encrypted && !s.encrypted {
-        forget_key(&old, &library);
+        forget_key(&app, &old, &library);
     }
     save_settings(&state, &s)?;
     lock(&state)?.set_local_setting(STATUS, &serde_json::Value::Null)?;
@@ -516,10 +516,10 @@ pub(crate) async fn unlock_backup_copy(app: tauri::AppHandle, state: tauri::Stat
 
 /// Stops making the copy; what is there stays.
 #[tauri::command]
-pub(crate) fn stop_backup_copy(state: tauri::State<AppState>) -> CmdResult<()> {
+pub(crate) fn stop_backup_copy(app: tauri::AppHandle, state: tauri::State<AppState>) -> CmdResult<()> {
     let library = lock(&state)?.library_id()?;
     let s = settings(&state)?;
-    forget_key(&s, &library);
+    forget_key(&app, &s, &library);
     save_settings(&state, &Settings::default())?;
     lock(&state)?.set_local_setting(STATUS, &serde_json::Value::Null)?;
     tracing::info!("backup copy stopped");
@@ -588,7 +588,7 @@ pub(crate) fn restore_library_from_copy(app: tauri::AppHandle, state: tauri::Sta
     if encrypted && library != current {
         if let Some(key) = local_key(&app, &s, &current) {
             keep_key(&app, &mut kept, &library, &key)?;
-            forget_key(&s, &current);
+            forget_key(&app, &s, &current);
         }
     }
     store.set_local_setting(KEY, &serde_json::to_value(&kept).map_err(|e| CommandError::Other(e.to_string()))?)?;

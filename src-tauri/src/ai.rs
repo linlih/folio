@@ -79,7 +79,7 @@ pub(crate) fn ai_set_key(app: tauri::AppHandle, state: tauri::State<AppState>, p
 fn keep(app: &tauri::AppHandle, state: &AppState, provider: String, key: String, synced: String) -> CmdResult<()> {
     let mut keys = kept_keys(state)?;
     if let Some(old) = keys.remove(&provider) {
-        secret::delete(&old.place, &entry_name(&provider));
+        secret::delete(app, &old.place, &entry_name(&provider));
     }
     if !key.is_empty() {
         let kept = match secret::put(app, &entry_name(&provider), &key) {

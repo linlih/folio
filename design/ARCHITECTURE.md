@@ -594,6 +594,7 @@ CREATE TABLE index_meta (doc_id TEXT PRIMARY KEY, indexed_vv BLOB, gen INT);
 
 **第 4 项的做法**（2026-10-31，`src-tauri/src/secret.rs`）：
 - macOS、iOS 存 Keychain，Windows 存凭据管理器，Linux 存 Secret Service；服务名 `Folio`，账户 `sync key {工作区}/{设备}`，同一台电脑上的多个资料库互不相干。Android 用 Android Keystore 里不可导出的 AES 密钥以 AES-GCM 加密主密钥，密文留在本机设置（`folio-apk` 插件的 `seal` / `open`）。
+- **macOS 改存文件（v0.1.32）**：密钥存在应用目录下的 `keys.json`（`~/Library/Application Support/dev.folio.app/`，与资料库指针同级，不在资料库里；文件 0600）。原因：钥匙串的“始终允许”对没有 Apple 团队 ID 的应用按单个构建的哈希（partition `cdhash:`）记，自签证书解决不了，每次更新、每次开发版重编都要对每个密钥再问一遍。旧版本存在钥匙串里的密钥在第一次读取时复制到文件，钥匙串里的条目保留（旧版本仍能读）；删除密钥时两处都删。设置里记的位置：新存的是 `file`，迁移过来的仍是 `keychain`，macOS 上两者都先读文件。代价：同一用户下的其他程序可以直接读这个文件。等有了 Developer ID（团队 ID）再迁回钥匙串。
 - 同步设置里 `keyIn` 记录存在哪里，`key` 留成空字段（旧版本仍能读出设置）。
 - **升级**：启动时把设置里的明文密钥写入钥匙串，读回一致后才清掉明文，只做一次。没有钥匙串（如没有 Secret Service 的 Linux）时照旧存在设置里，同步不受影响。
 - **读不到密钥**（资料库复制或恢复到另一台设备、Android 从云备份恢复）：同步页提示，停止同步后用同步码 + 口令重新加入，笔记不受影响。停止同步时删除钥匙串里的这一项。

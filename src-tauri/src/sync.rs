@@ -882,7 +882,7 @@ pub fn sync_disable(app: tauri::AppHandle) -> CmdResult<SyncStatus> {
     let state = app.state::<AppState>();
     let settings = load(&app);
     if let Some(s) = &settings {
-        secret::delete(&s.key_in, &account(s));
+        secret::delete(&app, &s.key_in, &account(s));
     }
     let name = settings.map(|s| s.name);
     {
