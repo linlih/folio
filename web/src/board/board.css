@@ -57,7 +57,8 @@
 .board-card:hover .board-card-open { opacity: 1; }
 .board-card-content { flex: 1; min-height: 0; padding: 0 14px 12px 30px; pointer-events: none; }
 .board-card.fixed .board-card-content { overflow-y: auto; pointer-events: auto; }
-.board-card-body { font-size: 14px; line-height: 1.6; color: var(--secondary); }
+/* Read as it is written: the editor's own font, size and colour (.prose),
+   so nothing shifts when a card is opened for editing. */
 .board-card-body.card-body { min-height: 0; }
 .board-card-body > :first-child { margin-top: 0; }
 .board-card-body ul, .board-card-body ol { padding-left: 1.3em; margin: 0; }

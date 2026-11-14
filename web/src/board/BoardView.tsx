@@ -193,7 +193,7 @@ function CardPreview({ cardId }: { cardId: string }) {
       void hub.release(cardId);
     };
   }, [cardId]);
-  return <div ref={host} className="card-body board-card-body" />;
+  return <div ref={host} className="prose card-body board-card-body" />;
 }
 
 /** The knob at a map node's right: folds its branch, and, folded, says how
