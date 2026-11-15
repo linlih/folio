@@ -1,13 +1,15 @@
-import { Check, ClipboardPaste, ExternalLink, Inbox, RotateCw, Trash2, X } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { Check, ClipboardPaste, ExternalLink, Inbox, RotateCw, Search, Trash2, X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { appUndo, docs } from "../app";
 import type { InboxItem } from "../bindings/commands";
 import { CARDS_CHANGED, moveToTrash } from "../card/actions";
 import { backend } from "../platform";
+import { usePinyin } from "../search/pinyin";
 import { EmptyState } from "../shell/EmptyState";
 import { toSide, useShell } from "../shell/tabs";
 import { dropPending, firstUrl, INBOX_CHANGED, inboxChanged, keepClip, type PendingClip, usePendingClips } from "./clip";
+import { filterInbox } from "./filter";
 import "./inbox.css";
 
 /** Takes a card out of the inbox, or puts it back, and refreshes it where
@@ -25,6 +27,13 @@ export function InboxView({ active = true }: { active?: boolean }) {
   const { open, setNotice } = useShell();
   const [items, setItems] = useState<InboxItem[] | null>(null);
   const [text, setText] = useState("");
+  // Only what waits here, so a hunt for one clipping is not lost among the
+  // notes the global search also turns up. Not remembered.
+  const [find, setFind] = useState("");
+  const pinyin = usePinyin();
+  // `pinyin`: matched again once the dictionary is there.
+  const shown = useMemo(() => (items ? filterInbox(items, find) : null), [items, find, pinyin]);
+  const finding = find.trim() !== "";
   const pending = usePendingClips((s) => s.items);
   const justSaved = usePendingClips((s) => s.justSaved);
 
@@ -76,7 +85,7 @@ export function InboxView({ active = true }: { active?: boolean }) {
     <div className="page inbox">
       <header className="page-header">
         <h1>{t("inbox.title")}</h1>
-        {items && items.length > 0 && <span className="page-meta">{t("inbox.count", { count: items.length })}</span>}
+        {items && items.length > 0 && <span className="page-meta">{finding ? t("inbox.found", { count: shown!.length, total: items.length }) : t("inbox.count", { count: items.length })}</span>}
       </header>
       <form
         className="inbox-add"
@@ -104,14 +113,30 @@ export function InboxView({ active = true }: { active?: boolean }) {
           </button>
         )}
       </form>
+      {items && items.length > 0 && (
+        <label className="inbox-search">
+          <Search size={14} strokeWidth={1.75} />
+          <input
+            type="search"
+            value={find}
+            placeholder={t("inbox.search")}
+            aria-label={t("inbox.search")}
+            spellCheck={false}
+            autoComplete="off"
+            onChange={(e) => setFind(e.target.value)}
+            onKeyDown={(e) => e.key === "Escape" && setFind("")}
+          />
+        </label>
+      )}
       {items?.length === 0 && pending.length === 0 && <EmptyState icon={<Inbox size={28} strokeWidth={1.5} />} title={t("inbox.empty")} hint={t("inbox.emptyHint")} />}
-      {(pending.length > 0 || (items && items.length > 0)) && (
+      {finding && shown?.length === 0 && pending.length === 0 && <p className="empty">{t("inbox.noMatch")}</p>}
+      {(pending.length > 0 || (shown && shown.length > 0)) && (
         <ul className="inbox-list">
           {pending.map((p) => (
             <PendingRow key={p.key} clip={p} />
           ))}
-          {items?.map((item) => (
-            <li key={item.id} className={`inbox-item${item.id === justSaved ? " just-saved" : ""}`}>
+          {shown?.map((item) => (
+            <li key={item.id} className={`inbox-item${item.id === justSaved && !finding ? " just-saved" : ""}`}>
               <button className="inbox-open" onClick={(e) => open({ kind: "card", cardId: item.id }, item.title, toSide(e))}>
                 <span className="inbox-title">{item.title || t("library.untitled")}</span>
                 <span className="inbox-meta">

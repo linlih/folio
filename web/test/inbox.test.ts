@@ -1,9 +1,12 @@
 import { LoroDoc } from "loro-crdt";
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 import { readMeta, readProps, setClip, setInbox, setProp } from "../src/docs/card";
+import type { InboxItem } from "../src/bindings/commands";
 import { firstUrl, noteFrom, saveClip } from "../src/inbox/clip";
+import { filterInbox } from "../src/inbox/filter";
 import { backend } from "../src/platform";
 import { memoryBackend } from "../src/platform/memory";
+import { loadPinyin } from "../src/search/pinyin";
 
 describe("finding the link in shared text", () => {
   it("takes the first link and keeps the words around it", () => {
@@ -105,5 +108,34 @@ describe("card fields", () => {
     b.import(a.export({ mode: "update" }));
     expect(readProps(a)).toEqual({ status: "在读", rating: 5 });
     expect(readProps(b)).toEqual(readProps(a));
+  });
+});
+
+describe("filterInbox", () => {
+  beforeAll(() => loadPinyin());
+  const item = (id: string, title: string, preview = "", clip: InboxItem["clip"] = null): InboxItem => ({ id, title, preview, clip, inboxAt: 0, updatedAt: 0 });
+  const items = [
+    item("a", "Local-first software", "Seven ideals", { url: "https://www.inkandswitch.com/local-first/", site: "Ink & Switch", excerpt: "You own your data", author: "Kleppmann" }),
+    item("b", "读书笔记", "关于写作"),
+    item("c", "", "a bare line kept for later"),
+  ];
+  const ids = (q: string) => filterInbox(items, q).map((i) => i.id);
+
+  it("keeps everything for an empty query", () => {
+    expect(ids("  ")).toEqual(["a", "b", "c"]);
+  });
+  it("looks in the title, notes, site, author and address", () => {
+    expect(ids("local")).toEqual(["a"]);
+    expect(ids("bare")).toEqual(["c"]);
+    expect(ids("switch")).toEqual(["a"]);
+    expect(ids("kleppmann")).toEqual(["a"]);
+    expect(ids("inkandswitch.com")).toEqual(["a"]);
+    expect(ids("own data")).toEqual(["a"]);
+  });
+  it("needs every word", () => {
+    expect(ids("local nothing")).toEqual([]);
+  });
+  it("finds a title by pinyin", () => {
+    expect(ids("dsbj")).toEqual(["b"]);
   });
 });

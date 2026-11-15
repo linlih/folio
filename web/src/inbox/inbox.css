@@ -14,6 +14,22 @@
 .inbox-add input:focus { border-color: var(--accent); }
 .inbox-add .button { flex: none; white-space: nowrap; }
 
+/* Search within the inbox: quieter than the box above, which adds. */
+.inbox-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  margin-bottom: 10px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--muted);
+  background: var(--bg);
+}
+.inbox-search:focus-within { border-color: var(--accent); }
+.inbox-search input { flex: 1; min-width: 0; border: 0; outline: none; background: none; color: var(--text); font: 14px var(--font-ui); }
+
 .inbox-list { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--border); }
 .inbox-item { display: flex; align-items: flex-start; gap: 8px; border-bottom: 1px solid var(--border); }
 .inbox-open { display: grid; gap: 3px; flex: 1; min-width: 0; padding: 12px 8px; text-align: left; border-radius: var(--radius); }
