@@ -244,7 +244,7 @@ atom   := "(" query ")"                    // 只允许一层
 | 创建 / 修改 | `c.created_at` / `c.updated_at` 的毫秒范围 |
 | 日期 | `c.card_id BETWEEN 'journal:2026-11-01' AND 'journal:2026-11-07'` |
 | 文字 | 三字以上走 `idx.fts`，短词 `LIKE`（同搜索）；卡片类型查标题和正文 |
-| 位置 | `c.kind`、`c.card_id = ?`、`c.inbox_at`、`idx.card_topics` |
+| 位置 | `c.kind`、`c.card_id = ?`、`c.inbox_at`、`c.archived_at`、`idx.card_topics` |
 | 链接 | `EXISTS idx.links WHERE from_card = b.card_id AND from_bid = b.bid AND to_card = ?`；块引用查 `idx.refs`；卡片类型：卡片里任一块链接到 |
 | 字段 | `json_extract(c.props, '$."' || field_id || '"')` 比较；先这样，慢了再把字段值拆成单独的表 |
 | 总是 | `c.deleted_at IS NULL`、`b.type != 'query'`、不在模板 id 里、收集箱规则（§3.2） |

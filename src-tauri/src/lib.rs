@@ -281,10 +281,18 @@ fn inbox(state: tauri::State<AppState>) -> CmdResult<Vec<folio_store::InboxItem>
     Ok(lock(&state)?.inbox()?)
 }
 
-/// Takes a card out of the inbox (dealt with) or puts it back.
+/// 已整理: dealt with, kept out of the card library.
 #[tauri::command]
-fn set_inbox(app: tauri::AppHandle, state: tauri::State<AppState>, id: String, inbox: bool) -> CmdResult<()> {
-    lock(&state)?.set_inbox(&DocId::parse(&id)?, inbox, now_ms())?;
+fn inbox_archived(state: tauri::State<AppState>) -> CmdResult<Vec<folio_store::InboxItem>> {
+    Ok(lock(&state)?.archived()?)
+}
+
+/// Moves a card to the inbox ("inbox"), 已整理 ("archived") or the card
+/// library ("library").
+#[tauri::command]
+fn set_inbox_place(app: tauri::AppHandle, state: tauri::State<AppState>, id: String, place: String) -> CmdResult<()> {
+    let place = folio_core::card::InboxPlace::parse(&place).ok_or_else(|| CommandError::Other(format!("unknown inbox place: {place}")))?;
+    lock(&state)?.set_inbox_place(&DocId::parse(&id)?, place, now_ms())?;
     sync::poke(&app);
     Ok(())
 }
@@ -1336,7 +1344,8 @@ pub fn run() {
             clip_preview,
             clip_create,
             inbox,
-            set_inbox,
+            inbox_archived,
+            set_inbox_place,
             take_shared,
             to_background,
             tag_cards,

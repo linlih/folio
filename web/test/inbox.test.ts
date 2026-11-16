@@ -1,6 +1,6 @@
 import { LoroDoc } from "loro-crdt";
 import { beforeAll, describe, expect, it } from "vitest";
-import { readMeta, readProps, setClip, setInbox, setProp } from "../src/docs/card";
+import { readMeta, readProps, setClip, setInboxPlace, setProp } from "../src/docs/card";
 import type { InboxItem } from "../src/bindings/commands";
 import { firstUrl, noteFrom, saveClip } from "../src/inbox/clip";
 import { filterInbox } from "../src/inbox/filter";
@@ -44,11 +44,22 @@ describe("the inbox", () => {
     expect((await b.search("what it")).map((h) => h.cardId)).toEqual([a]);
     expect((await b.listCards()).find((r) => r.id === a)?.preview).toBe("What it says");
     expect((await b.listCards()).find((r) => r.id === a)?.fromInbox).toBeNull();
-    await b.setInbox(a, false);
+    // Dealt with: under 已整理, collected when it was, not in the inbox.
+    await b.setInboxPlace(a, "archived");
     expect((await b.inbox()).map((i) => i.id)).toEqual([c]);
-    // Dealt with, it still says it came from the inbox, and when.
+    const [kept] = await b.inboxArchived();
+    expect([kept.id, kept.inboxAt < kept.archivedAt!]).toEqual([a, true]);
+    // Put back: where it was collected, below the newer one.
+    await b.setInboxPlace(a, "inbox");
+    expect((await b.inbox()).map((i) => i.id)).toEqual([c, a]);
+    expect(await b.inboxArchived()).toEqual([]);
+    // Added to the library: in neither list, and it still says it came
+    // from the inbox, and when.
+    await b.setInboxPlace(a, "library");
+    expect((await b.inbox()).map((i) => i.id)).toEqual([c]);
+    expect(await b.inboxArchived()).toEqual([]);
     const collected = (await b.listCards()).find((r) => r.id === a)?.fromInbox;
-    expect(collected).toBeTypeOf("number");
+    expect(collected).toBe(kept.inboxAt);
     await b.trashCard(c);
     expect(await b.inbox()).toEqual([]);
   });
@@ -76,17 +87,19 @@ describe("card fields", () => {
     expect(readMeta(doc)).toMatchObject({ clip: null, inboxAt: null });
     setClip(doc, { url: "https://a.com", site: "a.com", excerpt: "", author: "" }, 5);
     expect(readMeta(doc)).toMatchObject({ clip: { url: "https://a.com", site: "a.com", excerpt: "", author: "" }, inboxAt: 5 });
-    setInbox(doc, null);
-    expect(readMeta(doc)).toMatchObject({ inboxAt: null, inboxFrom: 5 });
-    // Back in the inbox (undo) and out again: still collected at 5.
-    setInbox(doc, 9);
-    setInbox(doc, null);
-    expect(readMeta(doc).inboxFrom).toBe(5);
+    setInboxPlace(doc, "archived", 6);
+    expect(readMeta(doc)).toMatchObject({ inboxAt: null, inboxFrom: 5, archivedAt: 6 });
+    // Back in the inbox (undo): where it was collected, not under 已整理.
+    setInboxPlace(doc, "inbox", 9);
+    expect(readMeta(doc)).toMatchObject({ inboxAt: 5, archivedAt: null });
+    setInboxPlace(doc, "archived", 10);
+    setInboxPlace(doc, "library", 11);
+    expect(readMeta(doc)).toMatchObject({ inboxAt: null, inboxFrom: 5, archivedAt: null });
     // A plain note dealt with keeps it too; a card never in the inbox has none.
     const note = new LoroDoc();
     expect(readMeta(note).inboxFrom).toBeNull();
-    setInbox(note, 7);
-    setInbox(note, null);
+    setInboxPlace(note, "inbox", 7);
+    setInboxPlace(note, "library", 8);
     expect(readMeta(note).inboxFrom).toBe(7);
     setProp(doc, "status", "在读");
     setProp(doc, "rating", 4);
@@ -113,7 +126,7 @@ describe("card fields", () => {
 
 describe("filterInbox", () => {
   beforeAll(() => loadPinyin());
-  const item = (id: string, title: string, preview = "", clip: InboxItem["clip"] = null): InboxItem => ({ id, title, preview, clip, inboxAt: 0, updatedAt: 0 });
+  const item = (id: string, title: string, preview = "", clip: InboxItem["clip"] = null): InboxItem => ({ id, title, preview, clip, inboxAt: 0, updatedAt: 0, archivedAt: null });
   const items = [
     item("a", "Local-first software", "Seven ideals", { url: "https://www.inkandswitch.com/local-first/", site: "Ink & Switch", excerpt: "You own your data", author: "Kleppmann" }),
     item("b", "读书笔记", "关于写作"),

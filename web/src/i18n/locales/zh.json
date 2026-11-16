@@ -27,19 +27,12 @@
     "title": "卡片库",
     "newCard": "新建卡片",
     "untitled": "无标题",
-    "inboxWaiting_one": "收集箱里还有 {{count}} 条未整理",
-    "inboxWaiting_other": "收集箱里还有 {{count}} 条未整理",
     "empty": "还没有卡片",
     "count_one": "{{count}} 张卡片",
     "count_other": "{{count}} 张卡片",
     "moveToTrash": "移到回收站",
     "search": "搜索卡片标题和内容",
     "edited": "编辑于",
-    "origin": "来源",
-    "origins": {
-      "all": "全部来源",
-      "inbox": "来自收集箱"
-    },
     "within": {
       "all": "不限",
       "today": "今天",
@@ -880,8 +873,6 @@
     "search": "在收集箱中搜索",
     "found": "{{count}} / {{total}} 条",
     "noMatch": "收集箱里没有匹配的内容。",
-    "count_one": "{{count}} 条待整理",
-    "count_other": "{{count}} 条待整理",
     "placeholder": "粘贴链接或写一句，回车保存",
     "paste": "保存",
     "save": "保存",
@@ -896,12 +887,24 @@
     "clipboardEmpty": "剪贴板里没有内容",
     "clipboardBlocked": "读不到剪贴板。请把链接粘贴到输入框里。",
     "empty": "收集箱是空的",
-    "emptyHint": "看到值得留下的内容，在其他 App 里点「分享」选 Folio，或复制链接粘贴到上面。这里只保存标题、摘要和链接；读完后点 ✓ 标为已整理，它会留在卡片库里。",
+    "emptyHint": "看到值得留下的内容，在其他 App 里点「分享」选 Folio，或复制链接粘贴到上面。这里只保存标题、摘要和链接；读完后点 ✓ 移到「已整理」，值得长期保留的点「加到卡片库」。",
     "openSource": "打开原文",
     "markDone": "已整理",
-    "done": "「{{title}}」已整理，仍在卡片库里",
+    "done": "「{{title}}」已移到「已整理」",
     "inInbox": "在收集箱中",
-    "fromInbox": "来自收集箱 · 收于 {{date}}"
+    "fromInbox": "来自收集箱 · 收于 {{date}}",
+    "added": "「{{title}}」已加到卡片库",
+    "putBack": "「{{title}}」已放回待整理",
+    "putBackAction": "放回待整理",
+    "addToLibrary": "加到卡片库",
+    "archivedOn": "整理于 {{date}}",
+    "inArchive": "已整理 · {{date}}",
+    "archivedEmpty": "还没有整理过的内容",
+    "archivedEmptyHint": "在「待整理」里点 ✓ 的内容会放到这里，不进卡片库。值得长期保留的，点「加到卡片库」变成一张卡片。",
+    "tabs": {
+      "waiting": "待整理",
+      "archived": "已整理"
+    }
   },
   "db": {
     "cards_one": "{{count}} 张卡片",

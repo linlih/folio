@@ -49,6 +49,8 @@ export interface CardMeta {
   /** Collected in the inbox at, and dealt with since (a clip dealt with
    *  before this was kept: when its card was made). */
   inboxFrom: number | null;
+  /** Dealt with and kept under 已整理 since, out of the card library. */
+  archivedAt: number | null;
   /** The link it keeps, when it is a clipped one. */
   clip: Clip | null;
 }
@@ -88,6 +90,7 @@ export function readMeta(doc: LoroDoc): CardMeta {
     source: str("source") || "human",
     inboxAt: num("inbox_at"),
     inboxFrom: num("inbox_from") ?? (str("clip_url") && num("inbox_at") === null ? num("created_at") : null),
+    archivedAt: num("archived_at"),
     clip: str("clip_url") ? { url: str("clip_url"), site: str("clip_site"), excerpt: str("clip_excerpt"), author: str("clip_author") } : null,
   };
 }
@@ -101,15 +104,27 @@ export function setClip(doc: LoroDoc, clip: Clip, inboxAt: number) {
   doc.commit({ origin: `${META_ORIGIN}clip` });
 }
 
-/** In the inbox since `at`, or out of it (dealt with) with null; when
- *  it was collected stays as `inbox_from`. Same as `folio_core::card::set_inbox`. */
-export function setInbox(doc: LoroDoc, at: number | null) {
+/** Where a card from the inbox stands (design/inbox-and-tags.md §2):
+ *  waiting in it, dealt with and kept under 已整理 (out of the card
+ *  library), or a card in the library. */
+export type InboxPlace = "inbox" | "archived" | "library";
+
+/** Moves the card there at `now`; leaving the inbox keeps when it was
+ *  collected as `inbox_from` (the first time only), and going back puts it
+ *  where it was collected, not at the top. Same as
+ *  `folio_core::card::set_inbox_place`. */
+export function setInboxPlace(doc: LoroDoc, place: InboxPlace, now: number) {
   const meta = doc.getMap(META);
-  if (at === null) {
+  if (place === "inbox") {
+    const from = meta.get("inbox_from");
+    if (meta.get("inbox_at") === undefined) meta.set("inbox_at", typeof from === "number" ? from : now);
+  } else {
     const was = meta.get("inbox_at");
     if (typeof was === "number" && meta.get("inbox_from") === undefined) meta.set("inbox_from", was);
-    meta.delete("inbox_at");
-  } else meta.set("inbox_at", at);
+    if (meta.get("inbox_at") !== undefined) meta.delete("inbox_at");
+  }
+  if (place === "archived") meta.set("archived_at", now);
+  else if (meta.get("archived_at") !== undefined) meta.delete("archived_at");
   doc.commit({ origin: `${META_ORIGIN}inbox` });
 }
 

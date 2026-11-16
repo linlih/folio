@@ -80,8 +80,11 @@ export interface InboxItem {
   /** The notes on it, or the page's summary. */
   preview: string;
   clip: ClipInfo | null;
+  /** When it was collected. */
   inboxAt: number;
   updatedAt: number;
+  /** Under 已整理 since; null while it waits in the inbox. */
+  archivedAt: number | null;
 }
 
 /** A row of a tag's database. */

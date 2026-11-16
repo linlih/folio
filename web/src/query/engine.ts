@@ -13,6 +13,8 @@ export interface EngineCard {
   createdAt: number | null;
   updatedAt: number;
   inboxAt: number | null;
+  /** Under 已整理: a clipping dealt with, not a card of the library. */
+  archivedAt: number | null;
   fromInbox: number | null;
   topics: string[];
   index: IndexExtract;
@@ -91,7 +93,7 @@ function check(c: ResolvedCond, { card, block }: Row, q: ResolvedQuery): boolean
         case "journal":
           return isJournal(card);
         case "inbox":
-          return card.inboxAt !== null;
+          return card.inboxAt !== null || card.archivedAt !== null;
         case "card":
           return card.id === v[1];
         case "topic":
@@ -131,7 +133,7 @@ export function runQuery(cards: EngineCard[], q: ResolvedQuery): QueryRows {
   const byEdit = [...cards].sort((a, b) => b.updatedAt - a.updatedAt || (a.id < b.id ? -1 : 1));
   for (const card of byEdit) {
     if (q.exclude.includes(card.id)) continue;
-    if (!q.includeInbox && card.inboxAt !== null) continue;
+    if (!q.includeInbox && (card.inboxAt !== null || card.archivedAt !== null)) continue;
     if (q.show === "cards") {
       if (!isJournal(card)) rows.push({ card, block: null, order: order++ });
       continue;

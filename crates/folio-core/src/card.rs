@@ -172,21 +172,57 @@ pub fn set_clip(doc: &LoroDoc, clip: &Clip, inbox_at: i64) -> LoroResult<()> {
     Ok(())
 }
 
-/// Takes the card out of the inbox (dealt with); the link stays on it, and
-/// `inbox_from` keeps when it was collected, so the card library can still
-/// tell it came from the inbox.
-pub fn set_inbox(doc: &LoroDoc, at: Option<i64>) -> LoroResult<()> {
-    let meta = doc.get_map(META);
-    match at {
-        Some(t) => meta.insert("inbox_at", t)?,
-        None => {
-            if let Some(ValueOrContainer::Value(v @ (LoroValue::I64(_) | LoroValue::Double(_)))) = meta.get("inbox_at")
-                && meta.get("inbox_from").is_none()
-            {
-                meta.insert("inbox_from", v)?;
-            }
-            meta.delete("inbox_at")?
+/// Where a card from the inbox stands (design/inbox-and-tags.md §2).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum InboxPlace {
+    /// Waiting in the inbox (`inbox_at`).
+    Waiting,
+    /// Dealt with, kept under 已整理, not in the card library (`archived_at`).
+    Archived,
+    /// A card in the library: neither mark.
+    Library,
+}
+
+impl InboxPlace {
+    pub fn parse(s: &str) -> Option<Self> {
+        match s {
+            "inbox" => Some(Self::Waiting),
+            "archived" => Some(Self::Archived),
+            "library" => Some(Self::Library),
+            _ => None,
         }
+    }
+}
+
+/// Moves the card between the inbox, 已整理 and the card library, at `now`.
+/// Leaving the inbox keeps when it was collected as `inbox_from` (the first
+/// time only), so the card can still say it came from there; going back
+/// puts it where it was collected, not at the top.
+pub fn set_inbox_place(doc: &LoroDoc, place: InboxPlace, now: i64) -> LoroResult<()> {
+    let meta = doc.get_map(META);
+    if place == InboxPlace::Waiting {
+        let from = match meta.get("inbox_from") {
+            Some(ValueOrContainer::Value(LoroValue::I64(n))) => Some(n),
+            Some(ValueOrContainer::Value(LoroValue::Double(n))) => Some(n as i64),
+            _ => None,
+        };
+        if meta.get("inbox_at").is_none() {
+            meta.insert("inbox_at", from.unwrap_or(now))?;
+        }
+    } else {
+        if let Some(ValueOrContainer::Value(v @ (LoroValue::I64(_) | LoroValue::Double(_)))) = meta.get("inbox_at")
+            && meta.get("inbox_from").is_none()
+        {
+            meta.insert("inbox_from", v)?;
+        }
+        if meta.get("inbox_at").is_some() {
+            meta.delete("inbox_at")?;
+        }
+    }
+    if place == InboxPlace::Archived {
+        meta.insert("archived_at", now)?;
+    } else if meta.get("archived_at").is_some() {
+        meta.delete("archived_at")?;
     }
     doc.commit();
     Ok(())
@@ -288,6 +324,8 @@ pub struct CardSummary {
     /// Collected in the inbox at, and dealt with since. A clipped link dealt
     /// with before this was kept counts from when its card was made.
     pub inbox_from: Option<i64>,
+    /// Dealt with and kept under 已整理 since, out of the card library.
+    pub archived_at: Option<i64>,
     /// The link it keeps, when it is a clipped one.
     pub clip: Option<Clip>,
     /// Database field values by field id, as a JSON object (`{}` for none).
@@ -335,6 +373,7 @@ pub fn summarize(doc: &LoroDoc) -> CardSummary {
         pinned_at: int("pinned_at"),
         inbox_at: int("inbox_at"),
         inbox_from: int("inbox_from").or_else(|| (clip.is_some() && int("inbox_at").is_none()).then(|| int("created_at")).flatten()),
+        archived_at: int("archived_at"),
         clip,
         props: props_json(doc),
         preview,
@@ -635,13 +674,22 @@ mod tests {
         append_paragraph(&doc, "my note").unwrap();
         assert_eq!(summarize(&doc).preview, "my note");
         assert_eq!(summarize(&doc).inbox_from, None);
-        set_inbox(&doc, None).unwrap();
-        assert_eq!((summarize(&doc).inbox_at, summarize(&doc).inbox_from), (None, Some(5)));
+        set_inbox_place(&doc, InboxPlace::Library, 6).unwrap();
+        assert_eq!((summarize(&doc).inbox_at, summarize(&doc).inbox_from, summarize(&doc).archived_at), (None, Some(5), None));
         assert_eq!(summarize(&doc).clip, Some(clip));
         // Back in the inbox and out again: still collected at 5.
-        set_inbox(&doc, Some(9)).unwrap();
-        set_inbox(&doc, None).unwrap();
-        assert_eq!(summarize(&doc).inbox_from, Some(5));
+        set_inbox_place(&doc, InboxPlace::Waiting, 9).unwrap();
+        assert_eq!(summarize(&doc).inbox_at, Some(5), "back where it was collected");
+        set_inbox_place(&doc, InboxPlace::Archived, 10).unwrap();
+        let s = summarize(&doc);
+        assert_eq!((s.inbox_at, s.inbox_from, s.archived_at), (None, Some(5), Some(10)));
+        // Back to waiting clears 已整理; into the library too.
+        set_inbox_place(&doc, InboxPlace::Waiting, 11).unwrap();
+        assert_eq!((summarize(&doc).inbox_at, summarize(&doc).archived_at), (Some(5), None));
+        set_inbox_place(&doc, InboxPlace::Archived, 12).unwrap();
+        set_inbox_place(&doc, InboxPlace::Library, 13).unwrap();
+        let s = summarize(&doc);
+        assert_eq!((s.inbox_at, s.inbox_from, s.archived_at), (None, Some(5), None));
         // A clip dealt with by an older version (no inbox_from): from when
         // the card was made.
         doc.get_map(META).delete("inbox_from").unwrap();

@@ -156,8 +156,11 @@ pub struct InboxItem {
     /// The notes written on it, or the page's summary.
     pub preview: String,
     pub clip: Option<folio_core::card::Clip>,
+    /// When it was collected.
     pub inbox_at: i64,
     pub updated_at: i64,
+    /// Under 已整理 since; none while it waits in the inbox.
+    pub archived_at: Option<i64>,
 }
 
 /// A row of a tag's database.
@@ -654,9 +657,9 @@ impl Store {
         Ok(id)
     }
 
-    /// Puts a card back in the inbox or takes it out (dealt with).
-    pub fn set_inbox(&mut self, id: &DocId, inbox: bool, now_ms: i64) -> Result<()> {
-        self.edit(id, DocKind::Card, now_ms, |doc| card::set_inbox(doc, inbox.then_some(now_ms)))
+    /// Moves a card between the inbox, 已整理 and the card library.
+    pub fn set_inbox_place(&mut self, id: &DocId, place: card::InboxPlace, now_ms: i64) -> Result<()> {
+        self.edit(id, DocKind::Card, now_ms, |doc| card::set_inbox_place(doc, place, now_ms))
     }
 
     /// Everything a replica needs to load the document (snapshot form).
@@ -867,10 +870,23 @@ impl Store {
 
     /// The inbox: clipped links not dealt with yet, newest first.
     pub fn inbox(&self) -> Result<Vec<InboxItem>> {
-        let mut stmt = self.conn.prepare_cached(
-            "SELECT card_id, title, preview, clip, inbox_at, updated_at FROM idx.cards
+        self.inbox_items(
+            "SELECT card_id, title, preview, clip, inbox_at, updated_at, NULL FROM idx.cards
               WHERE inbox_at IS NOT NULL AND deleted_at IS NULL ORDER BY inbox_at DESC",
-        )?;
+        )
+    }
+
+    /// 已整理: dealt with and kept out of the card library, most recently
+    /// dealt with first.
+    pub fn archived(&self) -> Result<Vec<InboxItem>> {
+        self.inbox_items(
+            "SELECT card_id, title, preview, clip, COALESCE(inbox_from, created_at, archived_at), updated_at, archived_at FROM idx.cards
+              WHERE archived_at IS NOT NULL AND inbox_at IS NULL AND deleted_at IS NULL ORDER BY archived_at DESC",
+        )
+    }
+
+    fn inbox_items(&self, sql: &str) -> Result<Vec<InboxItem>> {
+        let mut stmt = self.conn.prepare_cached(sql)?;
         let rows = stmt.query_map([], |r| {
             let clip: Option<String> = r.get(3)?;
             Ok(InboxItem {
@@ -880,6 +896,7 @@ impl Store {
                 clip: clip.and_then(|c| serde_json::from_str(&c).ok()),
                 inbox_at: r.get(4)?,
                 updated_at: r.get(5)?,
+                archived_at: r.get(6)?,
             })
         })?;
         Ok(rows.collect::<std::result::Result<_, _>>()?)
@@ -1476,13 +1493,13 @@ impl Store {
         let s = card::summarize(self.doc_mut(id, DocKind::Card)?);
         self.conn.execute(
             "INSERT INTO idx.cards(card_id, kind, title, preview, text, created_at, updated_at, deleted_at, pinned_at,
-                                   inbox_at, clip, clip_text, props, lines, inbox_from)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)
+                                   inbox_at, clip, clip_text, props, lines, inbox_from, archived_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)
              ON CONFLICT(card_id) DO UPDATE SET kind = excluded.kind, title = excluded.title, preview = excluded.preview,
                text = excluded.text, created_at = excluded.created_at, updated_at = excluded.updated_at,
                deleted_at = excluded.deleted_at, pinned_at = excluded.pinned_at, inbox_at = excluded.inbox_at,
                clip = excluded.clip, clip_text = excluded.clip_text, props = excluded.props, lines = excluded.lines,
-               inbox_from = excluded.inbox_from",
+               inbox_from = excluded.inbox_from, archived_at = excluded.archived_at",
             params![
                 id.as_str(),
                 s.kind,
@@ -1498,7 +1515,8 @@ impl Store {
                 clip_text(&s),
                 s.props,
                 s.lines,
-                s.inbox_from
+                s.inbox_from,
+                s.archived_at
             ],
         )?;
         let x = folio_core::index::extract(self.doc_mut(id, DocKind::Card)?);
@@ -2073,7 +2091,15 @@ mod tests {
         assert!(s.search("协同数据", 10).unwrap().iter().any(|h| h.card_id == a.as_str()));
         assert!(s.search("协同", 10).unwrap().iter().any(|h| h.card_id == a.as_str()));
         assert!(s.search("GitHub", 10).unwrap().iter().any(|h| h.card_id == a.as_str()));
-        s.set_inbox(&a, false, 3).unwrap();
+        s.set_inbox_place(&a, card::InboxPlace::Archived, 3).unwrap();
+        assert_eq!(ids(&s), vec![b.to_string()]);
+        // Under 已整理, collected at 1, also after a rebuild.
+        let archived = |s: &Store| s.archived().unwrap().into_iter().map(|i| (i.id, i.inbox_at, i.archived_at)).collect::<Vec<_>>();
+        assert_eq!(archived(&s), vec![(a.to_string(), 1, Some(3))]);
+        s.rebuild_index().unwrap();
+        assert_eq!(archived(&s), vec![(a.to_string(), 1, Some(3))]);
+        s.set_inbox_place(&a, card::InboxPlace::Library, 3).unwrap();
+        assert!(archived(&s).is_empty());
         assert_eq!(ids(&s), vec![b.to_string()]);
         // Still a card in the library, with its link, and it says it came
         // from the inbox (collected at 1), also after a rebuild.

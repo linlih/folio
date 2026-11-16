@@ -27,19 +27,12 @@
     "title": "Card library",
     "newCard": "New card",
     "untitled": "Untitled",
-    "inboxWaiting_one": "{{count}} item waiting in the inbox",
-    "inboxWaiting_other": "{{count}} items waiting in the inbox",
     "empty": "No cards yet",
     "count_one": "{{count}} card",
     "count_other": "{{count}} cards",
     "moveToTrash": "Move to trash",
     "search": "Search titles and text",
     "edited": "Edited",
-    "origin": "From",
-    "origins": {
-      "all": "Any source",
-      "inbox": "From the inbox"
-    },
     "within": {
       "all": "Any time",
       "today": "Today",
@@ -880,8 +873,6 @@
     "search": "Search the inbox",
     "found": "{{count}} of {{total}}",
     "noMatch": "Nothing in the inbox matches.",
-    "count_one": "{{count}} to go through",
-    "count_other": "{{count}} to go through",
     "placeholder": "Paste a link or write a line, then press Enter",
     "paste": "Save",
     "save": "Save",
@@ -896,12 +887,24 @@
     "clipboardEmpty": "The clipboard is empty",
     "clipboardBlocked": "Can't read the clipboard. Paste the link into the box instead.",
     "empty": "The inbox is empty",
-    "emptyHint": "When you find something worth keeping, tap Share in another app and pick Folio, or copy the link and paste it above. Only the title, summary and link are kept; once read, tap ✓ to mark it dealt with and it stays in the card library.",
+    "emptyHint": "When you find something worth keeping, tap Share in another app and pick Folio, or copy the link and paste it above. Only the title, summary and link are kept; once read, tap ✓ to move it to Done, or add the ones worth keeping to the card library.",
     "openSource": "Open the original",
     "markDone": "Dealt with",
-    "done": "“{{title}}” dealt with; it stays in the card library",
+    "done": "“{{title}}” moved to Done",
     "inInbox": "In the inbox",
-    "fromInbox": "From the inbox · collected {{date}}"
+    "fromInbox": "From the inbox · collected {{date}}",
+    "added": "“{{title}}” added to the card library",
+    "putBack": "“{{title}}” put back in the inbox",
+    "putBackAction": "Put back in the inbox",
+    "addToLibrary": "Add to card library",
+    "archivedOn": "done {{date}}",
+    "inArchive": "Done · {{date}}",
+    "archivedEmpty": "Nothing done yet",
+    "archivedEmptyHint": "What you tick ✓ under To do comes here, out of the card library. Add the ones worth keeping to the card library to make them cards.",
+    "tabs": {
+      "waiting": "To do",
+      "archived": "Done"
+    }
   },
   "db": {
     "cards_one": "{{count}} card",

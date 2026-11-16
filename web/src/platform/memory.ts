@@ -1,6 +1,6 @@
 import { LoroDoc } from "loro-crdt";
 import type { AssetEvent, BackupInfo, Backlink, CardRow, ChildBlock, JournalDay, SearchHit, TaskRow } from "../bindings/commands";
-import { appendBlocks, bodyLines, dayLines, initCard, preview, readCardTopics, readMeta, readProps, setClip, setDeleted, setInbox, setPinned } from "../docs/card";
+import { appendBlocks, bodyLines, dayLines, initCard, preview, readCardTopics, readMeta, readProps, setClip, setDeleted, setInboxPlace, setPinned } from "../docs/card";
 import { isJournalId, journalDate, localDate, uuidv7 } from "../docs/ids";
 import { extractIndex } from "../docs/index";
 import { isBoardId } from "../docs/board";
@@ -117,10 +117,21 @@ export function memoryBackend(now: () => number = Date.now): Backend {
         .filter(([, e]) => readMeta(e.doc).inboxAt !== null)
         .map(([id, e]) => {
           const m = readMeta(e.doc);
-          return { id, title: m.title, preview: cardPreview(e.doc), clip: m.clip, inboxAt: m.inboxAt!, updatedAt: e.updatedAt };
+          return { id, title: m.title, preview: cardPreview(e.doc), clip: m.clip, inboxAt: m.inboxAt!, updatedAt: e.updatedAt, archivedAt: null };
         })
         .sort((a, b) => b.inboxAt - a.inboxAt),
-    setInbox: async (id, inbox) => edit(id, (d) => setInbox(d, inbox ? now() : null)),
+    inboxArchived: async () =>
+      live()
+        .filter(([, e]) => {
+          const m = readMeta(e.doc);
+          return m.archivedAt !== null && m.inboxAt === null;
+        })
+        .map(([id, e]) => {
+          const m = readMeta(e.doc);
+          return { id, title: m.title, preview: cardPreview(e.doc), clip: m.clip, inboxAt: m.inboxFrom ?? m.createdAt ?? m.archivedAt!, updatedAt: e.updatedAt, archivedAt: m.archivedAt };
+        })
+        .sort((a, b) => b.archivedAt! - a.archivedAt!),
+    setInboxPlace: async (id, place) => edit(id, (d) => setInboxPlace(d, place, now())),
     takeShared: async () => null,
     toBackground: async () => {},
     tagDocs: async (tag) => {
@@ -179,7 +190,7 @@ export function memoryBackend(now: () => number = Date.now): Backend {
       runQuery(
         live().map(([id, e]) => {
           const m = readMeta(e.doc);
-          return { id, kind: m.kind, title: m.title, preview: cardPreview(e.doc), createdAt: m.createdAt, updatedAt: e.updatedAt, inboxAt: m.inboxAt, fromInbox: m.inboxAt === null ? m.inboxFrom : null, topics: readCardTopics(e.doc), index: extractIndex(e.doc) };
+          return { id, kind: m.kind, title: m.title, preview: cardPreview(e.doc), createdAt: m.createdAt, updatedAt: e.updatedAt, inboxAt: m.inboxAt, archivedAt: m.archivedAt, fromInbox: m.inboxAt === null ? m.inboxFrom : null, topics: readCardTopics(e.doc), index: extractIndex(e.doc) };
         }),
         q,
       ),

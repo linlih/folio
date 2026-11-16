@@ -14,13 +14,18 @@
 .inbox-add input:focus { border-color: var(--accent); }
 .inbox-add .button { flex: none; white-space: nowrap; }
 
-/* Search within the inbox: quieter than the box above, which adds. */
+/* 待整理 / 已整理, and search within the one shown: quieter than the box
+   above, which adds. On a narrow pane the search takes a line of its own. */
+.inbox-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin-bottom: 10px; }
+.inbox-tabs { flex: none; }
+.inbox-tabs button { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.inbox-tab-count { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
 .inbox-search {
+  flex: 1 1 220px;
   display: flex;
   align-items: center;
   gap: 8px;
   height: 32px;
-  margin-bottom: 10px;
   padding: 0 10px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -58,7 +63,8 @@
 .clip-source-link:hover span { text-decoration: underline; }
 .clip-source-excerpt { margin: 0; color: var(--secondary); line-height: 1.55; }
 .clip-source-inbox { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; }
-.clip-source-inbox .button { padding: 2px 10px; font-size: 12.5px; }
+.clip-source-inbox { flex-wrap: wrap; }
+.clip-source-inbox .button { display: inline-flex; align-items: center; gap: 4px; padding: 2px 10px; font-size: 12.5px; }
 .clip-source-from { margin-left: 0; }
 
 /* Text on its way in (InboxView PendingRow): being read, or failed. */

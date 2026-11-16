@@ -15,27 +15,23 @@ export type LibraryView = "grid" | "list";
  *  cards in one list. */
 export type LibraryGrouping = "topics" | "all";
 
-/** Every card, or only those that came from the inbox and were dealt with. */
-export type CardOrigin = "all" | "inbox";
-
 export interface LibraryQuery {
   text: string;
   sort: SortKey;
   edited: EditedWithin;
   view: LibraryView;
   grouping: LibraryGrouping;
-  origin: CardOrigin;
 }
 
-export const DEFAULT_QUERY: LibraryQuery = { text: "", sort: "updated", edited: "all", view: "grid", grouping: "topics", origin: "all" };
+export const DEFAULT_QUERY: LibraryQuery = { text: "", sort: "updated", edited: "all", view: "grid", grouping: "topics" };
 
 /** A card nobody wrote anything in (Heptabase's "empty cards"). */
 export const isEmptyCard = (c: CardRow) => !c.title.trim() && !c.preview.trim();
 
-/** The library without what still waits in the inbox: a clipped link not
- *  dealt with is little more than a link, so it stays out of the cards
- *  written by hand until marked 已整理. One already put in a topic has been
- *  sorted, so it shows. `waiting`: how many were left out. */
+/** The library without the inbox's clippings, waiting or kept under
+ *  已整理: little more than a link each, they stay out of the cards
+ *  written by hand until added to the library. One already put in a topic
+ *  has been sorted, so it shows. `waiting`: how many were left out. */
 export function withoutUnsorted(rows: CardRow[], inTopics: [string, string][], inbox: { id: string }[]) {
   const filed = new Set(inTopics.map(([id]) => id));
   const waiting = new Set(inbox.map((i) => i.id).filter((id) => !filed.has(id)));
@@ -54,7 +50,6 @@ export function applyQuery(rows: CardRow[], q: LibraryQuery, locale: string, now
   const since = startOf(q.edited, now);
   const out = rows.filter((c) => {
     if (c.updatedAt < since) return false;
-    if (q.origin === "inbox" && c.fromInbox == null) return false;
     // The title by pinyin too, the preview as written.
     return queryMatch(c.title, q.text) !== null || queryMatch(`${c.title}\n${c.preview}`, q.text) === "text";
   });

@@ -190,7 +190,7 @@ impl Sql {
             "in" => match c.v.first().map(String::as_str) {
                 Some("cards") => "c.kind != 'journal'".into(),
                 Some("journal") => "c.kind = 'journal'".into(),
-                Some("inbox") => "c.inbox_at IS NOT NULL".into(),
+                Some("inbox") => "(c.inbox_at IS NOT NULL OR c.archived_at IS NOT NULL)".into(),
                 Some("card") => format!("c.card_id = {}", self.arg(c.v.get(1).cloned().unwrap_or_default())),
                 Some("topic") => format!("EXISTS (SELECT 1 FROM idx.card_topics ct WHERE ct.card_id = c.card_id AND ct.topic = {})", self.arg(c.v.get(1).cloned().unwrap_or_default())),
                 _ => "0".into(),
@@ -249,7 +249,7 @@ impl Store {
             filter += " AND b.task_status IS NOT NULL";
         }
         if !q.include_inbox {
-            filter += " AND c.inbox_at IS NULL";
+            filter += " AND c.inbox_at IS NULL AND c.archived_at IS NULL";
         }
         if !q.exclude.is_empty() {
             filter += &format!(" AND c.card_id NOT IN {}", sql.list(&q.exclude));
@@ -447,7 +447,7 @@ mod tests {
         );
         let tpl = note(&mut s, "模板", at(11, 12), at(11, 12), vec![task("t1", "模板里的任务", "todo", None, None, None)]);
         let inbox = note(&mut s, "收集", at(11, 12), at(11, 12), vec![task("i1", "收集箱里的任务", "todo", None, None, None)]);
-        s.set_inbox(&inbox, true, at(11, 12)).unwrap();
+        s.set_inbox_place(&inbox, folio_core::card::InboxPlace::Waiting, at(11, 12)).unwrap();
         let reading = note(&mut s, "读书", at(10, 1), at(10, 1) + 30, vec![Item { tag: Some("读书"), ..item("r1", "三体") }]);
         s.set_card_topic(&reading, "work", true, at(10, 1) + 30).unwrap();
 

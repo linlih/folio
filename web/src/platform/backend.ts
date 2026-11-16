@@ -3,6 +3,7 @@ import type { BackupCopyStatus, CopySuggestion, LatestRelease, LibraryLocation, 
 import type { AppInfo, Backlink, BlockText, CardRow, DocKind, JournalDay, SearchFilter, SearchHit } from "../bindings/commands";
 import type { ClipInfo, InboxItem, LinkPreview, QueryRows, ResolvedQuery, TagCard, TaskRow } from "../bindings/commands";
 import type { AiEvent, AiModelInfo, AiProtocol, AiReply, AiTool, AiTurnRequest } from "../ai/types";
+import type { InboxPlace } from "../docs/card";
 
 /** A provider with a key on this device, and the synced copy it matches. */
 export interface AiKeyInfo {
@@ -49,8 +50,11 @@ export interface Backend {
   clipCreate(title: string, clip: ClipInfo, note: string): Promise<string>;
   /** Clipped links not dealt with yet, newest first. */
   inbox(): Promise<InboxItem[]>;
-  /** Takes a card out of the inbox (dealt with), or puts it back. */
-  setInbox(id: string, inbox: boolean): Promise<void>;
+  /** 已整理: dealt with and kept out of the card library, most recently
+   *  dealt with first. */
+  inboxArchived(): Promise<InboxItem[]>;
+  /** Moves a card to the inbox, 已整理 or the card library. */
+  setInboxPlace(id: string, place: InboxPlace): Promise<void>;
   /** Text another app shared to Folio since the last call (Android's share
    *  sheet); null where there is none or no such thing. */
   takeShared(): Promise<string | null>;

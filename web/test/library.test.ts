@@ -45,12 +45,6 @@ describe("card library query", () => {
     expect(ids(applyQuery(CARDS, { ...DEFAULT_QUERY, edited: "month" }, "en", now))).toEqual(["a", "e", "b", "c"]);
   });
 
-  it("shows only the cards that came from the inbox", () => {
-    const rows = [...CARDS, { ...row("f", "一篇文章", "", 2, 2), fromInbox: now.getTime() - 5 * DAY }];
-    expect(applyQuery(rows, { ...DEFAULT_QUERY, origin: "inbox" }, "zh").map((c) => c.id)).toEqual(["f"]);
-    expect(applyQuery(rows, DEFAULT_QUERY, "zh")).toHaveLength(6);
-  });
-
   it("finds empty cards", () => {
     expect(CARDS.filter(isEmptyCard).map((c) => c.id)).toEqual(["c"]);
   });

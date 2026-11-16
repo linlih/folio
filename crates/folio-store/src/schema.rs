@@ -65,7 +65,7 @@ pub fn has_pending_migrations(conn: &Connection) -> rusqlite::Result<bool> {
 }
 
 /// Bump whenever `INDEX_TABLES` changes.
-const INDEX_VERSION: i64 = 13;
+const INDEX_VERSION: i64 = 14;
 
 const INDEX_TABLES: &str = "
   CREATE TABLE idx.cards (
@@ -79,7 +79,9 @@ const INDEX_TABLES: &str = "
     -- A journal day's lines with their links, JSON (folio_core::body::Line).
     lines TEXT,
     -- Collected in the inbox at, for cards dealt with since (12).
-    inbox_from INTEGER
+    inbox_from INTEGER,
+    -- Dealt with and kept under 已整理, out of the card library (14).
+    archived_at INTEGER
   );
   CREATE INDEX idx.cards_by_inbox ON cards(inbox_at);
   CREATE INDEX idx.cards_by_updated ON cards(updated_at);

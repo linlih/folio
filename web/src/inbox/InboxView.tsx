@@ -1,8 +1,9 @@
-import { Check, ClipboardPaste, ExternalLink, Inbox, RotateCw, Search, Trash2, X } from "lucide-react";
+import { Check, ClipboardPaste, ExternalLink, Inbox, LibraryBig, RotateCw, Search, Trash2, Undo2, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { appUndo, docs } from "../app";
 import type { InboxItem } from "../bindings/commands";
+import type { InboxPlace } from "../docs/card";
 import { CARDS_CHANGED, moveToTrash } from "../card/actions";
 import { backend } from "../platform";
 import { usePinyin } from "../search/pinyin";
@@ -12,20 +13,27 @@ import { dropPending, firstUrl, INBOX_CHANGED, inboxChanged, keepClip, type Pend
 import { filterInbox } from "./filter";
 import "./inbox.css";
 
-/** Takes a card out of the inbox, or puts it back, and refreshes it where
- *  it is open (the host made the change). */
-export async function markDealtWith(id: string, done: boolean) {
-  await backend.setInbox(id, !done);
+/** Moves a card to the inbox, 已整理 or the card library, and refreshes it
+ *  where it is open (the host made the change). */
+export async function moveInboxCard(id: string, place: InboxPlace) {
+  await backend.setInboxPlace(id, place);
   await docs().refresh([id]);
   inboxChanged();
 }
 
-/** The inbox (design/inbox-and-tags.md §2): links kept to read later, until
- *  each is dealt with. Paste a link here, or share one from another app. */
+type InboxTab = "waiting" | "archived";
+
+/** The inbox (design/inbox-and-tags.md §2): links kept to read later. Each
+ *  waits under 待整理 until dealt with (✓, kept under 已整理) or added to
+ *  the card library as a card. Paste a link here, or share one from
+ *  another app. */
 export function InboxView({ active = true }: { active?: boolean }) {
   const { t, i18n } = useTranslation();
   const { open, setNotice } = useShell();
-  const [items, setItems] = useState<InboxItem[] | null>(null);
+  const [tab, setTab] = useState<InboxTab>("waiting");
+  const [waiting, setWaiting] = useState<InboxItem[] | null>(null);
+  const [archived, setArchived] = useState<InboxItem[] | null>(null);
+  const items = tab === "waiting" ? waiting : archived;
   const [text, setText] = useState("");
   // Only what waits here, so a hunt for one clipping is not lost among the
   // notes the global search also turns up. Not remembered.
@@ -38,7 +46,9 @@ export function InboxView({ active = true }: { active?: boolean }) {
   const justSaved = usePendingClips((s) => s.justSaved);
 
   const reload = useCallback(() => {
-    backend.inbox().then(setItems, (e) => setNotice(t("error.generic", { message: String(e) })));
+    const failed = (e: unknown) => setNotice(t("error.generic", { message: String(e) }));
+    backend.inbox().then(setWaiting, failed);
+    backend.inboxArchived().then(setArchived, failed);
   }, [setNotice, t]);
 
   useEffect(() => {
@@ -56,6 +66,7 @@ export function InboxView({ active = true }: { active?: boolean }) {
   async function save(value: string) {
     if (!value.trim()) return;
     setText("");
+    setTab("waiting");
     await keepClip(value);
   }
 
@@ -69,15 +80,19 @@ export function InboxView({ active = true }: { active?: boolean }) {
     }
   }
 
-  async function done(item: InboxItem) {
+  /** Moves it, with undo back to where it was. */
+  async function move(item: InboxItem, place: InboxPlace) {
+    const from: InboxPlace = item.archivedAt === null ? "inbox" : "archived";
     try {
-      await markDealtWith(item.id, true);
+      await moveInboxCard(item.id, place);
     } catch (e) {
       setNotice(t("error.generic", { message: String(e) }));
       return;
     }
-    appUndo.push({ label: "inbox", undo: () => markDealtWith(item.id, false), redo: () => markDealtWith(item.id, true) });
-    setNotice(t("inbox.done", { title: item.title || t("library.untitled") }), { undo: true });
+    appUndo.push({ label: "inbox", undo: () => moveInboxCard(item.id, from), redo: () => moveInboxCard(item.id, place) });
+    const title = item.title || t("library.untitled");
+    const said = { inbox: "inbox.putBack", archived: "inbox.done", library: "inbox.added" } as const;
+    setNotice(t(said[place], { title }), { undo: true });
   }
 
   const date = new Intl.DateTimeFormat(i18n.language, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
@@ -85,7 +100,7 @@ export function InboxView({ active = true }: { active?: boolean }) {
     <div className="page inbox">
       <header className="page-header">
         <h1>{t("inbox.title")}</h1>
-        {items && items.length > 0 && <span className="page-meta">{finding ? t("inbox.found", { count: shown!.length, total: items.length }) : t("inbox.count", { count: items.length })}</span>}
+        {finding && items && items.length > 0 && <span className="page-meta">{t("inbox.found", { count: shown!.length, total: items.length })}</span>}
       </header>
       <form
         className="inbox-add"
@@ -113,6 +128,18 @@ export function InboxView({ active = true }: { active?: boolean }) {
           </button>
         )}
       </form>
+      <div className="inbox-bar">
+        <span className="segmented inbox-tabs" role="tablist" aria-label={t("inbox.title")}>
+          {(["waiting", "archived"] as const).map((k) => {
+            const n = (k === "waiting" ? waiting : archived)?.length;
+            return (
+              <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? "on" : undefined} onClick={() => setTab(k)}>
+                {t(`inbox.tabs.${k}`)}
+                {n ? <span className="inbox-tab-count">{n}</span> : null}
+              </button>
+            );
+          })}
+        </span>
       {items && items.length > 0 && (
         <label className="inbox-search">
           <Search size={14} strokeWidth={1.75} />
@@ -128,11 +155,13 @@ export function InboxView({ active = true }: { active?: boolean }) {
           />
         </label>
       )}
-      {items?.length === 0 && pending.length === 0 && <EmptyState icon={<Inbox size={28} strokeWidth={1.5} />} title={t("inbox.empty")} hint={t("inbox.emptyHint")} />}
-      {finding && shown?.length === 0 && pending.length === 0 && <p className="empty">{t("inbox.noMatch")}</p>}
-      {(pending.length > 0 || (shown && shown.length > 0)) && (
+      </div>
+      {tab === "waiting" && items?.length === 0 && pending.length === 0 && <EmptyState icon={<Inbox size={28} strokeWidth={1.5} />} title={t("inbox.empty")} hint={t("inbox.emptyHint")} />}
+      {tab === "archived" && items?.length === 0 && <EmptyState icon={<Check size={28} strokeWidth={1.5} />} title={t("inbox.archivedEmpty")} hint={t("inbox.archivedEmptyHint")} />}
+      {finding && shown?.length === 0 && (tab === "archived" || pending.length === 0) && <p className="empty">{t("inbox.noMatch")}</p>}
+      {((tab === "waiting" && pending.length > 0) || (shown && shown.length > 0)) && (
         <ul className="inbox-list">
-          {pending.map((p) => (
+          {tab === "waiting" && pending.map((p) => (
             <PendingRow key={p.key} clip={p} />
           ))}
           {shown?.map((item) => (
@@ -140,7 +169,7 @@ export function InboxView({ active = true }: { active?: boolean }) {
               <button className="inbox-open" onClick={(e) => open({ kind: "card", cardId: item.id }, item.title, toSide(e))}>
                 <span className="inbox-title">{item.title || t("library.untitled")}</span>
                 <span className="inbox-meta">
-                  {[item.clip?.site, item.clip?.author, date.format(item.inboxAt)].filter(Boolean).join(" · ")}
+                  {[item.clip?.site, item.clip?.author, item.archivedAt === null ? date.format(item.inboxAt) : t("inbox.archivedOn", { date: date.format(item.archivedAt) })].filter(Boolean).join(" · ")}
                 </span>
                 {item.preview && <span className="inbox-excerpt">{item.preview}</span>}
               </button>
@@ -150,8 +179,17 @@ export function InboxView({ active = true }: { active?: boolean }) {
                     <ExternalLink size={15} />
                   </button>
                 )}
-                <button className="icon-button" title={t("inbox.markDone")} aria-label={t("inbox.markDone")} onClick={() => void done(item)}>
-                  <Check size={16} />
+                {item.archivedAt === null ? (
+                  <button className="icon-button" title={t("inbox.markDone")} aria-label={t("inbox.markDone")} onClick={() => void move(item, "archived")}>
+                    <Check size={16} />
+                  </button>
+                ) : (
+                  <button className="icon-button" title={t("inbox.putBackAction")} aria-label={t("inbox.putBackAction")} onClick={() => void move(item, "inbox")}>
+                    <Undo2 size={15} />
+                  </button>
+                )}
+                <button className="icon-button" title={t("inbox.addToLibrary")} aria-label={t("inbox.addToLibrary")} onClick={() => void move(item, "library")}>
+                  <LibraryBig size={15} />
                 </button>
                 <button className="icon-button" title={t("library.moveToTrash")} aria-label={t("library.moveToTrash")} onClick={() => void moveToTrash(item.id, item.title)}>
                   <Trash2 size={15} />

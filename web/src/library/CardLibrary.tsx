@@ -1,4 +1,4 @@
-import { Brush, FolderInput, Inbox, Layers, LayoutGrid, List, Plus, Search, Trash2, X, LibraryBig } from "lucide-react";
+import { Brush, FolderInput, Layers, LayoutGrid, List, Plus, Search, Trash2, X, LibraryBig } from "lucide-react";
 import { isTouch } from "../shell/phone";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -6,7 +6,7 @@ import type { CardRow } from "../bindings/commands";
 import { CARDS_CHANGED, moveManyToTrash } from "../card/actions";
 import { backend } from "../platform";
 import { useShell } from "../shell/tabs";
-import { applyQuery, DEFAULT_QUERY, isEmptyCard, withoutUnsorted, type CardOrigin, type EditedWithin, type LibraryGrouping, type LibraryQuery, type LibraryView, type SortKey } from "./query";
+import { applyQuery, DEFAULT_QUERY, isEmptyCard, withoutUnsorted, type EditedWithin, type LibraryGrouping, type LibraryQuery, type LibraryView, type SortKey } from "./query";
 import "./library.css";
 import { EmptyState } from "../shell/EmptyState";
 import { TopicPicker } from "../card/TopicRow";
@@ -42,15 +42,13 @@ export function CardLibrary({ active = true }: { active?: boolean }) {
   /** Naming a new sub-topic (asked for from the topic's menu). */
   const [addingSub, setAddingSub] = useState(false);
 
-  /** Links in the inbox, not dealt with yet: they wait there, not here. */
-  const [unsorted, setUnsorted] = useState(0);
+  /** Clippings waiting in the inbox or kept under 已整理 stay there, not here. */
 
   const reload = useCallback(async () => {
     try {
-      const [all, inTopics, inbox] = await Promise.all([backend.listCards(5000), backend.cardTopicPairs(), backend.inbox()]);
-      const { cards, waiting } = withoutUnsorted(all, inTopics, inbox);
+      const [all, inTopics, inbox, archived] = await Promise.all([backend.listCards(5000), backend.cardTopicPairs(), backend.inbox(), backend.inboxArchived()]);
+      const { cards } = withoutUnsorted(all, inTopics, [...inbox, ...archived]);
       setCards(cards);
-      setUnsorted(waiting);
       setPairs(inTopics);
     } catch (e) {
       setNotice(t("error.generic", { message: String(e) }));
@@ -134,7 +132,7 @@ export function CardLibrary({ active = true }: { active?: boolean }) {
   }, [withSubs, topics, subs, pairs]);
   // Home with topics shows their tiles and the cards in none; a search,
   // and the cards from the inbox, look through every card.
-  const searching = query.text.trim() !== "" || query.origin !== "all";
+  const searching = query.text.trim() !== "";
   const home = !topic && query.grouping === "topics" && !searching;
   const inView = useMemo(() => {
     if (!cards) return null;
@@ -240,17 +238,14 @@ export function CardLibrary({ active = true }: { active?: boolean }) {
       <header className="page-header">
         {topic ? <TopicHeader topicId={topic} onNewSub={() => setAddingSub(true)} /> : <h1>{t("library.title")}</h1>}
         {cards && <span className="page-meta">{t("library.count", { count: topic ? (deepByTopic.get(topic)?.length ?? 0) : cards.length })}</span>}
-        {!topic && unsorted > 0 && (
-          <button className="library-inbox-note" onClick={() => useShell.getState().open({ kind: "inbox" })}>
-            <Inbox size={13} />
-            {t("library.inboxWaiting", { count: unsorted })}
-          </button>
-        )}
         <span className="library-header-actions">
           {empties.length > 0 && (
-            <button className="button" title={t("library.cleanEmptyHint")} onClick={() => void moveManyToTrash(empties)}>
+            <button className="button library-clean" title={t("library.cleanEmptyHint")} aria-label={t("library.cleanEmpty", { count: empties.length })} onClick={() => void moveManyToTrash(empties)}>
               <Brush size={14} />
-              {t("library.cleanEmpty", { count: empties.length })}
+              <span className="library-clean-label">{t("library.cleanEmpty", { count: empties.length })}</span>
+              <span className="library-clean-count" aria-hidden>
+                {empties.length}
+              </span>
             </button>
           )}
           <button className="button primary" onClick={newCard}>
@@ -331,17 +326,6 @@ export function CardLibrary({ active = true }: { active?: boolean }) {
               {(["all", "today", "week", "month"] as const).map((k) => (
                 <option key={k} value={k}>
                   {t(`library.within.${k}`)}
-                </option>
-              ))}
-            </select>
-          </label>
-          {/* Not remembered, like the search: a library that looks half
-              empty next time would be a puzzle. */}
-          <label className="library-select">
-            <select value={query.origin} aria-label={t("library.origin")} onChange={(e) => update({ origin: e.target.value as CardOrigin })}>
-              {(["all", "inbox"] as const).map((k) => (
-                <option key={k} value={k}>
-                  {t(`library.origins.${k}`)}
                 </option>
               ))}
             </select>

@@ -2,11 +2,15 @@
    dates on the right, multi-select. */
 
 .library { max-width: calc(var(--measure) + 240px); }
-/* Links still in the inbox are not listed here; say how many wait there. */
-.library-inbox-note { display: inline-flex; align-items: center; gap: 4px; align-self: center; padding: 2px 8px; border-radius: 999px; color: var(--muted); font: 12.5px var(--font-ui); }
-.library-inbox-note:hover { background: var(--hover); color: var(--text); }
 .library-header-actions { margin-left: auto; display: flex; gap: 8px; align-self: center; }
 .page-header .library-header-actions .button { margin-left: 0; }
+/* A narrow pane: the header wraps as whole pieces (title, count, note,
+   buttons), never a word per line inside a squeezed piece. The buttons
+   keep to the right on their own line. */
+.library-clean-count { display: none; }
+.library .page-header { flex-wrap: wrap; row-gap: 8px; }
+.library .page-header > .page-meta,
+.library-header-actions .button { flex: none; white-space: nowrap; }
 
 .library-toolbar, .library-selection { min-height: 44px; margin-bottom: 12px; }
 /* One line when there is room, so it has the selection bar's height and
@@ -143,6 +147,9 @@
 }
 @container (max-width: 640px) {
   .library-select > span { display: none; }
+  /* The broom and the count are enough; the full wording is its tooltip. */
+  .library-clean-label { display: none; }
+  .library-clean-count { display: inline; }
 }
 /* One tile per row (a phone): as tall as its text, up to three lines, so a
    short card is not a mostly empty box. */

@@ -28,6 +28,7 @@ function card(id: string, over: Partial<EngineCard> & { blocks?: IndexBlock[]; t
     createdAt: 0,
     updatedAt: 0,
     inboxAt: null,
+    archivedAt: null,
     fromInbox: null,
     topics: [],
     index: { blocks, tags, links, refs: [] },
@@ -52,6 +53,7 @@ const library = (): EngineCard[] => [
   card("journal:2026-11-11", { updatedAt: 60, blocks: [task("k1", "约张三过排期", "todo", { scheduled: "2026-11-13", priority: "urgent" }), task("k2", "写周报", "todo")], links: [["k1", "project"]] }),
   card("tpl", { updatedAt: 70, blocks: [task("t1", "模板里的任务")] }),
   card("inbox-card", { updatedAt: 80, inboxAt: 1, blocks: [task("i1", "收集箱里的任务")] }),
+  card("archived-card", { updatedAt: 79, archivedAt: 2, blocks: [task("a1", "已整理里的任务")] }),
   card("reading", { title: "读书", updatedAt: 30, createdAt: new Date(2026, 9, 1).getTime(), topics: ["work"], blocks: [block({ bid: "r1", text: "三体" })], tags: [["r1", "读书"]] }),
 ];
 
@@ -88,7 +90,8 @@ describe("query: running in memory", () => {
     expect(taskTexts("task:open (in:this OR links:this)")).toEqual(["接口文档", "约张三过排期", "评审材料"]);
     expect(taskTexts("task:any")).not.toContain("模板里的任务");
     expect(taskTexts("task:any")).not.toContain("收集箱里的任务");
-    expect(taskTexts("task:any in:inbox")).toEqual(["收集箱里的任务"]);
+    expect(taskTexts("task:any")).not.toContain("已整理里的任务");
+    expect(taskTexts("task:any in:inbox").sort()).toEqual(["已整理里的任务", "收集箱里的任务"].sort());
   });
 
   it("counts a tag on the line above, and anywhere in a card, but not anywhere in a journal day", () => {
