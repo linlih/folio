@@ -136,7 +136,10 @@ body.resizing { cursor: col-resize; user-select: none; }
 .tab:hover .tab-close, .tab[aria-selected="true"] .tab-close, .tab-close:focus-visible { opacity: 1; }
 
 /* ---- views ---- */
-.view { flex: 1; min-height: 0; overflow-y: auto; }
+/* Always room for the scrollbar: a styled one (design/base.css) takes
+   width, so a page that comes to scroll, or stops, would shift sideways.
+   Not overflow-y: scroll, which draws an empty track in WKWebView. */
+.view { flex: 1; min-height: 0; overflow-y: auto; scrollbar-gutter: stable; }
 .view[hidden] { display: none; }
 .page { max-width: calc(var(--measure) + 96px); margin: 0 auto; padding: 40px 48px 80px; }
 .page-header { display: flex; align-items: baseline; gap: 12px; margin-bottom: 20px; }
