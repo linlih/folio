@@ -12,7 +12,8 @@
   outline: none;
 }
 .inbox-add input:focus { border-color: var(--accent); }
-.inbox-add .button { flex: none; white-space: nowrap; }
+/* As tall as the box beside it, not the usual 28px. */
+.inbox-add .button { flex: none; height: auto; white-space: nowrap; }
 
 /* 待整理 / 已整理, and search within the one shown: quieter than the box
    above, which adds. On a narrow pane the search takes a line of its own. */
