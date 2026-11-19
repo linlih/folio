@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>置顶查询卡片草图</title>
+<!-- Static mockups for pinning a query card to the sidebar; colours and fonts from web/src/design/tokens.css. -->
+<style>
+:root {
+  --ink: #2b2925; --paper: #fdfaf6; --accent: #2f5d8a;
+  --text: var(--ink);
+  --secondary: color-mix(in srgb, var(--ink) 72%, var(--paper));
+  --muted: color-mix(in srgb, var(--ink) 55%, var(--paper));
+  --surface: color-mix(in srgb, var(--ink) 3%, var(--paper));
+  --side: color-mix(in srgb, var(--ink) 4%, var(--paper));
+  --border: color-mix(in srgb, var(--ink) 11%, var(--paper));
+  --hover: color-mix(in srgb, var(--ink) 6%, transparent);
+  --selected: color-mix(in srgb, var(--ink) 9%, transparent);
+  --red: #b5523f;
+  --font-body: "Source Serif 4", "Noto Serif SC", ui-serif, Georgia, "Songti SC", serif;
+  --font-ui: system-ui, -apple-system, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+* { box-sizing: border-box; }
+body { margin: 0; padding: 32px 16px 64px; background: #ece8e1; font: 14px/1.5 var(--font-ui); color: var(--text); }
+h1.sheet { max-width: 1180px; margin: 0 auto 6px; font: 600 20px/1.4 var(--font-ui); }
+p.lead { max-width: 1180px; margin: 0 auto 28px; color: var(--secondary); }
+.row { display: flex; flex-wrap: wrap; gap: 28px; justify-content: center; align-items: flex-start; max-width: 1180px; margin: 0 auto 40px; }
+.label { font: 600 12px/1.4 var(--font-ui); color: var(--secondary); margin: 0 0 8px; letter-spacing: .02em; max-width: 100%; }
+.frame { background: var(--paper); border-radius: 10px; box-shadow: 0 1px 2px rgb(0 0 0 / .06), 0 8px 28px rgb(0 0 0 / .08); overflow: hidden; position: relative; max-width: 100%; }
+.hint { margin-top: 10px; color: var(--muted); font-size: 12px; line-height: 1.7; max-width: 360px; }
+.new { outline: 2px solid color-mix(in srgb, var(--accent) 55%, transparent); outline-offset: 2px; border-radius: 6px; }
+.tagnew { display: inline-block; margin-left: 6px; padding: 0 5px; border-radius: 4px; background: var(--accent); color: white; font: 600 10px/1.6 var(--font-ui); vertical-align: 1px; }
+svg.i { width: 15px; height: 15px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+
+/* sidebar */
+.side { width: 240px; padding: 12px 8px; background: var(--side); font-size: 13.5px; color: var(--secondary); min-height: 470px; }
+.search { display: flex; align-items: center; gap: 6px; height: 30px; padding: 0 8px; margin: 0 4px 10px; border: 1px solid var(--border); border-radius: 7px; color: var(--muted); background: var(--paper); font-size: 13px; }
+.nav { display: flex; align-items: center; gap: 8px; height: 30px; padding: 0 8px; border-radius: 7px; position: relative; }
+.nav span.t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nav .n { margin-left: auto; color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.nav .n.red { color: var(--red); }
+.nav.on { background: var(--selected); color: var(--text); }
+.nav.lift { background: var(--paper); color: var(--text); box-shadow: 0 6px 18px rgb(0 0 0 / .16); transform: translateX(6px) rotate(-1deg); }
+.nav .grip { position: absolute; left: -2px; color: var(--muted); font-size: 10px; letter-spacing: -2px; }
+.drop { height: 2px; margin: 1px 8px; background: var(--accent); border-radius: 1px; }
+.sec { margin: 16px 8px 4px; font-size: 12.5px; font-weight: 600; color: var(--secondary); }
+
+/* desktop page */
+.desk { width: 640px; min-height: 470px; padding: 32px 48px; }
+.ph1 { display: flex; align-items: baseline; gap: 12px; margin-bottom: 18px; }
+.ph1 h2 { margin: 0; font: 600 28px/1.3 var(--font-body); }
+.seg { display: inline-flex; padding: 2px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); font-size: 13px; align-self: center; }
+.seg span { padding: 3px 12px; border-radius: 6px; color: var(--secondary); }
+.seg span.on { background: white; color: var(--text); box-shadow: 0 1px 2px rgb(0 0 0 / .12); }
+.ibtn { width: 28px; height: 28px; display: inline-grid; place-items: center; border-radius: 7px; color: var(--secondary); align-self: center; }
+.tip { position: absolute; padding: 4px 8px; border-radius: 6px; background: var(--ink); color: white; font-size: 12px; white-space: nowrap; }
+.grp { margin: 14px 0 4px; font: 600 13px/1.6 var(--font-ui); color: var(--secondary); }
+.grp.red { color: var(--red); }
+.grp small { color: var(--muted); font-weight: 400; margin-left: 6px; }
+.task { display: flex; gap: 9px; align-items: flex-start; padding: 5px 0; }
+.circle { flex: none; width: 15px; height: 15px; margin-top: 5px; border-radius: 50%; border: 1.6px solid var(--muted); }
+.circle.doing { border-color: #c79a2a; background: conic-gradient(#c79a2a 0 50%, transparent 0); }
+.t-text { font: 15px/1.6 var(--font-body); }
+.t-meta { font-size: 11.5px; color: var(--muted); }
+.chip { display: inline-block; padding: 0 6px; border-radius: 4px; background: var(--hover); color: var(--secondary); font-size: 11px; margin-left: 4px; }
+.chip.red { background: color-mix(in srgb, #c9524a 12%, transparent); color: var(--red); }
+.toast { position: absolute; left: 50%; bottom: 18px; transform: translateX(-50%); display: flex; gap: 14px; align-items: center; padding: 8px 14px; border-radius: 8px; background: var(--ink); color: white; font-size: 13px; white-space: nowrap; }
+.toast b { color: #9cc3ea; font-weight: 500; }
+
+/* card with a query block */
+.card-title { font: 600 28px/1.3 var(--font-body); margin: 0 0 6px; }
+.meta { font-size: 12px; color: var(--muted); margin-bottom: 14px; }
+.q { margin: 8px 0 14px; border-left: 2px solid var(--border); background: var(--surface); border-radius: 0 8px 8px 0; position: relative; }
+.q-head { display: flex; align-items: center; gap: 8px; padding: 8px 10px 6px 12px; font-size: 13px; color: var(--secondary); }
+.q-title { font-weight: 600; color: var(--text); }
+.q-count { color: var(--muted); }
+.q-tools { margin-left: auto; display: flex; gap: 2px; color: var(--muted); }
+.q-tools span { width: 24px; height: 24px; display: grid; place-items: center; border-radius: 5px; }
+.q-tools span.on { background: var(--hover); color: var(--text); }
+.q .grp, .q .task { padding-left: 12px; padding-right: 12px; }
+.q .grp { margin: 4px 0 0; font-size: 12px; }
+.more { padding: 4px 12px 10px; font-size: 12.5px; color: var(--accent); }
+.menu { position: absolute; right: 8px; top: 34px; width: 220px; padding: 4px; background: var(--paper); border: 1px solid var(--border); border-radius: 9px; box-shadow: 0 12px 30px rgb(0 0 0 / .14); font-size: 13px; z-index: 2; }
+.mi { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 6px; color: var(--text); }
+.mi.hl { background: var(--hover); }
+.mi small { margin-left: auto; color: var(--muted); font-size: 11.5px; }
+.msep { height: 1px; margin: 4px 6px; background: var(--border); }
+
+/* presets */
+.presets { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.preset { padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; }
+.preset b { display: block; font-weight: 600; font-size: 13px; }
+.preset small { color: var(--muted); font-size: 11.5px; }
+.pframe { width: 520px; padding: 14px; font-size: 13px; }
+.plabel { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+
+/* phone */
+.phone { width: 360px; height: 640px; }
+.drawer { position: absolute; inset: 0 70px 0 0; background: var(--side); padding: 44px 10px 10px; box-shadow: 8px 0 30px rgb(0 0 0 / .14); font-size: 15px; color: var(--secondary); }
+.drawer .nav { height: 40px; }
+.drawer .sec { font-size: 13px; }
+.dim { position: absolute; inset: 0; background: rgb(0 0 0 / .22); }
+.under { padding: 52px 20px; font: 600 24px/1.3 var(--font-body); color: var(--muted); }
+.lp { position: absolute; width: 44px; height: 44px; border-radius: 50%; background: color-mix(in srgb, var(--accent) 22%, transparent); }
+
+@media (max-width: 700px) {
+  body { padding: 20px 16px 48px; }
+  .desk { width: 100%; padding: 24px 20px; }
+  .pframe { width: 100%; }
+  .presets { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute">
+  <symbol id="funnel" viewBox="0 0 16 16"><path d="M2 3h12l-4.6 5.4V13l-2.8-1.4V8.4z"/></symbol>
+  <symbol id="file" viewBox="0 0 16 16"><path d="M4 1.8h5.2L12.5 5v9.2H4z"/><path d="M9 1.8V5h3.5"/></symbol>
+  <symbol id="pin" viewBox="0 0 16 16"><path d="M6 2h4l-.6 4 2.6 2.4H4L6.6 6z"/><path d="M8 8.4V14"/></symbol>
+  <symbol id="cal" viewBox="0 0 16 16"><rect x="2" y="3" width="12" height="11" rx="2"/><path d="M2 6.5h12M5.5 1.5v3M10.5 1.5v3"/></symbol>
+  <symbol id="inbox" viewBox="0 0 16 16"><path d="M2 9l2-6h8l2 6v4H2z"/><path d="M2 9h3.5l1 1.5h3l1-1.5H14"/></symbol>
+  <symbol id="lib" viewBox="0 0 16 16"><path d="M3 2.5v11M6 2.5v11M9 3l3 10.5"/></symbol>
+  <symbol id="check" viewBox="0 0 16 16"><rect x="2" y="2" width="12" height="12" rx="2"/><path d="M5.2 8.2l2 2 3.6-4"/></symbol>
+  <symbol id="board" viewBox="0 0 16 16"><rect x="2" y="2" width="5" height="5" rx="1"/><rect x="9" y="2" width="5" height="5" rx="1"/><rect x="2" y="9" width="5" height="5" rx="1"/><rect x="9" y="9" width="5" height="5" rx="1"/></symbol>
+  <symbol id="plus" viewBox="0 0 16 16"><path d="M8 3v10M3 8h10"/></symbol>
+  <symbol id="search" viewBox="0 0 16 16"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5L14 14"/></symbol>
+</svg>
+
+<h1 class="sheet">置顶查询卡片 · 界面草图</h1>
+<p class="lead">静态示意，不是实际界面；字体、颜色取自 Folio 的 tokens。蓝框是这次新加的地方。</p>
+
+<div class="row">
+  <div>
+    <div class="label">① 侧边栏：现在</div>
+    <div class="frame side">
+      <div class="search"><svg class="i"><use href="#search"/></svg>搜索<span style="margin-left:auto;font-size:11px">⌘K</span></div>
+      <div class="nav"><svg class="i"><use href="#cal"/></svg><span class="t">日记</span></div>
+      <div class="nav"><svg class="i"><use href="#inbox"/></svg><span class="t">收集箱</span><span class="n">36</span></div>
+      <div class="nav"><svg class="i"><use href="#lib"/></svg><span class="t">卡片库</span></div>
+      <div class="nav"><svg class="i"><use href="#check"/></svg><span class="t">任务</span></div>
+      <div class="nav"><svg class="i"><use href="#board"/></svg><span class="t">白板</span></div>
+      <div class="sec">置顶</div>
+      <div class="nav"><svg class="i"><use href="#file"/></svg><span class="t">读书清单</span></div>
+      <div class="nav"><svg class="i"><use href="#file"/></svg><span class="t">待办</span></div>
+      <div class="nav"><svg class="i"><use href="#file"/></svg><span class="t">项目 A</span></div>
+    </div>
+    <div class="hint">· 都是一样的卡片图标，看不出哪张是查询<br>· 顺序是置顶的先后，改不了</div>
+  </div>
+
+  <div>
+    <div class="label">② 侧边栏：之后</div>
+    <div class="frame side">
+      <div class="search"><svg class="i"><use href="#search"/></svg>搜索<span style="margin-left:auto;font-size:11px">⌘K</span></div>
+      <div class="nav"><svg class="i"><use href="#cal"/></svg><span class="t">日记</span></div>
+      <div class="nav"><svg class="i"><use href="#inbox"/></svg><span class="t">收集箱</span><span class="n">36</span></div>
+      <div class="nav"><svg class="i"><use href="#lib"/></svg><span class="t">卡片库</span></div>
+      <div class="nav"><svg class="i"><use href="#check"/></svg><span class="t">任务</span></div>
+      <div class="nav"><svg class="i"><use href="#board"/></svg><span class="t">白板</span></div>
+      <div class="sec">置顶</div>
+      <div class="nav on new"><svg class="i"><use href="#funnel"/></svg><span class="t">未完成任务</span><span class="n">12</span></div>
+      <div class="nav new"><svg class="i"><use href="#funnel"/></svg><span class="t">本周到期</span><span class="n red">3</span></div>
+      <div class="nav"><svg class="i"><use href="#file"/></svg><span class="t">读书清单</span></div>
+      <div class="nav"><svg class="i"><use href="#file"/></svg><span class="t">项目 A</span></div>
+    </div>
+    <div class="hint">· 查询卡片用漏斗图标，后面是结果条数，和收集箱的数字一个样子<br>· 有过期的任务时数字变红<br>· 点一下打开这张卡片，不用搜索</div>
+  </div>
+
+  <div>
+    <div class="label">③ 拖动调整顺序</div>
+    <div class="frame side">
+      <div class="search"><svg class="i"><use href="#search"/></svg>搜索<span style="margin-left:auto;font-size:11px">⌘K</span></div>
+      <div class="nav"><svg class="i"><use href="#cal"/></svg><span class="t">日记</span></div>
+      <div class="nav"><svg class="i"><use href="#inbox"/></svg><span class="t">收集箱</span><span class="n">36</span></div>
+      <div class="nav"><svg class="i"><use href="#lib"/></svg><span class="t">卡片库</span></div>
+      <div class="nav"><svg class="i"><use href="#check"/></svg><span class="t">任务</span></div>
+      <div class="nav"><svg class="i"><use href="#board"/></svg><span class="t">白板</span></div>
+      <div class="sec">置顶</div>
+      <div class="nav"><svg class="i"><use href="#funnel"/></svg><span class="t">未完成任务</span><span class="n">12</span></div>
+      <div class="drop"></div>
+      <div class="nav lift new"><svg class="i"><use href="#file"/></svg><span class="t">项目 A</span></div>
+      <div class="nav"><svg class="i"><use href="#funnel"/></svg><span class="t">本周到期</span><span class="n red">3</span></div>
+      <div class="nav"><svg class="i"><use href="#file"/></svg><span class="t">读书清单</span></div>
+      <div class="nav" style="opacity:.3"><svg class="i"><use href="#file"/></svg><span class="t">项目 A</span></div>
+    </div>
+    <div class="hint">· 把「项目 A」往上拖：浮起来的是正在拖的，淡色的是原来的位置，蓝线是放下的地方<br>· 只在「置顶」里排序；顺序跟着卡片同步到其他设备</div>
+  </div>
+</div>
+
+<div class="row">
+  <div>
+    <div class="label">④ 任务页：一键存为置顶卡片</div>
+    <div class="frame desk">
+      <div class="ph1">
+        <h2>任务</h2>
+        <span class="seg"><span class="on">未完成</span><span>已完成</span><span>日历</span><span>习惯</span></span>
+        <span style="margin-left:auto;display:flex;gap:2px;position:relative">
+          <span class="ibtn new"><svg class="i"><use href="#pin"/></svg></span>
+          <span class="ibtn"><svg class="i"><use href="#plus"/></svg></span>
+          <span class="tip" style="right:0;top:34px">存为置顶卡片</span>
+        </span>
+      </div>
+      <div class="grp red">已过期<small>2</small></div>
+      <div class="task"><span class="circle"></span><div><div class="t-text">和设计确认首页稿</div><div class="t-meta">日记 · 11月8日<span class="chip red">截止 11月10日</span></div></div></div>
+      <div class="task"><span class="circle"></span><div><div class="t-text">回复出版社的邮件</div><div class="t-meta">读书清单<span class="chip red">截止 11月18日</span></div></div></div>
+      <div class="grp">今天<small>1</small></div>
+      <div class="task"><span class="circle doing"></span><div><div class="t-text">接口文档补全登录部分</div><div class="t-meta">项目 A<span class="chip">计划 今天</span></div></div></div>
+      <div class="grp">接下来 7 天<small>3</small></div>
+      <div class="task"><span class="circle"></span><div><div class="t-text">准备周五评审材料</div><div class="t-meta">周会记录<span class="chip">截止 11月21日</span></div></div></div>
+      <div class="toast">已新建「未完成任务」并置顶<b>打开</b><b>撤销</b></div>
+    </div>
+    <div class="hint">· 「未完成」和「已完成」两栏有这个按钮；日历、习惯没有<br>· 点了就新建一张卡片，放一个和这一栏一样的查询，置顶，底部提示可以打开或撤销<br>· 不会自己跳走，你还留在任务页</div>
+  </div>
+
+  <div>
+    <div class="label">⑤ 新建出来的卡片，和查询块的 ⋯ 菜单</div>
+    <div class="frame desk">
+      <h2 class="card-title">未完成任务</h2>
+      <div class="meta">卡片 · 新建于 11月20日 · 已置顶</div>
+      <div class="q">
+        <div class="q-head"><svg class="i" style="width:14px;height:14px"><use href="#funnel"/></svg><span class="q-title">未完成任务 · 按日期</span><span class="q-count">12</span><span class="q-tools"><span class="on">⋯</span><span>⌄</span></span></div>
+        <div class="menu">
+          <div class="mi">编辑条件</div>
+          <div class="mi">复制文字写法</div>
+          <div class="msep"></div>
+          <div class="mi hl new"><svg class="i"><use href="#pin"/></svg>置顶这张卡片<small>侧边栏</small></div>
+          <div class="msep"></div>
+          <div class="mi" style="color:var(--red)">删除查询</div>
+        </div>
+        <div class="grp red">已过期 2</div>
+        <div class="task"><span class="circle"></span><div><div class="t-text">和设计确认首页稿</div><div class="t-meta">日记 · 11月8日<span class="chip red">截止 11月10日</span></div></div></div>
+        <div class="task"><span class="circle"></span><div><div class="t-text">回复出版社的邮件</div><div class="t-meta">读书清单<span class="chip red">截止 11月18日</span></div></div></div>
+        <div class="grp">今天 1</div>
+        <div class="task"><span class="circle doing"></span><div><div class="t-text">接口文档补全登录部分</div><div class="t-meta">项目 A<span class="chip">计划 今天</span></div></div></div>
+        <div class="more">显示全部 12 条</div>
+      </div>
+      <p style="font:16px/1.7 var(--font-body);color:var(--muted);margin:0">下面还能接着写别的，比如这周的重点……</p>
+    </div>
+    <div class="hint">· 就是一张普通卡片：可以改名、加文字、再放别的查询<br>· 任务能直接勾，点文字跳到原处<br>· 已置顶时菜单里是「取消置顶」；卡片没有标题时，置顶会用查询的说明当标题</div>
+  </div>
+</div>
+
+<div class="row">
+  <div>
+    <div class="label">⑥ /查询 的常用查询：加一个「全部未完成任务」</div>
+    <div class="frame pframe">
+      <div class="plabel">常用查询</div>
+      <div class="presets">
+        <div class="preset new"><b>全部未完成任务<span class="tagnew">新</span></b><small>按日期分组，过期的在最前</small></div>
+        <div class="preset"><b>本卡相关的未完成任务</b><small>在本卡里或链接到本卡</small></div>
+        <div class="preset"><b>7 天内到期</b><small>含已过期</small></div>
+        <div class="preset"><b>最近 7 天新建的卡片</b><small>按新建时间</small></div>
+        <div class="preset"><b>最近 7 天修改的卡片</b><small>按修改时间</small></div>
+        <div class="preset"><b>带某个标签的卡片</b><small>先选标签</small></div>
+      </div>
+    </div>
+    <div class="hint">· 自己新建卡片、输入 /查询 的人，也能一步得到和任务页一样的列表</div>
+  </div>
+
+  <div>
+    <div class="label">⑦ 手机：侧边栏里一样有，长按拖动排序</div>
+    <div class="frame phone">
+      <div class="under">今天</div>
+      <div class="dim"></div>
+      <div class="drawer">
+        <div class="nav"><svg class="i"><use href="#cal"/></svg><span class="t">日记</span></div>
+        <div class="nav"><svg class="i"><use href="#inbox"/></svg><span class="t">收集箱</span><span class="n">36</span></div>
+        <div class="nav"><svg class="i"><use href="#lib"/></svg><span class="t">卡片库</span></div>
+        <div class="nav"><svg class="i"><use href="#check"/></svg><span class="t">任务</span></div>
+        <div class="sec">置顶</div>
+        <div class="nav"><svg class="i"><use href="#funnel"/></svg><span class="t">未完成任务</span><span class="n">12</span></div>
+        <div class="drop"></div>
+        <div class="nav lift new"><svg class="i"><use href="#file"/></svg><span class="t">项目 A</span></div>
+        <div class="nav"><svg class="i"><use href="#funnel"/></svg><span class="t">本周到期</span><span class="n red">3</span></div>
+        <div class="nav"><svg class="i"><use href="#file"/></svg><span class="t">读书清单</span></div>
+        <div class="nav" style="opacity:.3"><svg class="i"><use href="#file"/></svg><span class="t">项目 A</span></div>
+      </div>
+    </div>
+    <div class="hint">· 轻点打开；按住半秒后拿起来拖<br>· 不按住时上下滑动照常滚动，不会误拖</div>
+  </div>
+</div>
+</body>
+</html>

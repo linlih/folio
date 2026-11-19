@@ -19,6 +19,7 @@
     "itemMenu": "更多操作",
     "pin": "置顶",
     "unpin": "取消置顶",
+    "pinOverdue": "有过期的任务",
     "topics": "主题",
     "inbox": "收集箱",
     "tasks": "任务"
@@ -1106,6 +1107,8 @@
     "copyText": "复制为文字",
     "copied": "已复制查询",
     "refresh": "刷新",
+    "pinCard": "置顶这张卡片",
+    "unpinCard": "取消置顶这张卡片",
     "delete": "删除查询",
     "menu": "查询选项",
     "fold": "收起",
@@ -1154,6 +1157,7 @@
       "textTip": "例如：任务:未完成 #项目A 到期:<=+7天。⌘↩ 完成"
     },
     "preset": {
+      "allOpen": "全部未完成任务",
       "aboutThis": "本卡相关的未完成任务",
       "dueSoon": "7 天内到期的任务",
       "newCards": "最近 7 天新建的卡片",
@@ -1215,6 +1219,11 @@
   },
   "tasks": {
     "title": "任务",
+    "pinAsCard": "存为置顶卡片",
+    "pinTitleOpen": "未完成任务",
+    "pinTitleClosed": "已完成任务",
+    "pinned": "已新建「{{title}}」并置顶",
+    "pinnedOpen": "打开",
     "add": "添加任务",
     "addClose": "收起",
     "addPlaceholder": "要做什么？",

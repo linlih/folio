@@ -1,5 +1,6 @@
 import { Brush, FolderInput, Layers, LayoutGrid, List, Plus, Search, Trash2, X, LibraryBig } from "lucide-react";
-import { isTouch } from "../shell/phone";
+import { isTouch, usePhone } from "../shell/phone";
+import { PinnedSection } from "../shell/Sidebar";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { CardRow } from "../bindings/commands";
@@ -132,6 +133,7 @@ export function CardLibrary({ active = true }: { active?: boolean }) {
   }, [withSubs, topics, subs, pairs]);
   // Home with topics shows their tiles and the cards in none; a search,
   // and the cards from the inbox, look through every card.
+  const phone = usePhone();
   const searching = query.text.trim() !== "";
   const home = !topic && query.grouping === "topics" && !searching;
   const inView = useMemo(() => {
@@ -254,6 +256,9 @@ export function CardLibrary({ active = true }: { active?: boolean }) {
           </button>
         </span>
       </header>
+
+      {/* A phone has no sidebar: its pinned cards are here, one tap away. */}
+      {phone && !topic && !searching && <PinnedSection active={null} className="library-pins" />}
 
       {/* While cards are selected, the selection bar takes the toolbar's
           place at the same height, so the list never jumps under the

@@ -416,6 +416,31 @@ export function appendTag(doc: LoroDoc, tag: string) {
   node.ensureMergeableMovableList("children");
 }
 
+/** Appends a query block holding `spec` (as stored, JSON), then an empty
+ *  paragraph to write on under it. The caller commits. */
+export function appendQuery(doc: LoroDoc, spec: string) {
+  addNode(doc, undefined, "query", { bid: newBid(), spec });
+  addParagraph(doc, undefined, "", null);
+}
+
+/** The first query block's spec, wherever it sits; null when the card has
+ *  none (a card in the sidebar shows what it lists, design/query.md §13). */
+export function firstQuerySpec(doc: LoroDoc): string | null {
+  const find = (nodes: LoroTreeNode[] | undefined): string | null => {
+    for (const node of nodes ?? []) {
+      if (node.data.get("nodeName") === "query") {
+        const attrs = node.data.get("attributes");
+        const spec = attrs instanceof LoroMap ? attrs.get("spec") : undefined;
+        return typeof spec === "string" ? spec : "";
+      }
+      const found = find(node.children());
+      if (found !== null) return found;
+    }
+    return null;
+  };
+  return find(bodyTree(doc).roots());
+}
+
 /** A query's spec with tag `from` named `to` (both lower case), and how
  *  many it renamed; null when it has none (or is not JSON). Whatever else
  *  it holds is kept as it is. */

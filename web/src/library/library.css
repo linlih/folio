@@ -236,3 +236,10 @@
 .topic-title-trigger:hover, .topic-title-trigger[data-popup-open] { background: var(--hover); }
 .topic-title-mark { flex: none; color: var(--muted); transition: transform 0.15s; }
 .topic-title-trigger[data-popup-open] .topic-title-mark { transform: rotate(180deg); }
+
+/* A phone's pinned cards (no sidebar there), above the library's cards. */
+.library-pins { margin: -6px 0 16px; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+.library-pins h2 { margin: 0 0 4px; font-size: 12.5px; font-weight: 600; color: var(--secondary); }
+.library-pins .nav-item { padding: 9px 8px; font-size: 15px; color: var(--text); }
+.library-pins .nav-row-menu { display: none; }
+.library-pins .nav-row > .nav-item { padding-right: 8px; }

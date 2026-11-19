@@ -64,6 +64,16 @@ function queryView(editor: Editor, initial: PMNode, getPos: () => number | undef
       }),
     );
   render();
+  // A card opens read-only until its document has loaded (CardEditor):
+  // drawn then, the block must learn when it can be edited.
+  let editable = editor.isEditable;
+  const onEditable = () => {
+    if (editor.isEditable === editable) return;
+    editable = editor.isEditable;
+    render();
+  };
+  editor.on("update", onEditable);
+  editor.on("transaction", onEditable);
 
   return {
     dom,
@@ -78,6 +88,8 @@ function queryView(editor: Editor, initial: PMNode, getPos: () => number | undef
     stopEvent: (ev: Event) => !(ev.type.startsWith("drag") || ev.type === "drop"),
     ignoreMutation: () => true,
     destroy() {
+      editor.off("update", onEditable);
+      editor.off("transaction", onEditable);
       const r = root;
       root = null;
       // Not while React may be rendering (an update dispatched from it).

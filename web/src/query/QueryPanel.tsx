@@ -28,6 +28,7 @@ import {
   type QuerySpec,
   type Show,
 } from "./spec";
+import { TASKS_QUERY } from "./pinned";
 import { format, parse } from "./syntax";
 
 export type PanelTab = "conds" | "display" | "text";
@@ -36,6 +37,7 @@ const lang = () => (i18n.language?.startsWith("zh") ? "zh" : "en");
 
 /** Common queries for a new block (§2.1), as text. */
 const PRESETS: { id: string; text: string; tag?: boolean }[] = [
+  { id: "allOpen", text: TASKS_QUERY.open },
   { id: "aboutThis", text: "task:open (in:this OR links:this) sort:due,priority" },
   { id: "dueSoon", text: "task:open due:<=+7d group:day sort:due" },
   { id: "newCards", text: "show:cards created:-7d.. sort:-created" },

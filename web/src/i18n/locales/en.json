@@ -19,6 +19,7 @@
     "itemMenu": "More",
     "pin": "Pin",
     "unpin": "Unpin",
+    "pinOverdue": "Some are overdue",
     "topics": "Topics",
     "inbox": "Inbox",
     "tasks": "Tasks"
@@ -1106,6 +1107,8 @@
     "copyText": "Copy as text",
     "copied": "Query copied",
     "refresh": "Refresh",
+    "pinCard": "Pin this card",
+    "unpinCard": "Unpin this card",
     "delete": "Delete query",
     "menu": "Query options",
     "fold": "Collapse",
@@ -1154,6 +1157,7 @@
       "textTip": "For example: task:open #projectA due:<=+7d. ⌘↩ to finish"
     },
     "preset": {
+      "allOpen": "All open tasks",
       "aboutThis": "Open tasks about this card",
       "dueSoon": "Tasks due within 7 days",
       "newCards": "Cards created in the last 7 days",
@@ -1215,6 +1219,11 @@
   },
   "tasks": {
     "title": "Tasks",
+    "pinAsCard": "Save as a pinned card",
+    "pinTitleOpen": "Open tasks",
+    "pinTitleClosed": "Done tasks",
+    "pinned": "Made “{{title}}” and pinned it",
+    "pinnedOpen": "Open",
     "add": "Add a task",
     "addClose": "Close",
     "addPlaceholder": "What needs doing?",

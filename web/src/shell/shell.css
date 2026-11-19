@@ -60,6 +60,14 @@
 .nav-row > .nav-item { padding-right: 28px; }
 .nav-row-menu { position: absolute; top: 50%; right: 3px; width: 24px; height: 24px; transform: translateY(-50%); opacity: 0; }
 .nav-row:hover .nav-row-menu, .nav-row-menu[data-popup-open], .nav-row-menu:focus-visible { opacity: 1; }
+/* A pinned query's count turns red while some of its tasks are overdue. */
+.nav-item > .nav-count.late { color: #b5523f; }
+/* Pinned cards are dragged into order (Sidebar PinnedSection): the one
+   held follows the pointer, a line shows where it will land. */
+.pin-lifted { z-index: 2; pointer-events: none; }
+.pin-lifted > .nav-item { background: var(--paper); color: var(--text); box-shadow: 0 6px 18px rgb(0 0 0 / 0.16); }
+.pin-drop { height: 2px; margin: -1px 8px; border-radius: 1px; background: var(--accent); position: relative; z-index: 1; }
+.pin-dragging, .pin-dragging * { cursor: grabbing !important; user-select: none; -webkit-user-select: none; }
 /* Sub-topics sit under their topic, their icons under its name. A topic
    with sub-topics shows its fold arrow in place of its icon on hover, and
    while folded (so the hidden ones are not forgotten). */

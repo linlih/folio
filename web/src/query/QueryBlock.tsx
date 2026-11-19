@@ -4,12 +4,13 @@
 // was written.
 
 import { Menu } from "@base-ui/react/menu";
-import { ChevronRight, Filter, MoreHorizontal } from "lucide-react";
+import { ChevronRight, Filter, MoreHorizontal, Pin } from "lucide-react";
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { CardRow, QueryRows, TaskRow } from "../bindings/commands";
 import { byCard, Group } from "../card/Backlinks";
 import { CARDS_CHANGED } from "../card/actions";
+import { isPinned, pinQueryCard, setPin, usePins } from "../card/pins";
 import { cardName, openAt } from "../card/reveal";
 import { useTemplates } from "../card/templates";
 import { isJournalId, localDate } from "../docs/ids";
@@ -70,6 +71,7 @@ export function QueryBlock({
 
   const names = knownNames();
   const title = spec ? summary(spec, lang(), names) : "";
+  const pinned = usePins((s) => !!cardId && isPinned(s.cards, cardId));
 
   const empty = !!spec && spec.where.length === 0 && !spec.show;
   const load = useCallback(() => {
@@ -181,6 +183,16 @@ export function QueryBlock({
                 )}
                 <Menu.Item className="popup-item" onClick={copyText}>{t("query.copyText")}</Menu.Item>
                 <Menu.Item className="popup-item" onClick={load}>{t("query.refresh")}</Menu.Item>
+                {/* Its card in the sidebar, one click away (design/query.md §13). */}
+                {cardId && !isJournalId(cardId) && (
+                  <>
+                    <Menu.Separator className="popup-separator" />
+                    <Menu.Item className="popup-item" onClick={() => void (pinned ? setPin(cardId, false) : pinQueryCard(cardId, empty ? "" : title))}>
+                      <Pin size={14} />
+                      {t(pinned ? "query.unpinCard" : "query.pinCard")}
+                    </Menu.Item>
+                  </>
+                )}
                 {editable && (
                   <>
                     <Menu.Separator className="popup-separator" />

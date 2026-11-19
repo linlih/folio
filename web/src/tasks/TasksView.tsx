@@ -1,11 +1,13 @@
-import { Plus, SquareCheck, X } from "lucide-react";
+import { Pin, Plus, SquareCheck, X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { TaskRow } from "../bindings/commands";
-import { CARDS_CHANGED } from "../card/actions";
+import { appUndo } from "../app";
+import { CARDS_CHANGED, cardsChanged } from "../card/actions";
 import { localDate } from "../docs/ids";
 import { backend } from "../platform";
 import { EmptyState } from "../shell/EmptyState";
+import { newPinnedQueryCard, TASKS_QUERY } from "../query/pinned";
 import { useShell } from "../shell/tabs";
 import { groupTasks } from "./group";
 import { TaskCalendar } from "./TaskCalendar";
@@ -71,6 +73,31 @@ export function TasksView({ active = true }: { active?: boolean }) {
     setDay(d);
     setNewDate(d);
   };
+  // This tab as a card in the sidebar (design/query.md §13): one click to
+  // the list from anywhere, and a card to write around it.
+  const [pinning, setPinning] = useState(false);
+  const pinAsCard = async (m: "open" | "closed") => {
+    if (pinning) return;
+    setPinning(true);
+    const title = t(m === "open" ? "tasks.pinTitleOpen" : "tasks.pinTitleClosed");
+    try {
+      const id = await newPinnedQueryCard(title, TASKS_QUERY[m]);
+      const trash = async () => {
+        await backend.trashCard(id);
+        cardsChanged();
+      };
+      const restore = async () => {
+        await backend.restoreCard(id);
+        cardsChanged();
+      };
+      appUndo.push({ label: "pin", undo: trash, redo: restore });
+      setNotice(t("tasks.pinned", { title }), { undo: true, action: { label: t("tasks.pinnedOpen"), run: () => useShell.getState().open({ kind: "card", cardId: id }, title, false) } });
+    } catch (e) {
+      setNotice(t("error.generic", { message: String(e) }));
+    } finally {
+      setPinning(false);
+    }
+  };
   const item = (r: TaskRow) => <TaskItem key={`${r.cardId}/${r.bid}`} row={r} today={today} onChange={change(r)} />;
 
   return (
@@ -84,6 +111,11 @@ export function TasksView({ active = true }: { active?: boolean }) {
             </button>
           ))}
         </div>
+        {(mode === "open" || mode === "closed") && (
+          <button className="icon-button tasks-pin" title={t("tasks.pinAsCard")} aria-label={t("tasks.pinAsCard")} disabled={pinning} onClick={() => void pinAsCard(mode)}>
+            <Pin size={16} />
+          </button>
+        )}
         {mode !== "habits" && (
           <button
             className="icon-button tasks-add"

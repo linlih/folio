@@ -1,10 +1,10 @@
 import { Menu } from "@base-ui/react/menu";
-import { CalendarDays, ChevronRight, FileText, Layers, LayoutDashboard, Plus, Hash, LibraryBig, MoreHorizontal, PanelLeftClose, PanelLeftOpen, Search, SquarePen, SquareCheck, Trash2, Inbox } from "lucide-react";
+import { CalendarDays, ChevronRight, FileText, Filter, Layers, LayoutDashboard, Plus, Hash, LibraryBig, MoreHorizontal, PanelLeftClose, PanelLeftOpen, Search, SquarePen, SquareCheck, Trash2, Inbox } from "lucide-react";
 import { useInboxCount } from "../inbox/clip";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { TagInfo } from "../bindings/commands";
 import { CARDS_CHANGED, moveToTrash } from "../card/actions";
-import { isPinned, setPin, usePins, usePinsLoader } from "../card/pins";
+import { isPinned, movePin, setPin, usePins, usePinsLoader, type PinQuery } from "../card/pins";
 import { DOC_SAVED } from "../docs/persistence";
 import { newTopic, useBoards, useTopics, useTopicsLoader } from "../docs/topics";
 import { backend } from "../platform";
@@ -22,6 +22,113 @@ function Section({ title, children }: { title: string; children: ReactNode[] }) 
     <section className="nav-section">
       <h2>{title}</h2>
       {children}
+    </section>
+  );
+}
+
+/** A mouse moves this far before a press becomes a drag. */
+const DRAG_SLOP = 4;
+/** A finger holds still this long to pick a pin up (as the long press
+ *  that opens menus elsewhere, shell/longPress.ts); moving sooner scrolls. */
+const HOLD_MS = 450;
+const HOLD_SLOP = 10;
+
+/** Pinned cards, in the order the person drags them into: in the sidebar,
+ *  and on a phone (which has none) at the top of the card library. */
+export function PinnedSection({ active, className }: { active: string | null; className?: string }) {
+  const { t } = useTranslation();
+  const pins = usePins((s) => s.cards);
+  const queries = usePins((s) => s.queries);
+  const box = useRef<HTMLElement>(null);
+  const [drag, setDrag] = useState<{ id: string; dy: number; before: string | null } | null>(null);
+  const dragging = useRef(false);
+
+  // While a pin is lifted, the finger moves it rather than scrolling the
+  // sidebar: a listener that may cancel touchmove (React's is passive).
+  useEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    const stop = (e: TouchEvent) => dragging.current && e.cancelable && e.preventDefault();
+    el.addEventListener("touchmove", stop, { passive: false });
+    return () => el.removeEventListener("touchmove", stop);
+  }, [pins.length > 0]);
+
+  const start = (id: string) => (down: React.PointerEvent) => {
+    if (down.button !== 0 || !down.isPrimary || (down.target as Element).closest(".nav-row-menu")) return;
+    const touch = down.pointerType === "touch";
+    const rows = [...(box.current?.querySelectorAll<HTMLElement>("[data-pin]") ?? [])].map((el) => {
+      const r = el.getBoundingClientRect();
+      return { id: el.dataset.pin!, mid: r.top + r.height / 2 };
+    });
+    const x0 = down.clientX;
+    const y0 = down.clientY;
+    let lifted = false;
+    let before: string | null = null;
+    const lift = () => {
+      lifted = dragging.current = true;
+      document.documentElement.classList.add("pin-dragging");
+    };
+    const timer = touch ? setTimeout(lift, HOLD_MS) : undefined;
+    const move = (e: PointerEvent) => {
+      if (e.pointerId !== down.pointerId) return;
+      const far = Math.hypot(e.clientX - x0, e.clientY - y0);
+      if (!lifted) {
+        if (touch) return void (far > HOLD_SLOP && end());
+        if (far < DRAG_SLOP) return;
+        lift();
+      }
+      // The first row whose middle is below the pointer goes after it.
+      const next = rows.find((r) => r.id !== id && r.mid > e.clientY);
+      before = next?.id ?? null;
+      setDrag({ id, dy: e.clientY - y0, before });
+    };
+    const end = (e?: PointerEvent) => {
+      clearTimeout(timer);
+      window.removeEventListener("pointermove", move, true);
+      window.removeEventListener("pointerup", end, true);
+      window.removeEventListener("pointercancel", cancel, true);
+      document.documentElement.classList.remove("pin-dragging");
+      dragging.current = false;
+      setDrag(null);
+      if (!lifted) return;
+      // The press that dragged does not also open the card.
+      const swallow = (c: MouseEvent) => (c.preventDefault(), c.stopPropagation());
+      window.addEventListener("click", swallow, { capture: true, once: true });
+      setTimeout(() => window.removeEventListener("click", swallow, true), 0);
+      if (e && e.type === "pointerup") void movePin(id, before);
+    };
+    const cancel = () => end();
+    window.addEventListener("pointermove", move, true);
+    window.addEventListener("pointerup", end, true);
+    window.addEventListener("pointercancel", cancel, true);
+  };
+
+  if (pins.length === 0) return null;
+  // Where it would land; nothing shown where it already is.
+  const order = pins.map((c) => c.id);
+  const from = drag ? order.indexOf(drag.id) : -1;
+  const landing = drag && (drag.before === null ? order.length : order.indexOf(drag.before));
+  const shows = drag !== null && landing !== from && landing !== from + 1;
+  return (
+    <section className={`nav-section${className ? ` ${className}` : ""}`} ref={box}>
+      <h2>{t("nav.pinned")}</h2>
+      {pins.map((c) => (
+        <div key={c.id}>
+          {shows && drag.before === c.id && <div className="pin-drop" />}
+          <CardItem
+            cardId={c.id}
+            title={c.title}
+            active={active === `card:${c.id}`}
+            query={queries[c.id]}
+            drag={{
+              onPointerDown: start(c.id),
+              className: drag?.id === c.id ? "pin-lifted" : undefined,
+              style: drag?.id === c.id ? { transform: `translateY(${drag.dy}px)` } : undefined,
+            }}
+          />
+        </div>
+      ))}
+      {shows && drag.before === null && <div className="pin-drop" />}
     </section>
   );
 }
@@ -52,17 +159,36 @@ function useTags() {
 }
 
 /** A card in the sidebar (pinned or recent); its actions appear on hover. */
-function CardItem({ cardId, title, active }: { cardId: string; title: string | null; active: boolean }) {
+function CardItem({
+  cardId,
+  title,
+  active,
+  query,
+  drag,
+}: {
+  cardId: string;
+  title: string | null;
+  active: boolean;
+  /** A pinned card with a query block: what it finds. */
+  query?: PinQuery;
+  /** Pinned cards can be dragged into another order. */
+  drag?: { onPointerDown(e: React.PointerEvent): void; style?: React.CSSProperties; className?: string };
+}) {
   const { t } = useTranslation();
   const open = useShell((s) => s.open);
   const pins = usePins((s) => s.cards);
   const pinned = isPinned(pins, cardId);
   const shown = title || t("library.untitled");
   return (
-    <div className="nav-row">
+    <div className={`nav-row${drag?.className ? ` ${drag.className}` : ""}`} data-pin={drag ? cardId : undefined} style={drag?.style} onPointerDown={drag?.onPointerDown}>
       <button className="nav-item" aria-current={active ? "page" : undefined} onClick={(e) => open({ kind: "card", cardId }, title, toSide(e))}>
-        <FileText size={15} strokeWidth={1.75} />
+        {query ? <Filter size={15} strokeWidth={1.75} /> : <FileText size={15} strokeWidth={1.75} />}
         <span>{shown}</span>
+        {query && query.count !== null && (
+          <span className={`nav-count${query.overdue ? " late" : ""}`} title={query.overdue ? t("nav.pinOverdue") : undefined}>
+            {query.count}
+          </span>
+        )}
       </button>
       <Menu.Root>
         <Menu.Trigger className="icon-button nav-row-menu" aria-label={t("nav.itemMenu")} title={t("nav.itemMenu")}>
@@ -168,11 +294,7 @@ export function Sidebar() {
       {navItem({ kind: "boards" }, <LayoutDashboard size={15} strokeWidth={1.75} />, t("nav.boards"))}
 
       <div className="nav-scroll">
-        <Section title={t("nav.pinned")}>
-          {pins.map((c) => (
-            <CardItem key={c.id} cardId={c.id} title={c.title} active={active === `card:${c.id}`} />
-          ))}
-        </Section>
+        <PinnedSection active={active} />
         {/* Like pinned and tags: shown once there is a topic (they are made
             in the card library). */}
         {(topics.length > 0 || naming) && (

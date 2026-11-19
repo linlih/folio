@@ -137,7 +137,7 @@ const inTextField = (e: KeyboardEvent) =>
 
 export function AppShell() {
   const { t } = useTranslation();
-  const { panes, focused, split, notice, noticeUndo, setNotice, sidebarOpen } = useShell();
+  const { panes, focused, split, notice, noticeUndo, noticeAction, setNotice, sidebarOpen } = useShell();
   const main = useRef<HTMLElement>(null);
   const [narrow, setNarrow] = useState(false);
   const phone = usePhone();
@@ -223,6 +223,11 @@ export function AppShell() {
       {notice && (
         <div className="notice" role="status" onClick={() => setNotice(null)}>
           {notice}
+          {noticeAction && (
+            <button className="notice-undo" onClick={() => noticeAction.run()}>
+              {noticeAction.label}
+            </button>
+          )}
           {/* A button, not "press ⌘Z": a phone has no keys to press. */}
           {noticeUndo && (
             <button className="notice-undo" onClick={() => void appUndo.undo()}>
