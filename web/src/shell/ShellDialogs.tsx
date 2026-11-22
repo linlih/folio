@@ -1,6 +1,7 @@
 import { HistoryDialog } from "../card/HistoryDialog";
 import { McpApprovalDialog } from "../mcp/McpDialogs";
 import { SettingsDialog } from "../settings/SettingsDialog";
+import { StatsDialog } from "../stats/StatsDialog";
 import { ShortcutsDialog } from "./ShortcutsDialog";
 import { useShell } from "./tabs";
 
@@ -13,6 +14,8 @@ export function ShellDialogs() {
       return <SettingsDialog section={dialog.section} />;
     case "shortcuts":
       return <ShortcutsDialog />;
+    case "stats":
+      return <StatsDialog />;
     case "history":
       return <HistoryDialog cardId={dialog.cardId} />;
     case "mcpApproval":

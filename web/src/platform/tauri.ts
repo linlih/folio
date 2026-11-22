@@ -1,5 +1,5 @@
 import { Channel, convertFileSrc, invoke } from "@tauri-apps/api/core";
-import type { AppInfo, AssetInfo, BackupCopyStatus, BackupInfo, CopySuggestion, PickedCopyFolder, Backlink, BlockText, CardRow, JournalDay, McpStatus, SearchHit, SyncDevice, SyncStatus, TagInfo, TopicCount, CardText } from "../bindings/commands";
+import type { AppInfo, AssetInfo, BackupCopyStatus, BackupInfo, CopySuggestion, PickedCopyFolder, Backlink, BlockText, CardRow, JournalDay, LibraryStats, McpStatus, SearchHit, SyncDevice, SyncStatus, TagInfo, TopicCount, CardText } from "../bindings/commands";
 import type { AiKeyInfo, Backend, ExportResult } from "./backend";
 import i18n from "../i18n";
 import type { AiEvent, AiModelInfo, AiReply, AiTool } from "../ai/types";
@@ -31,6 +31,7 @@ export function tauriBackend(): Backend {
     query: (q) => invoke<QueryRows>("query", { q }),
     emptyTrash: () => invoke<string[]>("empty_trash"),
     journalDays: (from, to) => invoke<JournalDay[]>("journal_days", { from, to }),
+    libraryStats: (from) => invoke<LibraryStats>("library_stats", { from }),
     backlinks: (id) => invoke<Backlink[]>("backlinks", { id }),
     unlinkedReferences: (id, limit) => invoke<Backlink[]>("unlinked_references", { id, limit }),
     search: (query, limit, filter) => invoke<SearchHit[]>("search", { query, limit, filter }),

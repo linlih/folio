@@ -99,6 +99,30 @@ export interface TagCard {
   url: string | null;
 }
 
+/** The stats dialog's numbers (design/stats.md). */
+export interface LibraryStats {
+  /** Cards in the card library, as its header counts them. */
+  cards: number;
+  /** Words (docs/words.ts) in cards and journal days not in the trash. */
+  words: number;
+  /** Images and other files those cards use, and their size. */
+  files: number;
+  fileBytes: number;
+  /** Days a card was made or the journal written; the first of them. */
+  daysRecorded: number;
+  firstDay: string | null;
+  /** Those days from the asked date on, oldest first. */
+  heat: HeatDay[];
+  /** Databases, local files and backups; 0 where unknown. */
+  libraryBytes: number;
+}
+
+export interface HeatDay {
+  date: string;
+  cards: number;
+  journal: boolean;
+}
+
 export interface JournalDay {
   id: string;
   /** YYYY-MM-DD */

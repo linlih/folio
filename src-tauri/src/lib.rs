@@ -510,6 +510,12 @@ fn query(state: tauri::State<AppState>, q: folio_store::ResolvedQuery) -> CmdRes
     Ok(lock(&state)?.query(&q)?)
 }
 
+/// The stats dialog's numbers (design/stats.md); read-only.
+#[tauri::command]
+fn library_stats(state: tauri::State<AppState>, from: String) -> CmdResult<folio_store::LibraryStats> {
+    Ok(lock(&state)?.library_stats(&from)?)
+}
+
 #[tauri::command]
 fn journal_days(state: tauri::State<AppState>, from: String, to: String) -> CmdResult<Vec<JournalDay>> {
     Ok(lock(&state)?.journal_days(&from, &to)?)
@@ -1356,6 +1362,7 @@ pub fn run() {
             card_texts,
             pinned_cards,
             journal_days,
+            library_stats,
             backlinks,
             unlinked_references,
             search,

@@ -1,6 +1,6 @@
 import type { AssetEvent, AssetInfo, BackupInfo, McpStatus, SyncDevice, SyncStatus, TagInfo, TopicCount, CardText } from "../bindings/commands";
 import type { BackupCopyStatus, CopySuggestion, LatestRelease, LibraryLocation, PickedCopyFolder, PickedFolder } from "../bindings/commands";
-import type { AppInfo, Backlink, BlockText, CardRow, DocKind, JournalDay, SearchFilter, SearchHit } from "../bindings/commands";
+import type { AppInfo, Backlink, BlockText, CardRow, DocKind, JournalDay, LibraryStats, SearchFilter, SearchHit } from "../bindings/commands";
 import type { ClipInfo, InboxItem, LinkPreview, QueryRows, ResolvedQuery, TagCard, TaskRow } from "../bindings/commands";
 import type { AiEvent, AiModelInfo, AiProtocol, AiReply, AiTool, AiTurnRequest } from "../ai/types";
 import type { InboxPlace } from "../docs/card";
@@ -66,6 +66,8 @@ export interface Backend {
   tagCards(tag: string): Promise<TagCard[]>;
   /** Written journal days between two dates (inclusive), newest first. */
   journalDays(from: string, to: string): Promise<JournalDay[]>;
+  /** The stats dialog's numbers; the heat map from `from` (YYYY-MM-DD). */
+  libraryStats(from: string): Promise<LibraryStats>;
   /** Blocks in other cards that link to this card or reference its blocks. */
   backlinks(id: string): Promise<Backlink[]>;
   /** Blocks in other cards that mention this card's title without a link. */

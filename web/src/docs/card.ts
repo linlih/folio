@@ -7,6 +7,7 @@ import { APP_EDIT_ORIGIN } from "../vendor/loro-prosemirror";
 import { bodyTree } from "../vendor/loro-prosemirror/tree";
 import type { DayLine, DayPart } from "../bindings/commands";
 import { newBid } from "./ids";
+import { countWords } from "./words";
 
 export const META = "meta";
 
@@ -328,13 +329,12 @@ function inlineParts(inline: LoroMovableList): DayPart[] {
 export interface BodyFacts {
   headings: { bid: string; level: number; text: string }[];
   tags: string[];
-  /** Characters without whitespace (a fair measure for Chinese and English alike). */
-  chars: number;
-  blocks: number;
+  /** Chinese characters plus other words (docs/words.ts). */
+  words: number;
 }
 
 export function bodyFacts(doc: LoroDoc): BodyFacts {
-  const facts: BodyFacts = { headings: [], tags: [], chars: 0, blocks: 0 };
+  const facts: BodyFacts = { headings: [], tags: [], words: 0 };
   const tags = new Map<string, string>();
   const textOf = (n: Exclude<Json, string>) => {
     let s = "";
@@ -356,8 +356,7 @@ export function bodyFacts(doc: LoroDoc): BodyFacts {
       if (typeof child !== "object" || !child || inlineText(child) !== null) continue;
       if (child.nodeName === "paragraph" || child.nodeName === "heading" || child.nodeName === "codeBlock") {
         const text = textOf(child);
-        facts.blocks++;
-        facts.chars += [...text.replace(/\s/g, "")].length;
+        facts.words += countWords(text);
         const bid = String(child.attributes?.bid ?? "");
         if (child.nodeName === "heading" && bid && text.trim()) facts.headings.push({ bid, level: Number(child.attributes?.level ?? 1), text: text.trim() });
       } else walk(child);

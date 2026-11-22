@@ -114,10 +114,8 @@ function CardDetails({ cardId }: { cardId: string }) {
               <dd>{date(facts.createdAt)}</dd>
             </>
           )}
-          <dt>{t("panel.chars")}</dt>
-          <dd>{facts.chars.toLocaleString(i18n.language)}</dd>
-          <dt>{t("panel.blocks")}</dt>
-          <dd>{facts.blocks.toLocaleString(i18n.language)}</dd>
+          <dt>{t("panel.words")}</dt>
+          <dd>{facts.words.toLocaleString(i18n.language)}</dd>
           {topics.length > 0 && (
             <>
               <dt>{t("panel.topics")}</dt>

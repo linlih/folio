@@ -16,6 +16,7 @@ mod compact;
 mod query;
 mod repair;
 mod schema;
+mod stats;
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -30,6 +31,7 @@ pub use assets::{AssetInfo, Incoming, Swept};
 pub use backup::{BackupInfo, CardVersion};
 pub use compact::Compacted;
 pub use query::{QueryRows, ResolvedCond, ResolvedQuery};
+pub use stats::{HeatDay, LibraryStats};
 
 #[derive(Debug, thiserror::Error)]
 pub enum StoreError {

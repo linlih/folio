@@ -4,6 +4,7 @@ import { appendBlocks, bodyLines, dayLines, initCard, preview, readCardTopics, r
 import { isJournalId, journalDate, localDate, uuidv7 } from "../docs/ids";
 import { extractIndex } from "../docs/index";
 import { isBoardId } from "../docs/board";
+import { countWords } from "../docs/words";
 import { WORKSPACE_ID } from "../docs/workspace";
 import type { AiModelInfo } from "../ai/types";
 import type { Backend } from "./backend";
@@ -203,6 +204,27 @@ export function memoryBackend(now: () => number = Date.now): Backend {
         days.push({ id, date, text: bodyLines(e.doc).join("\n"), lines: dayLines(e.doc), updatedAt: e.updatedAt });
       }
       return days.sort((a, b) => (a.date < b.date ? 1 : -1));
+    },
+    // As folio-store's library_stats, without files or sizes (none here).
+    libraryStats: async (from) => {
+      const inTopic = (doc: LoroDoc) => readCardTopics(doc).length > 0;
+      const days = new Map<string, { cards: number; journal: boolean }>();
+      const at = (d: string) => days.get(d) ?? days.set(d, { cards: 0, journal: false }).get(d)!;
+      let cards = 0;
+      let words = 0;
+      for (const [id, e] of live()) {
+        const m = readMeta(e.doc);
+        const text = bodyLines(e.doc).join("\n");
+        words += countWords(text);
+        if (isJournalId(id)) {
+          if (text.trim()) at(journalDate(id)).journal = true;
+          continue;
+        }
+        if (!((m.inboxAt !== null || m.archivedAt !== null) && !inTopic(e.doc))) cards++;
+        if (m.createdAt !== null) at(localDate(new Date(m.createdAt))).cards++;
+      }
+      const all = [...days].sort(([a], [b]) => a.localeCompare(b)).map(([date, d]) => ({ date, ...d }));
+      return { cards, words, files: 0, fileBytes: 0, daysRecorded: all.length, firstDay: all[0]?.date ?? null, heat: all.filter((d) => d.date >= from), libraryBytes: 0 };
     },
     backlinks: async (id) => {
       const own = new Set(docs.has(id) ? extractIndex(docs.get(id)!.doc).blocks.map((b) => b.bid) : []);

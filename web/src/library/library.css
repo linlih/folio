@@ -243,3 +243,7 @@
 .library-pins .nav-item { padding: 9px 8px; font-size: 15px; color: var(--text); }
 .library-pins .nav-row-menu { display: none; }
 .library-pins .nav-row > .nav-item { padding-right: 8px; }
+
+/* The count opens the stats dialog (design/stats.md §3). */
+.library-stats-link { padding: 0; font: inherit; color: var(--muted); text-decoration: underline dashed color-mix(in srgb, var(--muted) 60%, transparent); text-underline-offset: 3px; cursor: pointer; }
+.library-stats-link:hover { color: var(--text); }

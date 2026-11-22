@@ -1,0 +1,55 @@
+/* The stats dialog (stats/StatsDialog.tsx, design/stats.md). */
+.dialog.stats-dialog:not(.phone) { width: min(600px, calc(100vw - 32px)); }
+.stats-scroll { min-height: 0; overflow-y: auto; }
+.dialog.stats-dialog.phone .stats-scroll { padding: 16px 18px 24px; }
+
+.stats-since { margin: 2px 0 18px; color: var(--muted); font-size: 12.5px; }
+
+/* The totals: type, not boxes. */
+.stats-totals { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-bottom: 22px; }
+.stats-totals > div { min-width: 0; padding: 0 14px; border-left: 1px solid var(--border); }
+.stats-totals > div:first-child { padding-left: 0; border-left: 0; }
+.stats-totals b { display: block; font: 500 30px/1.15 var(--font-body); letter-spacing: -0.01em; color: var(--text); font-variant-numeric: tabular-nums; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.stats-totals span { color: var(--muted); font-size: 12.5px; }
+.dialog.stats-dialog.phone .stats-totals b { font-size: 24px; }
+
+.stats-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin: 0 0 8px; font: 400 12px/1.4 var(--font-ui); color: var(--muted); }
+
+.stats-recent { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-bottom: 20px; }
+.stats-recent > div { min-width: 0; padding: 8px 10px; background: var(--surface); border-radius: 8px; }
+.stats-recent b { font: 600 17px/1.3 var(--font-ui); color: var(--text); font-variant-numeric: tabular-nums; }
+.stats-recent small { margin-left: 4px; font-size: 11.5px; color: var(--muted); }
+.stats-recent small.up { color: var(--accent); }
+.stats-recent span { display: block; color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.stats-range { display: inline-flex; padding: 1px; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; }
+.stats-range button { padding: 3px 8px; border: 0; border-radius: 5px; background: none; color: var(--muted); font: 11.5px/1.2 var(--font-ui); cursor: pointer; }
+.stats-range button[aria-pressed="true"] { background: var(--paper); color: var(--text); box-shadow: 0 1px 2px rgb(0 0 0 / 0.08); }
+
+/* One small calendar a month. */
+.stats-calendar { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 14px 18px; margin-bottom: 20px; }
+.stats-calendar h4 { margin: 0 0 4px; font: 500 11.5px/1.3 var(--font-ui); color: var(--secondary); }
+.stats-month { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 3px; }
+.stats-month i { display: block; aspect-ratio: 1; border-radius: 3px; background: color-mix(in srgb, var(--ink) 6%, var(--paper)); }
+.stats-month i.blank, .stats-month i.later { background: transparent; }
+.stats-month i.later { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 5%, var(--paper)); }
+.stats-month i.l1 { background: color-mix(in srgb, var(--accent) 28%, var(--paper)); }
+.stats-month i.l2 { background: color-mix(in srgb, var(--accent) 55%, var(--paper)); }
+.stats-month i.l3 { background: color-mix(in srgb, var(--accent) 85%, var(--paper)); }
+.stats-month i.today { outline: 1.5px solid var(--text); outline-offset: 1px; }
+
+.stats-topics { list-style: none; margin: 0 0 18px; padding: 0; }
+.stats-topics button { display: grid; grid-template-columns: 7em minmax(0, 1fr) 3em; align-items: center; gap: 10px; width: 100%; padding: 3px 4px; margin: 0 -4px; border: 0; border-radius: 5px; background: none; color: var(--text); font: 13px/1.5 var(--font-ui); text-align: left; cursor: pointer; }
+.stats-topics button:hover { background: var(--surface); }
+.stats-topics em { font-style: normal; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.stats-bar { height: 6px; min-width: 3px; border-radius: 3px; background: color-mix(in srgb, var(--accent) 45%, var(--paper)); }
+.stats-n { text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+.stats-usage { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; margin: 0; padding-top: 10px; border-top: 1px solid var(--border); color: var(--muted); font-size: 12px; }
+
+/* The day under the pointer, above it; kept inside the dialog. */
+.stats-calendar { position: relative; }
+.stats-tip { position: absolute; z-index: 2; transform: translate(-50%, calc(-100% - 6px)); padding: 4px 8px; border-radius: 6px; background: var(--ink); color: var(--paper); font: 12px/1.4 var(--font-ui); white-space: nowrap; pointer-events: none; box-shadow: 0 2px 8px rgb(0 0 0 / 0.15); }
+.stats-tip.start { transform: translate(-10px, calc(-100% - 6px)); }
+.stats-tip.end { transform: translate(calc(-100% + 10px), calc(-100% - 6px)); }
+.stats-month i[data-date] { cursor: default; }

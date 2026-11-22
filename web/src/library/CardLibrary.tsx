@@ -239,7 +239,14 @@ export function CardLibrary({ active = true }: { active?: boolean }) {
     <div className={`page library${query.view === "grid" ? " grid-view" : ""}`}>
       <header className="page-header">
         {topic ? <TopicHeader topicId={topic} onNewSub={() => setAddingSub(true)} /> : <h1>{t("library.title")}</h1>}
-        {cards && <span className="page-meta">{t("library.count", { count: topic ? (deepByTopic.get(topic)?.length ?? 0) : cards.length })}</span>}
+        {cards &&
+          (topic ? (
+            <span className="page-meta">{t("library.count", { count: deepByTopic.get(topic)?.length ?? 0 })}</span>
+          ) : (
+            <button className="page-meta library-stats-link" title={t("stats.open")} onClick={() => useShell.getState().setDialog({ kind: "stats" })}>
+              {t("library.count", { count: cards.length })}
+            </button>
+          ))}
         <span className="library-header-actions">
           {empties.length > 0 && (
             <button className="button library-clean" title={t("library.cleanEmptyHint")} aria-label={t("library.cleanEmpty", { count: empties.length })} onClick={() => void moveManyToTrash(empties)}>
