@@ -20,6 +20,7 @@ import { BlockSelection, OutlinerKeys } from "./outliner/keys";
 import { OutlinePaste } from "./outliner/paste";
 import { Suggestions } from "./outliner/suggest";
 import { OutlineTasks } from "./outliner/tasks";
+import { DomSelection } from "./domSelection";
 import { PasteIds } from "./pasteIds";
 import { TableKeys, TableNodes } from "./table";
 
@@ -100,5 +101,6 @@ export function baseExtensions(isRemote: RemoteTxPredicate, placeholder = "", mo
     RevealBlock,
     BlockId(isRemote),
     PasteIds,
+    DomSelection,
   ];
 }
