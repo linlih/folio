@@ -112,3 +112,8 @@
 .backlink-fold svg { transition: transform 0.12s; }
 .backlink-fold svg.open { transform: rotate(90deg); }
 .backlink-count { margin-left: 6px; color: var(--muted); font: 12px var(--font-ui); }
+
+/* A card still open while in the trash (CardView). */
+.card-trashed { display: flex; align-items: center; gap: 8px; margin: 0 0 14px; padding: 8px 10px 8px 12px; border-radius: var(--radius); background: color-mix(in srgb, #b5523f 9%, transparent); color: #9a4434; font-size: 13.5px; }
+.card-trashed span { flex: 1; min-width: 0; }
+.card-trashed .button { flex: none; }

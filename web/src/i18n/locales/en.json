@@ -19,6 +19,7 @@
     "itemMenu": "More",
     "pin": "Pin",
     "unpin": "Unpin",
+    "pinRestored": "Restored from the trash and pinned",
     "pinOverdue": "Some are overdue",
     "topics": "Topics",
     "inbox": "Inbox",
@@ -74,7 +75,8 @@
     "titlePlaceholder": "Untitled",
     "bodyPlaceholder": "Write something, or press / for commands",
     "extract": "Extract to card",
-    "menu": "Card actions"
+    "menu": "Card actions",
+    "inTrash": "This card is in the trash: it is not in the card library, search or pinned cards."
   },
   "journal": {
     "placeholder": "Write about today…",

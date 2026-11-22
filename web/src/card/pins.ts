@@ -92,11 +92,27 @@ export const usePins = create<Pins>((set) => ({
 
 export const isPinned = (cards: CardRow[], id: string) => cards.some((c) => c.id === id);
 
+/** Whether the card is in the trash (as its open replica says). */
+async function inTrash(cardId: string): Promise<boolean> {
+  const hub = docs();
+  const h = await hub.open(cardId);
+  try {
+    return readMeta(h.doc).deletedAt !== null;
+  } finally {
+    await hub.release(cardId);
+  }
+}
+
 export async function setPin(cardId: string, pinned: boolean) {
   try {
+    // A card in the trash is never listed: pinning one (it was open in a
+    // tab, say) takes it out of the trash first, and says so.
+    const restore = pinned && (await inTrash(cardId));
+    if (restore) await backend.restoreCard(cardId);
     // The host edits the card; an open replica takes the change in.
     await backend.pinCard(cardId, pinned);
     await docs().refresh([cardId]);
+    if (restore) useShell.getState().setNotice(i18n.t("nav.pinRestored"));
   } catch (e) {
     useShell.getState().setNotice(i18n.t("error.generic", { message: String(e) }));
   }

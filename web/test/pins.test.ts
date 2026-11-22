@@ -111,4 +111,14 @@ describe("pinned query cards", () => {
     await movePin(ids.at(-1)!, ids[1]);
     expect(await pinnedTitles()).toEqual([titles[0], titles.at(-1), ...titles.slice(1, -1)]);
   });
+
+  it("take a card out of the trash when it is pinned there (open in a tab)", async () => {
+    const { setPin } = await import("../src/card/pins");
+    const id = await backend.createCard("普通人如何做小红书");
+    await backend.trashCard(id);
+    await docs().refresh([id]);
+    await setPin(id, true);
+    expect((await backend.listTrash(50)).some((c) => c.id === id)).toBe(false);
+    expect((await backend.pinnedCards()).some((c) => c.id === id)).toBe(true);
+  });
 });

@@ -19,6 +19,7 @@
     "itemMenu": "更多操作",
     "pin": "置顶",
     "unpin": "取消置顶",
+    "pinRestored": "已从回收站恢复并置顶",
     "pinOverdue": "有过期的任务",
     "topics": "主题",
     "inbox": "收集箱",
@@ -74,7 +75,8 @@
     "titlePlaceholder": "无标题",
     "bodyPlaceholder": "写点什么，或按 / 插入",
     "extract": "提炼成卡片",
-    "menu": "卡片操作"
+    "menu": "卡片操作",
+    "inTrash": "这张卡片在回收站里，不会出现在卡片库、搜索和置顶里。"
   },
   "journal": {
     "placeholder": "记下今天的事…",

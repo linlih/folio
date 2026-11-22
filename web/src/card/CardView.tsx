@@ -1,6 +1,7 @@
 import { Menu } from "@base-ui/react/menu";
-import { MoreHorizontal } from "lucide-react";
+import { MoreHorizontal, Trash2 } from "lucide-react";
 import { isPinned, setPin, usePins } from "./pins";
+import { cardsChanged } from "./actions";
 import { isTemplate, markTemplate, useTemplates } from "./templates";
 import { TopicRow } from "./TopicRow";
 import { ClipSource } from "./ClipSource";
@@ -124,6 +125,8 @@ export function CardView({ cardId, pane, active = true }: { cardId: string; pane
   const inPanel = useShell((s) => s.panelOpen && s.focused === pane && focusedPane(s).active === `card:${cardId}`);
   const [handle, setHandle] = useState<DocHandle | null>(null);
   const [title, setTitleState] = useState("");
+  /** In the trash (here, or moved there on another device while open). */
+  const [trashed, setTrashed] = useState(false);
   const editor = useRef<Editor | null>(null);
   const titleRef = useRef<HTMLTextAreaElement | null>(null);
 
@@ -145,11 +148,13 @@ export function CardView({ cardId, pane, active = true }: { cardId: string; pane
       if (cancelled) return;
       setHandle(h);
       setTitleState(readMeta(h.doc).title);
+      setTrashed(readMeta(h.doc).deletedAt !== null);
       // The title edited elsewhere: the same card in the other pane, or
       // another device.
       unsubscribe = h.doc.subscribe(() => {
-        const next = readMeta(h.doc).title;
-        setTitleState((prev) => (prev === next ? prev : next));
+        const meta = readMeta(h.doc);
+        setTitleState((prev) => (prev === meta.title ? prev : meta.title));
+        setTrashed(meta.deletedAt !== null);
       });
     }, () => {});
     return () => {
@@ -200,8 +205,31 @@ export function CardView({ cardId, pane, active = true }: { cardId: string; pane
     continueAtEnd(editor.current, false);
   }
 
+  async function restore() {
+    try {
+      await backend.restoreCard(cardId);
+      await docs().refresh([cardId]);
+    } catch (e) {
+      useShell.getState().setNotice(t("error.generic", { message: String(e) }));
+      return;
+    }
+    useShell.getState().setNotice(t("trash.restored", { title: title || t("library.untitled") }));
+    cardsChanged();
+  }
+
   return (
     <div className="page card-page">
+      {/* Still open, but in the trash: say so, and how to get it back. It
+          is not in the library, search or pinned cards until then. */}
+      {handle && trashed && (
+        <div className="card-trashed" role="status">
+          <Trash2 size={15} />
+          <span>{t("card.inTrash")}</span>
+          <button className="button" onClick={() => void restore()}>
+            {t("trash.restore")}
+          </button>
+        </div>
+      )}
       {handle && (
         <div className="card-title-row" data-page-title>
           <textarea
