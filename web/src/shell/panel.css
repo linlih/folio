@@ -19,9 +19,6 @@
 .details-section-head:hover { color: var(--text); }
 .details-section-head svg { transition: transform 0.12s; }
 .details-section-head svg.open { transform: rotate(90deg); }
-.details-outline { list-style: none; margin: 0 0 6px; padding: 0; }
-.details-outline button { display: block; width: 100%; padding: 3px 8px; border-radius: var(--radius); text-align: left; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.details-outline button:hover { background: var(--hover); }
 /* Backlinks as at the foot of a card, made to fit a narrow column. */
 .details-backlinks .backlinks { max-width: none; margin: 0; padding: 0 4px; border: 0; }
 .details-backlinks .backlinks > h2 { display: none; }

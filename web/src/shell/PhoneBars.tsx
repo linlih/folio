@@ -1,5 +1,6 @@
 import type { Editor } from "@tiptap/core";
-import { ArrowDown, ArrowUp, CalendarDays, ChevronLeft, ChevronsDownUp, Hash, ImagePlus, IndentDecrease, IndentIncrease, Keyboard, LayoutDashboard, LibraryBig, Redo2, Search, Settings, Slash, Sparkles, SquareCheck, SquarePen, Undo2, Inbox } from "lucide-react";
+import { ArrowDown, ArrowUp, CalendarDays, ChevronLeft, ChevronsDownUp, Hash, ImagePlus, IndentDecrease, IndentIncrease, Keyboard, LayoutDashboard, LibraryBig, Redo2, Search, Settings, Slash, Sparkles, SquareCheck, SquarePen, TableOfContents, Undo2, Inbox } from "lucide-react";
+import { setTocSheet, tocSlot, useTocOffered } from "../card/tocState";
 import { useInboxCount } from "../inbox/clip";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -68,6 +69,18 @@ export function goBackFrom(pane: Pane): boolean {
 
 /** The bar at the top of a pane on a phone, in place of the tab bar:
  *  Back on a page opened from another, the page's name, and settings. */
+/** A card's table of contents, from two headings on (card/Toc.tsx). */
+function TocButton({ pane, cardId }: { pane: string; cardId: string }) {
+  const { t } = useTranslation();
+  const key = tocSlot(pane, cardId);
+  if (!useTocOffered(key)) return null;
+  return (
+    <button className="icon-button phone-toc" aria-label={t("panel.outline")} title={t("panel.outline")} onClick={() => setTocSheet(key)}>
+      <TableOfContents size={19} />
+    </button>
+  );
+}
+
 export function PhoneTopBar({ pane }: { pane: Pane }) {
   const { t } = useTranslation();
   const label = useTabLabel();
@@ -88,6 +101,7 @@ export function PhoneTopBar({ pane }: { pane: Pane }) {
       )}
       {/* A whiteboard and a topic show their own names, on the page. */}
       <span className="phone-title">{root || tab.target.kind === "board" ? "" : label(tab)}</span>
+      {tab.target.kind === "card" && <TocButton pane={pane.id} cardId={tab.target.cardId} />}
       {root && (
         <button className="icon-button" aria-label={t("ai.open")} title={t("ai.open")} onClick={() => useShell.getState().setChatOpen(true)}>
           <Sparkles size={18} />

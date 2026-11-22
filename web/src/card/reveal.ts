@@ -2,20 +2,26 @@
 // reference): the card's tab scrolls the block into view and flashes it.
 
 import type { EditorView } from "@tiptap/pm/view";
-import { flashBlock } from "../editor/reveal";
+import { flashBlock, type RevealAlign } from "../editor/reveal";
 import i18n from "../i18n";
 import { isJournalId, journalDate } from "../docs/ids";
 import { jumpToDay } from "../shell/journalJump";
 import { useShell } from "../shell/tabs";
 
+/** A block to show and where it lands. */
+export interface Reveal {
+  bid: string;
+  align: RevealAlign;
+}
+
 /** Blocks waiting to be shown, by pane and card. */
-const pending = new Map<string, string>();
+const pending = new Map<string, Reveal>();
 const EVENT = "folio:reveal-block";
 const slot = (pane: string, cardId: string) => `${pane}\n${cardId}`;
 
 /** Opens the card (in the other pane with `side`) and, when given, scrolls
- *  to the block. */
-export function openAt(cardId: string, title: string | null, bid?: string | null, side = false) {
+ *  to the block: to the middle, or the top with `align` "start". */
+export function openAt(cardId: string, title: string | null, bid?: string | null, side = false, align: RevealAlign = "center") {
   const shell = useShell.getState();
   // A journal day: the journal, at that day and block (shell/journalJump.ts).
   if (isJournalId(cardId)) {
@@ -26,24 +32,24 @@ export function openAt(cardId: string, title: string | null, bid?: string | null
   shell.open({ kind: "card", cardId }, title, side);
   if (!bid) return;
   const pane = useShell.getState().focused;
-  pending.set(slot(pane, cardId), bid);
+  pending.set(slot(pane, cardId), { bid, align });
   window.dispatchEvent(new CustomEvent(EVENT, { detail: { pane, cardId } }));
 }
 
 /** For a card view: takes the block waiting to be revealed, if any. */
-export function takePending(pane: string, cardId: string): string | null {
+export function takePending(pane: string, cardId: string): Reveal | null {
   const key = slot(pane, cardId);
-  const bid = pending.get(key) ?? null;
+  const at = pending.get(key) ?? null;
   pending.delete(key);
-  return bid;
+  return at;
 }
 
-export function onReveal(pane: string, cardId: string, f: (bid: string) => void) {
+export function onReveal(pane: string, cardId: string, f: (at: Reveal) => void) {
   const listener = (e: Event) => {
     const d = (e as CustomEvent).detail;
     if (d?.cardId !== cardId || d?.pane !== pane) return;
-    const bid = takePending(pane, cardId);
-    if (bid) f(bid);
+    const at = takePending(pane, cardId);
+    if (at) f(at);
   };
   window.addEventListener(EVENT, listener);
   return () => window.removeEventListener(EVENT, listener);
@@ -52,8 +58,8 @@ export function onReveal(pane: string, cardId: string, f: (bid: string) => void)
 /** Scrolls an editor's block into view and flashes it. The flash is a
  *  decoration (editor/reveal.ts), so it survives ProseMirror redrawing the
  *  block right after the tab opens. */
-export function revealIn(view: EditorView, bid: string) {
-  flashBlock(view, bid);
+export function revealIn(view: EditorView, at: Reveal) {
+  flashBlock(view, at.bid, at.align);
 }
 
 /** A card's name for lists: its title, a journal day's date, or "Untitled". */

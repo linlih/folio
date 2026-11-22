@@ -10,7 +10,7 @@ import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { Extension, type Editor } from "@tiptap/core";
 import { docs } from "../app";
-import { readMeta, setTitle } from "../docs/card";
+import { bodyFacts, readMeta, setTitle } from "../docs/card";
 import type { DocHandle } from "../docs/hub";
 import { CardEditor, focusEditor } from "../editor/CardEditor";
 import { extractExtension } from "../editor/extract";
@@ -22,6 +22,9 @@ import { downloadCardFiles } from "../editor/assets";
 import { backend } from "../platform";
 import { usePhone } from "../shell/phone";
 import { onReveal, revealIn, takePending } from "./reveal";
+import { TocSheet, type Heading } from "./Toc";
+import { offerToc, setTocSheet, tocSlot, useHeadingTracker, useTocSheetOpen } from "./tocState";
+import type { EditorView } from "@tiptap/pm/view";
 import { canExportPdf, exportPdf } from "../print/print";
 import { TitleChange } from "../ai/ReviewBar";
 import "./card.css";
@@ -58,7 +61,7 @@ function titleEdge(toTitle: () => void) {
 
 /** The card's actions, behind "⋯" at the end of the title line (also in
  *  the card tab's right-click menu). */
-function CardMenu({ cardId, title }: { cardId: string; title: string }) {
+function CardMenu({ cardId, title, onToc }: { cardId: string; title: string; onToc?: () => void }) {
   const { t } = useTranslation();
   const pinned = usePins((s) => isPinned(s.cards, cardId));
   const template = useTemplates((s) => isTemplate(s.ids, cardId));
@@ -79,6 +82,14 @@ function CardMenu({ cardId, title }: { cardId: string; title: string }) {
       <Menu.Portal>
         <Menu.Positioner side="bottom" align="end" sideOffset={4}>
           <Menu.Popup className="popup">
+            {onToc && (
+              <>
+                <Menu.Item className="popup-item" onClick={onToc}>
+                  {t("panel.outline")}
+                </Menu.Item>
+                <Menu.Separator className="popup-separator" />
+              </>
+            )}
             <Menu.Item className="popup-item" onClick={() => void setPin(cardId, !pinned)}>
               {t(pinned ? "nav.unpin" : "nav.pin")}
             </Menu.Item>
@@ -118,6 +129,27 @@ function CardMenu({ cardId, title }: { cardId: string; title: string }) {
   );
 }
 
+/** On a phone, the card's headings for its table of contents (the ⋯ menu
+ *  offers it from two on), kept current once edits settle. */
+function usePhoneHeadings(handle: DocHandle | null): Heading[] {
+  const [headings, setHeadings] = useState<Heading[]>([]);
+  useEffect(() => {
+    if (!handle) return setHeadings([]);
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const read = () => setHeadings(bodyFacts(handle.doc).headings);
+    read();
+    const unsubscribe = handle.doc.subscribe(() => {
+      clearTimeout(timer);
+      timer = setTimeout(read, 300);
+    });
+    return () => {
+      clearTimeout(timer);
+      unsubscribe();
+    };
+  }, [handle]);
+  return headings;
+}
+
 /** A card in its own tab: title, then the body. */
 export function CardView({ cardId, pane, active = true }: { cardId: string; pane: string; active?: boolean }) {
   const { t } = useTranslation();
@@ -129,9 +161,24 @@ export function CardView({ cardId, pane, active = true }: { cardId: string; pane
   const [trashed, setTrashed] = useState(false);
   const editor = useRef<Editor | null>(null);
   const titleRef = useRef<HTMLTextAreaElement | null>(null);
+  const root = useRef<HTMLDivElement>(null);
+  const [view, setView] = useState<EditorView | null>(null);
+  const phone = usePhone();
+  const headings = usePhoneHeadings(phone ? handle : null);
+  const tocKey = tocSlot(pane, cardId);
+  const tocOpen = useTocSheetOpen(tocKey);
+  const tocOffered = headings.length >= 2;
+  // The phone's top bar offers it too, reachable anywhere down the card.
+  useEffect(() => {
+    offerToc(tocKey, tocOffered);
+    return () => offerToc(tocKey, false);
+  }, [tocKey, tocOffered]);
 
-  // A backlink or search hit asked to show a block of this (open) card.
-  useEffect(() => onReveal(pane, cardId, (bid) => editor.current && revealIn(editor.current.view, bid)), [pane, cardId]);
+  // A backlink, search hit or the table of contents asked to show a block
+  // of this (open) card.
+  useEffect(() => onReveal(pane, cardId, (at) => editor.current && revealIn(editor.current.view, at)), [pane, cardId]);
+  // Which heading is being read, for the table of contents.
+  useHeadingTracker(pane, cardId, view, root, active);
 
   const toTitle = () => {
     const el = titleRef.current;
@@ -218,7 +265,7 @@ export function CardView({ cardId, pane, active = true }: { cardId: string; pane
   }
 
   return (
-    <div className="page card-page">
+    <div className="page card-page" ref={root}>
       {/* Still open, but in the trash: say so, and how to get it back. It
           is not in the library, search or pinned cards until then. */}
       {handle && trashed && (
@@ -243,7 +290,7 @@ export function CardView({ cardId, pane, active = true }: { cardId: string; pane
             autoFocus={!title}
             spellCheck={false}
           />
-          <CardMenu cardId={cardId} title={title} />
+          <CardMenu cardId={cardId} title={title} onToc={tocOffered ? () => setTocSheet(tocKey) : undefined} />
         </div>
       )}
       {handle && <TitleChange cardId={cardId} />}
@@ -258,13 +305,15 @@ export function CardView({ cardId, pane, active = true }: { cardId: string; pane
           extensions={(h) => [extractExtension(h), titleEdge(toTitle)]}
           onReady={(e) => {
             editor.current = e;
-            const bid = takePending(pane, cardId);
-            if (bid) setTimeout(() => revealIn(e.view, bid), 50);
+            setView(e.view);
+            const at = takePending(pane, cardId);
+            if (at) setTimeout(() => revealIn(e.view, at), 50);
           }}
         />
       </div>
       {/* Shown in the details panel instead while it is about this card. */}
       {!inPanel && <Backlinks cardId={cardId} active={active} />}
+      {tocOpen && <TocSheet cardId={cardId} title={title} pane={pane} headings={headings} onClose={() => setTocSheet(null)} />}
     </div>
   );
 }

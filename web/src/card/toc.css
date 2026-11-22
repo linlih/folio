@@ -1,0 +1,49 @@
+/* The table of contents (card/Toc.tsx, design/toc.md): a hairline at the
+   left, the section being read a short accent segment on it that glides
+   to its row. Levels step by indent, size and colour, not bullets. */
+.toc { position: relative; list-style: none; margin: 2px 0 8px 4px; padding: 0 0 0 1px; }
+.toc::before { content: ""; position: absolute; left: 0; top: 2px; bottom: 2px; width: 1px; background: var(--border); }
+.toc-mark {
+  position: absolute; left: -0.5px; top: 0; width: 2px; border-radius: 1px; background: var(--accent);
+  transition: transform 0.22s cubic-bezier(0.2, 0.7, 0.2, 1), height 0.22s, opacity 0.15s;
+}
+.toc button {
+  display: block; width: 100%; padding: 4px 8px 4px 12px; border-radius: 0 var(--radius) var(--radius) 0;
+  font: inherit; line-height: 20px; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  transition: color 0.15s, background-color 0.15s;
+}
+.toc button:hover { background: var(--hover); color: var(--text); }
+.toc-d0 button { color: var(--text); font-weight: 500; }
+.toc-d1 button { padding-left: 24px; color: var(--secondary); font-size: 12.5px; }
+.toc-d2 button { padding-left: 36px; color: var(--muted); font-size: 12.5px; }
+.toc-d0 + .toc-d0 { margin-top: 4px; }
+.toc li.current button { color: var(--accent); }
+
+/* A heading picked there lands a little below the top edge. */
+.ProseMirror :is(h1, h2, h3, h4)[data-bid] { scroll-margin-top: 20px; }
+
+/* The phone sheet. */
+.toc-sheet-back { position: fixed; z-index: 60; inset: 0; display: flex; align-items: flex-end; background: rgb(0 0 0 / 0.2); animation: toc-fade 0.18s ease-out; }
+.toc-sheet {
+  box-sizing: border-box; display: flex; flex-direction: column; width: 100%; max-height: 70dvh; outline: none;
+  padding: 0 8px calc(12px + var(--safe-bottom)); border-top: 1px solid var(--border); border-radius: 14px 14px 0 0; background: var(--popup);
+  transition: transform 0.2s ease-out; animation: toc-rise 0.22s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+.toc-sheet-head { flex: none; padding: 8px 12px 10px; touch-action: none; }
+.toc-sheet-grab { display: block; width: 36px; height: 5px; margin: 0 auto 12px; border-radius: 3px; background: color-mix(in srgb, var(--ink) 16%, var(--popup)); }
+.toc-sheet-head h2 { margin: 0; font: 600 16px/1.3 var(--font-ui); color: var(--text); }
+.toc-sheet-body { min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding-left: 12px; }
+.toc-sheet .toc { margin-left: 0; font-size: 15.5px; }
+.toc-sheet .toc button { padding: 6px 12px 6px 16px; line-height: 22px; }
+/* No hover on a phone to show a long title whole: two lines, then cut. */
+.toc-sheet .toc button { white-space: normal; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.toc-sheet .toc-d1 button, .toc-sheet .toc-d2 button { font-size: 15px; }
+.toc-sheet .toc-d1 button { padding-left: 30px; }
+.toc-sheet .toc-d2 button { padding-left: 44px; }
+.toc-sheet .toc-d0 + .toc-d0 { margin-top: 6px; }
+@keyframes toc-fade { from { opacity: 0; } }
+@keyframes toc-rise { from { transform: translateY(40%); opacity: 0.6; } }
+@media (prefers-reduced-motion: reduce) {
+  .toc-mark, .toc-sheet { transition: none; }
+  .toc-sheet-back, .toc-sheet { animation: none; }
+}

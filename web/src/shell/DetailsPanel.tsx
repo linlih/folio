@@ -1,9 +1,9 @@
 import { ChevronRight, PanelRightClose } from "lucide-react";
-import { useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { docs } from "../app";
 import { Backlinks } from "../card/Backlinks";
-import { openAt } from "../card/reveal";
+import { TocList } from "../card/Toc";
 import { bodyFacts, readCardTopics, readMeta, type BodyFacts } from "../docs/card";
 import { topicPath, useTopics } from "../docs/topics";
 import { keyLabel, PANEL_COMBO, togglePanel } from "./shortcuts";
@@ -79,10 +79,11 @@ function useFacts(cardId: string) {
 function CardDetails({ cardId }: { cardId: string }) {
   const { t, i18n } = useTranslation();
   const facts = useFacts(cardId);
+  const pane = useShell((s) => s.focused);
+  const scroller = useCallback(() => document.querySelector<HTMLElement>(".details-body"), []);
   const allTopics = useTopics((s) => s.topics);
   if (!facts) return null;
   const topics = facts.topics.map((id) => ({ id, name: topicPath(allTopics, id) })).filter((x) => x.name !== null);
-  const top = Math.min(...facts.headings.map((h) => h.level));
   const date = (ms: number) => new Intl.DateTimeFormat(i18n.language, { dateStyle: "medium", timeStyle: "short" }).format(ms);
   return (
     <>
@@ -90,15 +91,7 @@ function CardDetails({ cardId }: { cardId: string }) {
         {facts.headings.length === 0 ? (
           <p className="details-empty">{t("panel.noHeadings")}</p>
         ) : (
-          <ul className="details-outline">
-            {facts.headings.map((h) => (
-              <li key={h.bid} style={{ paddingLeft: (h.level - top) * 14 }}>
-                <button onClick={() => openAt(cardId, facts.title, h.bid)} title={h.text}>
-                  {h.text}
-                </button>
-              </li>
-            ))}
-          </ul>
+          <TocList cardId={cardId} title={facts.title} pane={pane} headings={facts.headings} scroller={scroller} />
         )}
       </Section>
       <Section title={t("panel.backlinks")}>
